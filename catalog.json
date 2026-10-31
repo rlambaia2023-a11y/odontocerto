@@ -1,0 +1,618 @@
+[
+ {
+  "id": "mat-drive-000",
+  "arquivo": "mat-drive-000.pdf",
+  "titulo": "Farmacologia dos anestésicos locais - Anestesiologia em Odontologia",
+  "materia": "Anestesiologia",
+  "paginas": 6,
+  "tamanhoMB": 2.0
+ },
+ {
+  "id": "mat-drive-001",
+  "arquivo": "mat-drive-001.pdf",
+  "titulo": "Nervo Trigêmio - Anestesiologia em Odontologia",
+  "materia": "Anestesiologia",
+  "paginas": 6,
+  "tamanhoMB": 5.1
+ },
+ {
+  "id": "mat-drive-002",
+  "arquivo": "mat-drive-002.pdf",
+  "titulo": "Neurofisiologia - Anestesiologia",
+  "materia": "Anestesiologia",
+  "paginas": 7,
+  "tamanhoMB": 2.2
+ },
+ {
+  "id": "mat-drive-003",
+  "arquivo": "mat-drive-003.pdf",
+  "titulo": "Seringas, Agulhas e Tubetes - Anestesiologia em Odontologia",
+  "materia": "Anestesiologia",
+  "paginas": 5,
+  "tamanhoMB": 2.0
+ },
+ {
+  "id": "mat-drive-004",
+  "arquivo": "mat-drive-004.pdf",
+  "titulo": "Técnicas Anestésicas - Anestesiologia",
+  "materia": "Anestesiologia",
+  "paginas": 12,
+  "tamanhoMB": 8.9
+ },
+ {
+  "id": "mat-drive-005",
+  "arquivo": "mat-drive-005.pdf",
+  "titulo": "Vascularização da Face - Anestesiologia em Odontologia",
+  "materia": "Anestesiologia",
+  "paginas": 5,
+  "tamanhoMB": 2.3
+ },
+ {
+  "id": "mat-drive-006",
+  "arquivo": "mat-drive-006.pdf",
+  "titulo": "Pontos importantes para realizar uma anestesia - Anestesiologia",
+  "materia": "Anestesiologia",
+  "paginas": 6,
+  "tamanhoMB": 3.0
+ },
+ {
+  "id": "mat-drive-007",
+  "arquivo": "mat-drive-007.pdf",
+  "titulo": "Fundamentos da cirurgia - Cirurgia Oral",
+  "materia": "Cirurgia Oral",
+  "paginas": 18,
+  "tamanhoMB": 1.8
+ },
+ {
+  "id": "mat-drive-008",
+  "arquivo": "mat-drive-008.pdf",
+  "titulo": "Manejo de Exodontias Complexas - Dentes Retidos - Cirurgia",
+  "materia": "Cirurgia Oral",
+  "paginas": 23,
+  "tamanhoMB": 3.3
+ },
+ {
+  "id": "mat-drive-009",
+  "arquivo": "mat-drive-009.pdf",
+  "titulo": "Tratamento Cirúrgico Radical de Dentes Retidos - Cirurgia Buco Maxilo Facial",
+  "materia": "Cirurgia Oral",
+  "paginas": 29,
+  "tamanhoMB": 5.4
+ },
+ {
+  "id": "mat-drive-010",
+  "arquivo": "mat-drive-010.pdf",
+  "titulo": "Adesivos Dentários - Dentística Pré-Clínica",
+  "materia": "Dentística Restauradora",
+  "paginas": 7,
+  "tamanhoMB": 0.6
+ },
+ {
+  "id": "mat-drive-011",
+  "arquivo": "mat-drive-011.pdf",
+  "titulo": "Adesivos Dentinários - Dentística Pré-Clínica",
+  "materia": "Dentística Restauradora",
+  "paginas": 3,
+  "tamanhoMB": 0.9
+ },
+ {
+  "id": "mat-drive-012",
+  "arquivo": "mat-drive-012.pdf",
+  "titulo": "Cimentos Odontológicos - Dentística Restauradora Pré-Clínica",
+  "materia": "Dentística Restauradora",
+  "paginas": 5,
+  "tamanhoMB": 0.4
+ },
+ {
+  "id": "mat-drive-013",
+  "arquivo": "mat-drive-013.pdf",
+  "titulo": "Diagnóstico das alterações pulpares - Dentística Restauradora",
+  "materia": "Dentística Restauradora",
+  "paginas": 8,
+  "tamanhoMB": 1.1
+ },
+ {
+  "id": "mat-drive-014",
+  "arquivo": "mat-drive-014.pdf",
+  "titulo": "Fotopolimerizadores - Dentística Clínica Integrada 2",
+  "materia": "Dentística Restauradora",
+  "paginas": 4,
+  "tamanhoMB": 0.3
+ },
+ {
+  "id": "mat-drive-015",
+  "arquivo": "mat-drive-015.pdf",
+  "titulo": "Isolamento Absoluto - Dentística Restauradora Pré-Clínica",
+  "materia": "Dentística Restauradora",
+  "paginas": 10,
+  "tamanhoMB": 10.0
+ },
+ {
+  "id": "mat-drive-016",
+  "arquivo": "mat-drive-016.pdf",
+  "titulo": "Análise de lesões não cariosas - Dentística Clínica",
+  "materia": "Dentística Restauradora",
+  "paginas": 7,
+  "tamanhoMB": 0.8
+ },
+ {
+  "id": "mat-drive-017",
+  "arquivo": "mat-drive-017.pdf",
+  "titulo": "Nomenclatura e classificação das cavidades - Dentística Restauradora Pré-Clínica",
+  "materia": "Dentística Restauradora",
+  "paginas": 7,
+  "tamanhoMB": 6.7
+ },
+ {
+  "id": "mat-drive-018",
+  "arquivo": "mat-drive-018.pdf",
+  "titulo": "Preparo de classes I a V - Dentística Restauradora Pré-Clínica",
+  "materia": "Dentística Restauradora",
+  "paginas": 10,
+  "tamanhoMB": 5.3
+ },
+ {
+  "id": "mat-drive-019",
+  "arquivo": "mat-drive-019.pdf",
+  "titulo": "Preparo e Restauração com Resina Composta Classes I a V - Dentística Pré-Clínica",
+  "materia": "Dentística Restauradora",
+  "paginas": 12,
+  "tamanhoMB": 5.4
+ },
+ {
+  "id": "mat-drive-020",
+  "arquivo": "mat-drive-020.pdf",
+  "titulo": "Proteção do complexo dentino-pulpar - Dentística Restauradora Pré-Clínica",
+  "materia": "Dentística Restauradora",
+  "paginas": 6,
+  "tamanhoMB": 1.3
+ },
+ {
+  "id": "mat-drive-021",
+  "arquivo": "mat-drive-021.pdf",
+  "titulo": "Resinas Compostas - Dentística Pré-Clínica",
+  "materia": "Dentística Restauradora",
+  "paginas": 9,
+  "tamanhoMB": 5.7
+ },
+ {
+  "id": "mat-drive-022",
+  "arquivo": "mat-drive-022.pdf",
+  "titulo": "Roteiro: Clínica Dentística",
+  "materia": "Dentística Restauradora",
+  "paginas": 3,
+  "tamanhoMB": 0.1
+ },
+ {
+  "id": "mat-drive-023",
+  "arquivo": "mat-drive-023.pdf",
+  "titulo": "Sistema de matrizes - Dentística Restauradora Pré-Clínica",
+  "materia": "Dentística Restauradora",
+  "paginas": 7,
+  "tamanhoMB": 2.2
+ },
+ {
+  "id": "mat-drive-024",
+  "arquivo": "mat-drive-024.pdf",
+  "titulo": "Escultura dental - Dentística Restauradora Pré-Clínica",
+  "materia": "Anatomia Dental",
+  "paginas": 3,
+  "tamanhoMB": 0.1
+ },
+ {
+  "id": "mat-drive-025",
+  "arquivo": "mat-drive-025.pdf",
+  "titulo": "Anatomia interna - Endodontia Pré-Clínica",
+  "materia": "Endodontia",
+  "paginas": 10,
+  "tamanhoMB": 3.3
+ },
+ {
+  "id": "mat-drive-026",
+  "arquivo": "mat-drive-026.pdf",
+  "titulo": "Cirurgia de Acesso - Endodontia Pré-Clínica",
+  "materia": "Endodontia",
+  "paginas": 9,
+  "tamanhoMB": 0.5
+ },
+ {
+  "id": "mat-drive-027",
+  "arquivo": "mat-drive-027.pdf",
+  "titulo": "Diagnóstico e tratamento das alterações pulpares - Endodontia",
+  "materia": "Endodontia",
+  "paginas": 17,
+  "tamanhoMB": 2.6
+ },
+ {
+  "id": "mat-drive-028",
+  "arquivo": "mat-drive-028.pdf",
+  "titulo": "Técnica de PQC em endodontia mecanizada e automatizada - Endodontia Pré-Clínica",
+  "materia": "Endodontia",
+  "paginas": 4,
+  "tamanhoMB": 1.0
+ },
+ {
+  "id": "mat-drive-029",
+  "arquivo": "mat-drive-029.pdf",
+  "titulo": "Obturação - Endodontia Pré-Clínica",
+  "materia": "Endodontia",
+  "paginas": 6,
+  "tamanhoMB": 0.3
+ },
+ {
+  "id": "mat-drive-030",
+  "arquivo": "mat-drive-030.pdf",
+  "titulo": "Odontometria - Endodontia Pré-Clínica",
+  "materia": "Endodontia",
+  "paginas": 10,
+  "tamanhoMB": 2.0
+ },
+ {
+  "id": "mat-drive-031",
+  "arquivo": "mat-drive-031.pdf",
+  "titulo": "Panorâmica da Endodontia - Endodontia Pré-Clínica",
+  "materia": "Endodontia",
+  "paginas": 3,
+  "tamanhoMB": 0.1
+ },
+ {
+  "id": "mat-drive-032",
+  "arquivo": "mat-drive-032.pdf",
+  "titulo": "Preparo Químico Cirúrgico (PQC) - Endodontia Pré-Clínica",
+  "materia": "Endodontia",
+  "paginas": 10,
+  "tamanhoMB": 1.7
+ },
+ {
+  "id": "mat-drive-033",
+  "arquivo": "mat-drive-033.pdf",
+  "titulo": "Introdução à Implantodontia - Osteointegração e Protocolo de Branemark",
+  "materia": "Implantodontia",
+  "paginas": 15,
+  "tamanhoMB": 2.8
+ },
+ {
+  "id": "mat-drive-034",
+  "arquivo": "mat-drive-034.pdf",
+  "titulo": "Odontogênese - Odontopediatria Teórica",
+  "materia": "Odontopediatria",
+  "paginas": 50,
+  "tamanhoMB": 9.5
+ },
+ {
+  "id": "mat-drive-035",
+  "arquivo": "mat-drive-035.pdf",
+  "titulo": "Introdução à Ortodontia",
+  "materia": "Ortodontia",
+  "paginas": 30,
+  "tamanhoMB": 4.9
+ },
+ {
+  "id": "mat-drive-036",
+  "arquivo": "mat-drive-036.pdf",
+  "titulo": "Pacientes com necessidades especiais - Interpretação de exames laboratoriais",
+  "materia": "Semiologia e Diagnóstico",
+  "paginas": 39,
+  "tamanhoMB": 6.9
+ },
+ {
+  "id": "mat-drive-037",
+  "arquivo": "mat-drive-037.pdf",
+  "titulo": "Metodologia do exame clínico - Diagnóstico Integrado I",
+  "materia": "Semiologia e Diagnóstico",
+  "paginas": 5,
+  "tamanhoMB": 1.6
+ },
+ {
+  "id": "mat-drive-038",
+  "arquivo": "mat-drive-038.pdf",
+  "titulo": "Anatomia e Histologia do Periodonto - Periodontia Pré-Clínica",
+  "materia": "Periodontia",
+  "paginas": 10,
+  "tamanhoMB": 1.2
+ },
+ {
+  "id": "mat-drive-039",
+  "arquivo": "mat-drive-039.pdf",
+  "titulo": "Biofilmes e Cálculos Orais - Periodontia Pré-Clínica",
+  "materia": "Periodontia",
+  "paginas": 8,
+  "tamanhoMB": 0.4
+ },
+ {
+  "id": "mat-drive-040",
+  "arquivo": "mat-drive-040.pdf",
+  "titulo": "Classificação das Doenças Periodontais - Periodontia Pré-Clínica",
+  "materia": "Periodontia",
+  "paginas": 7,
+  "tamanhoMB": 0.4
+ },
+ {
+  "id": "mat-drive-041",
+  "arquivo": "mat-drive-041.pdf",
+  "titulo": "Exame Clínico e Diagnóstico - Periodontia Pré-Clínica",
+  "materia": "Periodontia",
+  "paginas": 7,
+  "tamanhoMB": 0.3
+ },
+ {
+  "id": "mat-drive-042",
+  "arquivo": "mat-drive-042.pdf",
+  "titulo": "Mapa mental - Parâmetros clínicos periodontais",
+  "materia": "Periodontia",
+  "paginas": 2,
+  "tamanhoMB": 0.1
+ },
+ {
+  "id": "mat-drive-043",
+  "arquivo": "mat-drive-043.pdf",
+  "titulo": "Mapa mental - Biofilme e Cálculos Orais",
+  "materia": "Periodontia",
+  "paginas": 2,
+  "tamanhoMB": 0.3
+ },
+ {
+  "id": "mat-drive-044",
+  "arquivo": "mat-drive-044.pdf",
+  "titulo": "Mapa mental - Anatomia e Histologia do Periodonto",
+  "materia": "Periodontia",
+  "paginas": 2,
+  "tamanhoMB": 0.2
+ },
+ {
+  "id": "mat-drive-045",
+  "arquivo": "mat-drive-045.pdf",
+  "titulo": "Mapa mental - Patogênese das desordens periodontais",
+  "materia": "Periodontia",
+  "paginas": 2,
+  "tamanhoMB": 0.1
+ },
+ {
+  "id": "mat-drive-046",
+  "arquivo": "mat-drive-046.pdf",
+  "titulo": "Patogênese das Doenças e Desordens Periodontais - Periodontia Pré-Clínica",
+  "materia": "Periodontia",
+  "paginas": 5,
+  "tamanhoMB": 0.1
+ },
+ {
+  "id": "mat-drive-047",
+  "arquivo": "mat-drive-047.pdf",
+  "titulo": "Princípios básicos das cirurgias periodontais - Periodontia",
+  "materia": "Periodontia",
+  "paginas": 20,
+  "tamanhoMB": 10.9
+ },
+ {
+  "id": "mat-drive-048",
+  "arquivo": "mat-drive-048.pdf",
+  "titulo": "Planejamento em odontologia restauradora - Prótese Clínica",
+  "materia": "Prótese Parcial e Fixa",
+  "paginas": 4,
+  "tamanhoMB": 0.3
+ },
+ {
+  "id": "mat-drive-049",
+  "arquivo": "mat-drive-049.pdf",
+  "titulo": "Prótese Fixa - Reabilitação Oral - Prótese Pré-Clínica",
+  "materia": "Prótese Parcial e Fixa",
+  "paginas": 25,
+  "tamanhoMB": 3.5
+ },
+ {
+  "id": "mat-drive-050",
+  "arquivo": "mat-drive-050.pdf",
+  "titulo": "Prótese Parcial Removível - Indicações e componentes",
+  "materia": "Prótese Total e Removível",
+  "paginas": 18,
+  "tamanhoMB": 3.7
+ },
+ {
+  "id": "mat-drive-051",
+  "arquivo": "mat-drive-051.pdf",
+  "titulo": "Prótese Total e Fixa - Introdução - Prótese Pré-Clínica",
+  "materia": "Prótese Total e Removível",
+  "paginas": 29,
+  "tamanhoMB": 3.1
+ },
+ {
+  "id": "mat-drive-052",
+  "arquivo": "mat-drive-052.pdf",
+  "titulo": "Radiografias na clínica e Técnica Interproximal - Dentística Clínica",
+  "materia": "Radiologia Odontológica",
+  "paginas": 2,
+  "tamanhoMB": 0.1
+ },
+ {
+  "id": "mat-drive-053",
+  "arquivo": "mat-drive-053.pdf",
+  "titulo": "Anatomia das radiografias panorâmicas",
+  "materia": "Radiologia Odontológica",
+  "paginas": 5,
+  "tamanhoMB": 1.7
+ },
+ {
+  "id": "mat-drive-054",
+  "arquivo": "mat-drive-054.pdf",
+  "titulo": "Anatomia Radiográfica dental, da maxila e mandíbula - Diagnóstico Integrado I",
+  "materia": "Radiologia Odontológica",
+  "paginas": 11,
+  "tamanhoMB": 5.3
+ },
+ {
+  "id": "mat-drive-055",
+  "arquivo": "mat-drive-055.pdf",
+  "titulo": "Processamentos e filmes radiográficos - Diagnóstico Integrado I",
+  "materia": "Radiologia Odontológica",
+  "paginas": 4,
+  "tamanhoMB": 0.5
+ },
+ {
+  "id": "mat-drive-056",
+  "arquivo": "mat-drive-056.pdf",
+  "titulo": "Radiografias Interproximais - Diagnóstico Integrado I",
+  "materia": "Radiologia Odontológica",
+  "paginas": 3,
+  "tamanhoMB": 0.3
+ },
+ {
+  "id": "mat-drive-057",
+  "arquivo": "mat-drive-057.pdf",
+  "titulo": "Radiologia e Imaginologia - Histórico - Diagnóstico Integrado I",
+  "materia": "Radiologia Odontológica",
+  "paginas": 7,
+  "tamanhoMB": 3.6
+ },
+ {
+  "id": "mat-drive-058",
+  "arquivo": "mat-drive-058.pdf",
+  "titulo": "Radiologia e Imaginologia - Histórico - Diagnóstico Integrado I (conteúdo duplicado)",
+  "materia": "Radiologia Odontológica",
+  "paginas": 7,
+  "tamanhoMB": 4.1
+ },
+ {
+  "id": "mat-drive-059",
+  "arquivo": "mat-drive-059.pdf",
+  "titulo": "Lesões do órgão dentário - Diagnóstico Integrado 2",
+  "materia": "Radiologia Odontológica",
+  "paginas": 12,
+  "tamanhoMB": 3.2
+ },
+ {
+  "id": "mat-drive-060",
+  "arquivo": "mat-drive-060.pdf",
+  "titulo": "Lesões do Periodonto e do Periápice - Diagnóstico Integrado 2",
+  "materia": "Radiologia Odontológica",
+  "paginas": 7,
+  "tamanhoMB": 1.2
+ },
+ {
+  "id": "mat-drive-061",
+  "arquivo": "mat-drive-061.pdf",
+  "titulo": "Úlcera aftosa recorrente - Estomatite aftosa recorrente (AFTA) - Diagnóstico Integrado I",
+  "materia": "Estomatologia",
+  "paginas": 3,
+  "tamanhoMB": 0.7
+ },
+ {
+  "id": "mat-drive-062",
+  "arquivo": "mat-drive-062.pdf",
+  "titulo": "Alterações não patológicas da mucosa oral - Diagnóstico Integrado I",
+  "materia": "Estomatologia",
+  "paginas": 6,
+  "tamanhoMB": 1.5
+ },
+ {
+  "id": "mat-drive-063",
+  "arquivo": "mat-drive-063.pdf",
+  "titulo": "Anomalias Dentárias de Desenvolvimento - Diagnóstico Integrado 2",
+  "materia": "Estomatologia",
+  "paginas": 12,
+  "tamanhoMB": 5.0
+ },
+ {
+  "id": "mat-drive-064",
+  "arquivo": "mat-drive-064.pdf",
+  "titulo": "Biópsia e Citologia Esfoliativa - Diagnóstico Integrado 2",
+  "materia": "Estomatologia",
+  "paginas": 6,
+  "tamanhoMB": 2.8
+ },
+ {
+  "id": "mat-drive-065",
+  "arquivo": "mat-drive-065.pdf",
+  "titulo": "Cistos Não Odontogênicos - Diagnóstico Integrado 2",
+  "materia": "Estomatologia",
+  "paginas": 2,
+  "tamanhoMB": 0.6
+ },
+ {
+  "id": "mat-drive-066",
+  "arquivo": "mat-drive-066.pdf",
+  "titulo": "Cistos Odontogênicos - Diagnóstico Integrado 2",
+  "materia": "Estomatologia",
+  "paginas": 9,
+  "tamanhoMB": 2.8
+ },
+ {
+  "id": "mat-drive-067",
+  "arquivo": "mat-drive-067.pdf",
+  "titulo": "Gengivite ulcerativa necrosante (GUN) - Diagnóstico Integrado I",
+  "materia": "Estomatologia",
+  "paginas": 2,
+  "tamanhoMB": 0.3
+ },
+ {
+  "id": "mat-drive-068",
+  "arquivo": "mat-drive-068.pdf",
+  "titulo": "Lesões bacterianas - Sífilis - Diagnóstico Integrado I",
+  "materia": "Estomatologia",
+  "paginas": 7,
+  "tamanhoMB": 2.6
+ },
+ {
+  "id": "mat-drive-069",
+  "arquivo": "mat-drive-069.pdf",
+  "titulo": "Lesões fundamentais - definições - Diagnóstico Integrado I",
+  "materia": "Estomatologia",
+  "paginas": 3,
+  "tamanhoMB": 0.1
+ },
+ {
+  "id": "mat-drive-070",
+  "arquivo": "mat-drive-070.pdf",
+  "titulo": "Lesões fundamentais e ficha clínica odontológica",
+  "materia": "Estomatologia",
+  "paginas": 2,
+  "tamanhoMB": 0.1
+ },
+ {
+  "id": "mat-drive-071",
+  "arquivo": "mat-drive-071.pdf",
+  "titulo": "Lesões Ulcerativas e Erosivas da Mucosa Oral - Diagnóstico Integrado 2",
+  "materia": "Estomatologia",
+  "paginas": 16,
+  "tamanhoMB": 9.4
+ },
+ {
+  "id": "mat-drive-072",
+  "arquivo": "mat-drive-072.pdf",
+  "titulo": "Lesões virais e bacterianas - Herpes vírus - Diagnóstico Integrado I",
+  "materia": "Estomatologia",
+  "paginas": 6,
+  "tamanhoMB": 0.7
+ },
+ {
+  "id": "mat-drive-073",
+  "arquivo": "mat-drive-073.pdf",
+  "titulo": "Neoplasias - Diagnóstico Integrado I",
+  "materia": "Estomatologia",
+  "paginas": 4,
+  "tamanhoMB": 1.5
+ },
+ {
+  "id": "mat-drive-074",
+  "arquivo": "mat-drive-074.pdf",
+  "titulo": "Pseudocistos - Diagnóstico Integrado 2",
+  "materia": "Estomatologia",
+  "paginas": 2,
+  "tamanhoMB": 0.4
+ },
+ {
+  "id": "mat-drive-075",
+  "arquivo": "mat-drive-075.pdf",
+  "titulo": "Tumores NÃO Odontogênicos - Diagnóstico Integrado 2",
+  "materia": "Estomatologia",
+  "paginas": 6,
+  "tamanhoMB": 2.7
+ },
+ {
+  "id": "mat-drive-extra",
+  "arquivo": "mat-drive-extra.pdf",
+  "titulo": "Periodontia - Princípios básicos das cirurgias periodontais (aula)",
+  "materia": "Periodontia",
+  "paginas": 20,
+  "tamanhoMB": 10.9
+ }
+]
