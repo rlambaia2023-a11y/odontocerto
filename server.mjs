@@ -14,8 +14,11 @@
 //
 // Autenticação: se APP_USER e APP_PASSWORD estiverem definidos, todas as
 // rotas exceto /api/health exigem HTTP Basic com esses valores. Sem essas
-// variáveis, o app fica aberto (uso local). O upload de admin exige a
-// autenticação e DATA_DIR, e nunca aceita upload sem senha.
+// variáveis, o app fica aberto (uso local, ou público por escolha do usuário
+// em 2026-10-31). O upload de admin exige DATA_DIR e, sem senha configurada,
+// só CRIA arquivos novos: nunca sobrescreve um PDF ou manifesto já existente.
+// Com senha configurada, o upload exige a senha (o portão acima já barrou
+// quem não a tem) e aí pode substituir.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -102,7 +105,7 @@ const server = http.createServer((req, res) => {
   const p = url.pathname;
 
   if (p === '/api/health') {
-    return json(res, { ok: true, livros: livros.length, pdfsPresentes: livros.filter((l) => l.pdfPresente).length, fonte });
+    return json(res, { ok: true, livros: livros.length, pdfsPresentes: livros.filter((l) => l.pdfPresente).length, fonte, uploadSemSenha: !process.env.APP_USER || !process.env.APP_PASSWORD });
   }
   if (!autorizado(req)) {
     res.writeHead(401, { 'www-authenticate': 'Basic realm="OdontoCerto"' });
@@ -131,25 +134,34 @@ const server = http.createServer((req, res) => {
 
   const mUpPdf = p.match(/^\/api\/admin\/upload-pdf\/([a-z0-9-]+)$/);
   if (mUpPdf && req.method === 'POST') {
-    if (!process.env.APP_USER || !process.env.APP_PASSWORD || !DATA_DIR) return json(res, { erro: 'Upload exige senha e DATA_DIR' }, 503);
+    if (!DATA_DIR) return json(res, { erro: 'Upload exige DATA_DIR' }, 503);
     const livro = porId.get(mUpPdf[1]);
     if (!livro) return json(res, { erro: 'Livro não encontrado' }, 404);
     const destDir = path.join(DATA_DIR, 'pdfs'); fs.mkdirSync(destDir, { recursive: true });
+    const dest = path.join(destDir, livro.arquivo);
+    if (fs.existsSync(dest)) return json(res, { ok: true, id: livro.id, ja_existe: true });
     return readBody(req, 300 * 1024 * 1024, (err, buf) => {
       if (err) return json(res, { erro: 'Upload falhou' }, 400);
-      fs.writeFileSync(path.join(destDir, livro.arquivo), buf);
+      if (fs.existsSync(dest)) return json(res, { ok: true, id: livro.id, ja_existe: true });
+      const tmp = dest + '.tmp-' + process.pid;
+      fs.writeFileSync(tmp, buf); fs.renameSync(tmp, dest);
       livro.pdfPresente = true;
       json(res, { ok: true, id: livro.id, bytes: buf.length });
     });
   }
   if (p === '/api/admin/upload-manifest' && req.method === 'POST') {
-    if (!process.env.APP_USER || !process.env.APP_PASSWORD || !DATA_DIR) return json(res, { erro: 'Upload exige senha e DATA_DIR' }, 503);
+    if (!DATA_DIR) return json(res, { erro: 'Upload exige DATA_DIR' }, 503);
+    const dest = path.join(DATA_DIR, 'manifest.json');
+    if (fs.existsSync(dest) && (!process.env.APP_USER || !process.env.APP_PASSWORD)) {
+      return json(res, { erro: 'Manifesto já existe; sem senha, não é possível substituir' }, 409);
+    }
     return readBody(req, 50 * 1024 * 1024, (err, buf) => {
       if (err) return json(res, { erro: 'Upload falhou' }, 400);
       let items; try { items = JSON.parse(buf.toString('utf8')); } catch { return json(res, { erro: 'JSON inválido' }, 400); }
       if (!Array.isArray(items) || items.length === 0) return json(res, { erro: 'Manifesto vazio' }, 400);
       fs.mkdirSync(DATA_DIR, { recursive: true });
-      fs.writeFileSync(path.join(DATA_DIR, 'manifest.json'), buf);
+      const tmp = dest + '.tmp-' + process.pid;
+      fs.writeFileSync(tmp, buf); fs.renameSync(tmp, dest);
       loadData();
       json(res, { ok: true, livros: livros.length, fonte });
     });
