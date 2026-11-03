@@ -96,8 +96,9 @@ async function buildDocPdf({ doc, patient, prof, clinic }) {
   // rodapé à direita: o canto inferior esquerdo fica livre para o carimbo do assinador (o VIDaaS assina ali, sem escolha de posição)
   const footer = () => {
     const x0 = M + 190, rx = pdf.W - M, avail = rx - x0; pdf.line(x0, pdf.H - 58, rx, pdf.H - 58, 0.5, '#bbbbbb');
-    const f1 = [clinic.name, addr, fPhone(clinic.phone)].filter(Boolean).join(' · ');
-    const rows = [[f1, 7.5, '#555555'], ...(doc.verify_code ? [[`Código de verificação ${doc.verify_code}`, 7.5, '#777777'], [`confira em ${verifyUrl(doc.verify_code)}`, 7, '#777777']] : [])]
+    // quebra entre os itens (nome · endereço · telefone), não no meio deles
+    const f1 = [clinic.name, addr, fPhone(clinic.phone)].filter(Boolean).reduce((ls, p) => { const t = ls.length ? ls[ls.length - 1] + ' · ' + p : p; if (ls.length && textW(t, 7.5) > avail) ls.push(p); else ls[Math.max(0, ls.length - 1)] = t; return ls; }, []);
+    const rows = [...f1.map(t => [t, 7.5, '#555555']), ...(doc.verify_code ? [[`Código de verificação ${doc.verify_code}`, 7.5, '#777777'], [`confira em ${verifyUrl(doc.verify_code)}`, 7, '#777777']] : [])]
       .flatMap(([t, s, c]) => wrap([{ t, st: 'r' }], avail, s).map(ln => [ln.map(w => w.t).join(''), s, c]));
     let y = pdf.H - 47; rows.slice(0, 4).forEach(([t, s, c]) => { pdf.text(rx - textW(t, s), y, t, s, 'r', c); y += 9.5; });
   };
