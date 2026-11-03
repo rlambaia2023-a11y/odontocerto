@@ -222,7 +222,8 @@ route('/configuracoes', async (_, q) => {
   return html`<div class="pagehead"><h1>Configurações</h1></div><div class="grid g2 collapse" style="align-items:start">
   <div class="card"><h2>Consultório</h2><p class="small muted">Aparece no cabeçalho de receitas, atestados e orçamentos.</p><form data-form="saveClinic" class="stack" style="margin-top:10px"><fieldset ${owner ? '' : 'disabled'} style="border:0;padding:0;margin:0" class="stack">
     <label class="f"><span>Nome do consultório <i>*</i></span><input class="in" name="name" required value="${c.name || ''}"></label><div class="grid g2"><label class="f"><span>CNPJ</span><input class="in" name="cnpj" value="${c.cnpj || ''}"></label><label class="f"><span>Telefone</span><input class="in" name="phone" value="${fPhone(c.phone)}"></label></div>
-    <label class="f"><span>E-mail</span><input class="in" name="email" type="email" value="${c.email || ''}"></label><label class="f"><span>Endereço</span><input class="in" name="address" value="${c.address || ''}"></label>
+    <label class="f"><span>E-mail</span><input class="in" name="email" type="email" value="${c.email || ''}"></label>
+    <div class="grid g2"><label class="f"><span>CEP</span><input class="in" name="zip" inputmode="numeric" maxlength="9" placeholder="00000-000" value="${fCEP(c.zip || '')}"></label><label class="f"><span>Endereço</span><input class="in" name="address" value="${c.address || ''}"></label></div>
     <div class="grid g2"><label class="f"><span>Cidade</span><input class="in" name="city" value="${c.city || ''}"></label><label class="f"><span>UF</span><input class="in" name="state" maxlength="2" value="${c.state || ''}"></label></div>
     <button class="btn primary" type="submit">Salvar consultório</button></fieldset></form>
     <div style="margin-top:16px"><span class="small" style="font-weight:600;color:var(--ink-2)">Logo (aparece em receitas, atestados, orçamentos e na página de agendamento)</span>
@@ -242,7 +243,7 @@ route('/configuracoes', async (_, q) => {
 </div></div>
   <div class="grid g2 collapse" style="align-items:start;margin-top:14px">${await configExtra()}${isOwner() ? await googleCard() : ''}</div>`;
 }, 'config');
-onForm('saveClinic', async d => { const row = { ...d, phone: nz(onlyDigits(d.phone)), state: nz((d.state || '').toUpperCase()) }; S.clinic = { ...S.clinic, ...(await B().updateWhere('clinics', { id: S.clinic.id }, row)) }; toast('Dados do consultório salvos.', 'ok'); });
+onForm('saveClinic', async d => { const row = { ...d, zip: nz(onlyDigits(d.zip)), phone: nz(onlyDigits(d.phone)), state: nz((d.state || '').toUpperCase()) }; S.clinic = { ...S.clinic, ...(await B().updateWhere('clinics', { id: S.clinic.id }, row)) }; toast('Dados do consultório salvos.', 'ok'); });
 onForm('saveMe', async d => { const row = { ...d, cpf: nz(onlyDigits(d.cpf)), council_uf: nz((d.council_uf || '').toUpperCase()) }; await B().updateWhere('clinic_members', { clinic_id: S.clinic.id, user_id: S.me.user_id }, row); Object.assign(S.me, row); S.members = await db.list('clinic_members', { eq: { clinic_id: S.clinic.id } }); toast('Seus dados foram salvos.', 'ok'); });
 onForm('savePass', async (d, f) => { await Remote.req('/auth/v1/user', { method: 'PUT', body: { password: d.password } }); f.reset(); toast('Senha alterada.', 'ok'); });
 

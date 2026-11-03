@@ -21,7 +21,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src https://fonts.gstatic.com",
   "img-src 'self' data:",
-  "connect-src 'self' " + (URL_SB || ""),
+  "connect-src 'self' https://viacep.com.br https://brasilapi.com.br " + (URL_SB || ""),
   "frame-ancestors 'none'",
   "base-uri 'none'",
   "form-action 'self'",

@@ -131,8 +131,8 @@ function apptForm(a = {}, p = null) {
     <label class="f"><span>Status</span><select class="in" name="status">${Object.entries(STATUS).map(([k, v]) => html`<option value="${k}" ${(a.status || 'agendado') === k ? 'selected' : ''}>${v[0]}</option>`)}</select></label>
     <label class="f"><span>Profissional</span><select class="in" name="professional_id" data-change="apptPro">${pros().map(m => html`<option value="${m.user_id}" ${(a.professional_id || Auth.userId()) === m.user_id ? 'selected' : ''}>${m.full_name}</option>`)}</select></label></div>
     <div class="grid g2"><label class="f"><span>Modalidade</span><select class="in" name="modality" data-change="apptMod"><option value="presencial">Presencial</option><option value="online" ${a.modality === 'online' ? 'selected' : ''}>Online (Google Meet)</option></select></label>
-    <label class="f ${a.modality === 'online' ? '' : 'hidden'}" id="meetbox"><span>Link da chamada</span><input class="in" name="meeting_url" type="url" placeholder="https://meet.google.com/…" value="${a.meeting_url || (pros().find(m => m.user_id === (a.professional_id || Auth.userId())) || {}).meet_url || ''}"></label></div>
-    ${a.id && a.modality === 'online' && a.meeting_url ? html`<div class="row">${isClinical() ? html`<button type="button" class="btn accent" data-act="startTele" data-id="${a.id}">${icon('video')} Iniciar teleconsulta</button>` : html`<a class="btn accent" target="_blank" rel="noopener" href="${a.meeting_url}">${icon('video')} Abrir chamada</a>`}${p?.phone ? html`<a class="btn" target="_blank" rel="noopener" href="${waLink(p.phone, `Olá, ${p.name.split(' ')[0]}! Segue o link da sua teleconsulta de ${fDate(a.starts_at)} às ${fTime(a.starts_at)}: ${a.meeting_url}`)}">${icon('wa')} Enviar link</a>` : ''}${a.tele_consent_at ? html`<span class="pill ok">termo aceito ${fDT(a.tele_consent_at)}</span>` : html`<span class="pill warn">sem termo registrado</span>`}</div>` : ''}
+    <label class="f ${a.modality === 'online' ? '' : 'hidden'}" id="meetbox"><span>Link da chamada</span><input class="in" name="meeting_url" type="url" placeholder="https://meet.google.com/…" value="${[a.meeting_url, (pros().find(m => m.user_id === (a.professional_id || Auth.userId())) || {}).meet_url].find(u => u && !isGenericMeet(u)) || ''}"><span class="tiny muted"><a href="https://meet.google.com/new" target="_blank" rel="noopener">Criar sala nova no Meet</a>, copie o endereço e cole aqui — ou salve a sua sala fixa em Configurações › Atendimento online.</span></label></div>
+    ${a.id && a.modality === 'online' && a.meeting_url ? html`<div class="row">${isClinical() ? html`<button type="button" class="btn accent" data-act="startTele" data-id="${a.id}">${icon('video')} Iniciar teleconsulta</button>` : html`<a class="btn accent" target="_blank" rel="noopener" href="${a.meeting_url}">${icon('video')} Abrir chamada</a>`}${p ? html`<button type="button" class="btn" data-act="teleSendId" data-id="${a.id}">${icon('send')} Enviar ao paciente</button>` : ''}${a.tele_consent_at ? html`<span class="pill ok">termo aceito ${fDT(a.tele_consent_at)}</span>` : html`<span class="pill warn">sem termo registrado</span>`}</div>` : ''}
     ${a.reason ? html`<p class="small" style="margin:0"><b>Motivo informado pelo paciente:</b> ${a.reason}</p>` : ''}
     <label class="f"><span>Telefone (se for paciente novo)</span><input class="in" name="phone" inputmode="tel" placeholder="(11) 90000-0000"></label>
     <label class="f"><span>Observações</span><textarea class="in" name="notes" rows="2">${a.notes || ''}</textarea></label>
@@ -141,6 +141,7 @@ function apptForm(a = {}, p = null) {
     ${a.id && p ? html`<a class="btn" href="#/paciente/${p.id}" data-act="closeModalNav">${icon('clip')} Prontuário</a>` : ''}</div>
     <button class="btn primary" type="submit">Salvar</button></div></form>`;
 }
+act('teleSendId', async el => { const a = await db.get('appointments', el.dataset.id); teleSendModal(a, await db.get('patients', a.patient_id)); });
 act('newAppt', el => modal('Novo agendamento', apptForm({ _date: el.dataset.date, _time: el.dataset.time || '08:00' }, null)));
 act('editAppt', async el => { const a = await db.get('appointments', el.dataset.id); const p = a.patient_id ? await db.get('patients', a.patient_id) : null; modal('Agendamento', apptForm(a, p)); });
 act('delAppt', async el => { if (await confirmBox('Excluir este agendamento?', 'Excluir')) { const old = await db.get('appointments', el.dataset.id); await db.remove('appointments', el.dataset.id); if (old?.google_event_id) gpush('deleteRemote', { google_event_id: old.google_event_id }); closeModal(); toast('Agendamento excluído.'); router(); } });
@@ -149,11 +150,34 @@ onForm('saveAppt', async d => {
   const s = new Date(`${d.date}T${d.time}`); const e = new Date(s.getTime() + (+d.dur) * 60000);
   if (!['cancelado', 'faltou'].includes(d.status)) { const clash = await findConflicts({ pro: d.professional_id, start: s, end: e, online: d.modality === 'online', ignoreAppt: d.id || null }); if (!(await conflictGate(clash))) return; }
   if (d.modality === 'online' && d.meeting_url && !/^https:\/\//.test(d.meeting_url)) throw new Error('O link da chamada precisa começar com https://');
+  if (d.modality === 'online' && isGenericMeet(d.meeting_url)) throw new Error(MEET_GENERIC_MSG);
   const row = { patient_id: pid, starts_at: s.toISOString(), ends_at: e.toISOString(), kind: d.modality === 'online' && d.kind === 'consulta' ? 'teleconsulta' : d.kind, status: d.status, professional_id: d.professional_id, notes: nz(d.notes), modality: d.modality, meeting_url: d.modality === 'online' ? nz(d.meeting_url) : null };
   const saved = d.id ? (await db.update('appointments', d.id, row) || { id: d.id }) : await db.insert('appointments', row); if (saved?.id) gpush('pushAppt', { id: saved.id });
   if (d.request_id) { await db.update('appointment_requests', d.request_id, { status: 'agendado', response: `Agendado para ${fDT(s)}` }); updateNotif(); }
   closeModal(); toast('Agendamento salvo.', 'ok'); router();
+  if (row.modality === 'online' && row.meeting_url && pid && !['cancelado', 'faltou', 'atendido'].includes(row.status)) teleSendModal({ ...row, id: saved?.id }, await db.get('patients', pid));
 });
+
+/* ---------- enviar teleconsulta ao paciente (WhatsApp / e-mail) ---------- */
+const teleMsg = (a, p) => `Olá, ${p.name.split(' ')[0]}! Sua teleconsulta com ${proName(a.professional_id) || S.clinic.name} está marcada para ${fLong(new Date(a.starts_at))} às ${fTime(a.starts_at)}.
+
+Entre pelo link do Google Meet no horário:
+${a.meeting_url}
+
+Antes, teste câmera e microfone e fique em um local reservado.${p.user_id ? `\nNa sua área do paciente (${location.origin}) você encontra o link e o termo de consentimento da teleconsulta.` : ''}
+
+${S.clinic.name}${S.clinic.phone ? ' · ' + fPhone(S.clinic.phone) : ''}`;
+function teleSendModal(a, p) {
+  modal('Enviar teleconsulta ao paciente', html`<p class="small" style="margin:0"><b>${p.name}</b> · ${fDT(a.starts_at)} · <a href="${a.meeting_url}" target="_blank" rel="noopener">${a.meeting_url}</a></p>
+    <label class="f" style="margin-top:10px"><span>Mensagem (pode editar)</span><textarea class="in" id="telemsg" rows="10">${teleMsg(a, p)}</textarea></label>
+    ${!p.phone && !p.email ? html`<p class="small" style="color:var(--bad)">O paciente não tem celular nem e-mail no cadastro. Copie a mensagem ou edite o cadastro.</p>` : ''}
+    ${p.user_id ? '' : html`<p class="tiny muted">O paciente ainda não tem acesso online. Com o acesso, ele aceita o termo de teleconsulta pelo sistema; sem ele, registre o consentimento verbal na evolução.</p>`}`,
+    { wide: true, footer: html`<button class="btn" data-act="teleCopy">Copiar</button>${p.email ? html`<button class="btn" data-act="teleMail" data-to="${p.email}">E-mail</button>` : ''}${p.phone ? html`<button class="btn ok" data-act="teleWa" data-to="${p.phone}">${icon('wa')} Enviar no WhatsApp</button>` : ''}` });
+}
+const teleText = () => document.getElementById('telemsg').value;
+act('teleWa', el => window.open(waLink(el.dataset.to, teleText()), '_blank', 'noopener'));
+act('teleMail', el => { location.href = `mailto:${encodeURIComponent(el.dataset.to)}?subject=${encodeURIComponent('Sua teleconsulta – ' + S.clinic.name)}&body=${encodeURIComponent(teleText())}`; });
+act('teleCopy', async () => { try { await navigator.clipboard.writeText(teleText()); toast('Mensagem copiada.', 'ok'); } catch { document.getElementById('telemsg').select(); toast('Selecionei a mensagem: use Ctrl+C.'); } });
 
 /* ---------- PACIENTES ---------- */
 route('/pacientes', async (_, q) => {
@@ -186,7 +210,7 @@ function patientForm(p = {}) {
   <label class="f"><span>CPF</span><input class="in" name="cpf" inputmode="numeric" value="${fCPF(p.cpf)}"></label></div>
   <div class="grid g2"><label class="f"><span>Celular (WhatsApp)</span><input class="in" name="phone" inputmode="tel" value="${fPhone(p.phone)}"></label><label class="f"><span>E-mail</span><input class="in" type="email" name="email" value="${p.email || ''}"></label></div>
   <div class="grid g2"><label class="f"><span>Convênio</span><select class="in" name="insurance_id"><option value="">Particular</option>${S.insurances.filter(i => i.active && i.name !== 'Particular').map(i => html`<option value="${i.id}" ${p.insurance_id === i.id ? 'selected' : ''}>${i.name}</option>`)}</select></label><label class="f"><span>Nº da carteirinha</span><input class="in" name="insurance_card" value="${p.insurance_card || ''}"></label></div>
-  <div class="grid g3"><label class="f"><span>CEP</span><input class="in" name="zip" inputmode="numeric" value="${p.zip || ''}"></label><label class="f"><span>Cidade</span><input class="in" name="city" value="${p.city || ''}"></label><label class="f"><span>UF</span><input class="in" name="state" maxlength="2" value="${p.state || ''}"></label></div>
+  <div class="grid g3"><label class="f"><span>CEP</span><input class="in" name="zip" inputmode="numeric" maxlength="9" placeholder="00000-000" value="${fCEP(p.zip || '')}"></label><label class="f"><span>Cidade</span><input class="in" name="city" value="${p.city || ''}"></label><label class="f"><span>UF</span><input class="in" name="state" maxlength="2" value="${p.state || ''}"></label></div>
   <label class="f"><span>Endereço</span><input class="in" name="address" value="${p.address || ''}"></label>
   <div class="grid g3"><label class="f"><span>RG</span><input class="in" name="rg" value="${p.rg || ''}"></label><label class="f"><span>Profissão</span><input class="in" name="occupation" value="${p.occupation || ''}"></label><label class="f"><span>Como conheceu</span><input class="in" name="origin" list="origins" value="${p.origin || ''}"><datalist id="origins"><option>Indicação</option><option>Instagram</option><option>Google</option><option>Convênio</option><option>Passou em frente</option></datalist></label></div>
   <label class="f"><span>Responsável (menor de idade)</span><input class="in" name="guardian_name" value="${p.guardian_name || ''}"></label>
@@ -200,11 +224,11 @@ act('newPatient', () => modal('Novo paciente', patientForm(), { wide: true }));
 act('editPatient', async el => modal('Editar paciente', patientForm(await db.get('patients', el.dataset.id)), { wide: true }));
 act('delPatient', async el => { if (await confirmBox('Excluir o paciente e TODO o prontuário dele (consultas, evolução, documentos)? Essa ação não pode ser desfeita. Se quiser só esconder, desmarque "Paciente ativo".', 'Excluir definitivamente')) { await db.remove('patients', el.dataset.id); closeModal(); toast('Paciente excluído.'); go('#/pacientes'); } });
 onForm('savePatient', async d => {
-  const row = { name: d.name, birth_date: nz(d.birth_date), sex: nz(d.sex), cpf: nz(onlyDigits(d.cpf)), phone: nz(onlyDigits(d.phone)), email: nz(d.email), insurance_id: nz(d.insurance_id), insurance_card: nz(d.insurance_card), zip: nz(d.zip), city: nz(d.city), state: nz((d.state || '').toUpperCase()), address: nz(d.address), rg: nz(d.rg), occupation: nz(d.occupation), origin: nz(d.origin), guardian_name: nz(d.guardian_name), alerts: nz(d.alerts), notes: nz(d.notes), tags: (d.tags || '').split(',').map(s => s.trim()).filter(Boolean) };
+  const row = { name: d.name, birth_date: nz(d.birth_date), sex: nz(d.sex), cpf: nz(onlyDigits(d.cpf)), phone: nz(onlyDigits(d.phone)), email: nz(d.email), insurance_id: nz(d.insurance_id), insurance_card: nz(d.insurance_card), zip: nz(onlyDigits(d.zip)), city: nz(d.city), state: nz((d.state || '').toUpperCase()), address: nz(d.address), rg: nz(d.rg), occupation: nz(d.occupation), origin: nz(d.origin), guardian_name: nz(d.guardian_name), alerts: nz(d.alerts), notes: nz(d.notes), tags: (d.tags || '').split(',').map(s => s.trim()).filter(Boolean) };
   if (row.cpf && row.cpf.length !== 11) throw new Error('CPF precisa ter 11 dígitos.');
   if (d.id) { row.active = !!d.active; await db.update('patients', d.id, row); closeModal(); toast('Paciente atualizado.', 'ok'); router(); }
   else { const p = await db.insert('patients', row); closeModal(); toast('Paciente cadastrado.', 'ok'); go(`#/paciente/${p.id}`); }
 });
 
 onInput('apptMod', el => { document.getElementById('meetbox').classList.toggle('hidden', el.value !== 'online'); });
-onInput('apptPro', el => { const m = pros().find(x => x.user_id === el.value); const f = el.form.meeting_url; if (m?.meet_url && f) f.value = m.meet_url; });
+onInput('apptPro', el => { const m = pros().find(x => x.user_id === el.value); const f = el.form.meeting_url; if (m?.meet_url && !isGenericMeet(m.meet_url) && f) f.value = m.meet_url; });

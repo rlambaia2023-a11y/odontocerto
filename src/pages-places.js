@@ -90,7 +90,7 @@ act('editPlace', async el => {
   modal(p.id ? 'Editar local' : 'Novo local de atendimento', html`<form data-form="savePlace" class="stack"><input type="hidden" name="id" value="${p.id || ''}">
     <div class="grid g2"><label class="f"><span>Nome <i>*</i></span><input class="in" name="name" required value="${p.name || ''}" placeholder="Ex.: Hospital Municipal de Muritiba"></label>
       <label class="f"><span>Tipo</span><select class="in" name="kind">${Object.entries(PLACE_KIND).map(([k, v]) => html`<option value="${k}" ${p.kind === k ? 'selected' : ''}>${v}</option>`)}</select></label></div>
-    <div class="grid g2"><label class="f"><span>Endereço</span><input class="in" name="address" value="${p.address || ''}" placeholder="Rua, número, bairro"></label><label class="f"><span>Cidade/UF</span><input class="in" name="city" value="${p.city || ''}" placeholder="Cruz das Almas/BA"></label></div>
+    <div class="grid g3"><label class="f"><span>CEP</span><input class="in" name="zip" inputmode="numeric" maxlength="9" placeholder="00000-000" value="${fCEP(p.zip || '')}"></label><label class="f"><span>Endereço</span><input class="in" name="address" value="${p.address || ''}" placeholder="Rua, número, bairro"></label><label class="f"><span>Cidade/UF</span><input class="in" name="city" value="${p.city || ''}" placeholder="Cruz das Almas/BA"></label></div>
     <div class="grid g3"><label class="f"><span>Telefone</span><input class="in" name="phone" inputmode="tel" value="${p.phone || ''}"></label>
       <label class="f"><span>Deslocamento (min)</span><input class="in" name="travel_min" inputmode="numeric" value="${p.travel_min}"></label>
       <label class="f"><span>Cor na agenda</span><select class="in" name="color">${PLACE_COLORS.map(c => html`<option value="${c}" ${p.color === c ? 'selected' : ''} style="color:${c}">■ ${c}</option>`)}</select></label></div>
@@ -100,7 +100,7 @@ act('editPlace', async el => {
     <div class="row between">${p.id ? html`<button type="button" class="btn danger" data-act="delPlace" data-id="${p.id}">${icon('trash')} Excluir</button>` : html`<span></span>`}<button class="btn primary" type="submit">Salvar</button></div></form>`);
 });
 onForm('savePlace', async d => {
-  const row = { name: d.name, kind: d.kind, address: nz(d.address), city: nz(d.city), phone: nz(d.phone), travel_min: Math.min(240, Math.max(0, parseInt(d.travel_min) || 0)), color: d.color, notes: nz(d.notes), active: !!d.active };
+  const row = { name: d.name, kind: d.kind, zip: nz(onlyDigits(d.zip)), address: nz(d.address), city: nz(d.city), phone: nz(d.phone), travel_min: Math.min(240, Math.max(0, parseInt(d.travel_min) || 0)), color: d.color, notes: nz(d.notes), active: !!d.active };
   if (d.id) await db.update('work_places', d.id, row); else await db.insert('work_places', { ...row, professional_id: Auth.userId() });
   toast('Local salvo.', 'ok'); ACT.managePlaces();
 });

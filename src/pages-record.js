@@ -25,7 +25,8 @@ route('/paciente/:id', async ({ id }, q) => {
     <div class="row" style="gap:4px;flex-wrap:nowrap">${p.phone ? html`<a class="btn sm" target="_blank" rel="noopener" href="${waLink(p.phone, `Olá, ${p.name.split(' ')[0]}! Aqui é do ${S.clinic.name}.`)}" title="WhatsApp">${icon('wa')}</a>` : ''}<button class="btn sm" data-act="editPatient" data-id="${p.id}" title="Editar">${icon('edit')}</button></div></div>
     <div class="grid g4" style="margin-top:14px">
       ${isClinical() ? html`<button class="btn primary" data-act="newEvolution" data-id="${p.id}">${icon('edit')} Evoluir</button>
-      <a class="btn accent" href="#/prescrever?p=${p.id}">${icon('pill')} Prescrever</a>` : html`<button class="btn primary" data-act="apptForPatient" data-id="${p.id}" data-name="${p.name}">${icon('cal')} Agendar</button>`}
+      <a class="btn accent" href="#/prescrever?p=${p.id}">${icon('pill')} Prescrever</a>
+      <button class="btn" data-act="teleForPatient" data-id="${p.id}">${icon('video')} Teleconsulta</button>` : html`<button class="btn primary" data-act="apptForPatient" data-id="${p.id}" data-name="${p.name}">${icon('cal')} Agendar</button>`}
       <button class="btn" data-act="newReturn" data-id="${p.id}">${icon('alarm')} Retorno</button>
       <button class="btn" data-act="patientAccess" data-id="${p.id}">${icon(p.user_id ? 'check' : 'globe')} ${p.user_id ? 'Tem acesso' : 'Acesso online'}</button>
       ${isClinical() ? html`<button class="btn" data-act="printRecord" data-id="${p.id}">${icon('print')} Imprimir</button>` : ''}
@@ -149,13 +150,18 @@ const TABRENDER = {
 
   async consultas(p) {
     const a = await db.list('appointments', { eq: { patient_id: p.id }, order: 'starts_at.desc' });
-    return html`<div class="row between" style="margin-bottom:12px"><h2>Consultas</h2><button class="btn primary" data-act="apptForPatient" data-id="${p.id}" data-name="${p.name}">${icon('plus')} Agendar</button></div>
+    return html`<div class="row between" style="margin-bottom:12px"><h2>Consultas</h2><div class="row">${isClinical() ? html`<button class="btn" data-act="teleForPatient" data-id="${p.id}">${icon('video')} Teleconsulta</button>` : ''}<button class="btn primary" data-act="apptForPatient" data-id="${p.id}" data-name="${p.name}">${icon('plus')} Agendar</button></div></div>
     ${a.length ? html`<div class="list">${a.map(x => html`<div class="li" data-act="editAppt" data-id="${x.id}" style="cursor:pointer"><b class="small" style="width:120px">${fDT(x.starts_at)}</b><span class="grow small">${KINDS[x.kind] || ''}${x.notes ? ' · ' + x.notes : ''}</span>${apPill(x)}</div>`)}</div>` : html`<div class="card empty">Nenhuma consulta registrada.</div>`}`;
   },
 };
 
 /* ---- ações do prontuário ---- */
 act('apptForPatient', el => modal('Novo agendamento', apptForm({ _date: ymd(new Date()), _time: '08:00' }, { id: el.dataset.id, name: el.dataset.name })));
+act('teleForPatient', async el => {
+  const p = await db.get('patients', el.dataset.id); const me = pros().find(m => m.user_id === Auth.userId()) || pros()[0] || {};
+  const t = new Date(Math.ceil((Date.now() + 15 * 60000) / 1800000) * 1800000); // próxima meia hora, com folga de 15 min
+  modal('Agendar teleconsulta (Google Meet)', apptForm({ _date: ymd(t), _time: fTime(t), modality: 'online', kind: 'teleconsulta', status: 'confirmado', professional_id: me.user_id, meeting_url: isGenericMeet(me.meet_url) ? '' : me.meet_url || '' }, p));
+});
 onForm('saveAnam', async d => { const pid = d.patient_id; delete d.patient_id; await db.insert('anamneses', { patient_id: pid, data: d, created_by: Auth.userId() }); toast('Anamnese salva.', 'ok'); router(); });
 act('printAnam', async el => {
   const p = await db.get('patients', el.dataset.id); const a = (await db.list('anamneses', { eq: { patient_id: p.id }, order: 'created_at.desc', limit: 1 }))[0]?.data || {};

@@ -70,6 +70,8 @@ const startOfDay = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return 
 const age = b => { if (!b) return null; const d = parseYmd(b), n = new Date(); let a = n.getFullYear() - d.getFullYear(); if (n.getMonth() < d.getMonth() || (n.getMonth() === d.getMonth() && n.getDate() < d.getDate())) a--; return a; };
 const initials = n => String(n || '?').trim().split(/\s+/).filter(w => /^\p{L}/u.test(w) && !/^(dr|dra|de|da|do|das|dos|e)\.?$/i.test(w)).map(w => w[0]).filter((_, i, a) => i === 0 || i === a.length - 1).join('').toUpperCase() || '?';
 const onlyDigits = s => String(s || '').replace(/\D/g, '');
+const isGenericMeet = u => /^https?:\/\/meet\.google\.com\/?(new|landing)?\/?(\?.*)?$/i.test((u || '').trim());
+const MEET_GENERIC_MSG = 'O endereço meet.google.com/new cria uma sala nova a cada clique — você e o paciente cairiam em salas diferentes. Abra "Criar sala nova no Meet", copie o endereço da sala que abriu (ex.: https://meet.google.com/abc-defg-hij) e cole aqui.';
 const waLink = (phone, text) => { let p = onlyDigits(phone); if (p && p.length <= 11) p = '55' + p; return `https://wa.me/${p}?text=${encodeURIComponent(text || '')}`; };
 const fPhone = p => { const d = onlyDigits(p); if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`; if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`; return p || ''; };
 const fCPF = c => { const d = onlyDigits(c); return d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : (c || ''); };
@@ -254,6 +256,32 @@ document.addEventListener('submit', async e => {
 });
 document.addEventListener('input', e => { const el = e.target.closest('[data-input]'); if (el && INPUTS[el.dataset.input]) INPUTS[el.dataset.input](el, e); });
 document.addEventListener('change', e => { const el = e.target.closest('[data-change]'); if (el && INPUTS[el.dataset.change]) INPUTS[el.dataset.change](el, e); });
+
+/* ---------- CEP: preenche endereço, cidade e UF (ViaCEP, com BrasilAPI de reserva) ---------- */
+const fCEP = v => { const d = onlyDigits(v).slice(0, 8); return d.length > 5 ? d.slice(0, 5) + '-' + d.slice(5) : d; };
+async function lookupCEP(cep) {
+  const get = async (url, map) => { const r = await fetch(url, { signal: AbortSignal.timeout(6000) }); if (!r.ok) throw new Error(r.status === 404 ? 'nf' : 'net'); const j = await r.json(); if (j.erro) throw new Error('nf'); return map(j); };
+  try { return await get(`https://viacep.com.br/ws/${cep}/json/`, j => ({ street: j.logradouro, district: j.bairro, city: j.localidade, uf: j.uf })); }
+  catch (e) { if (e.message === 'nf') throw e; return get(`https://brasilapi.com.br/api/cep/v1/${cep}`, j => ({ street: j.street, district: j.neighborhood, city: j.city, uf: j.state })); }
+}
+document.addEventListener('input', async e => {
+  const el = e.target; if (!(el instanceof HTMLInputElement) || el.name !== 'zip' || !el.form) return;
+  const v = fCEP(el.value); if (v !== el.value) el.value = v;
+  const cep = onlyDigits(v); if (cep.length !== 8 || el.dataset.cepDone === cep) return;
+  el.dataset.cepDone = cep; const f = el.form;
+  try {
+    const c = await lookupCEP(cep); if (onlyDigits(el.value) !== cep) return;
+    const city = f.elements.city, uf = f.elements.state, addr = f.elements.address;
+    if (city) city.value = uf ? c.city : `${c.city}/${c.uf}`;
+    if (uf) uf.value = c.uf;
+    if (addr && !c.street && addr.dataset.cepFill === addr.value) { addr.value = ''; delete addr.dataset.cepFill; }
+    if (addr && c.street && (!addr.value.trim() || addr.dataset.cepFill === addr.value)) {
+      addr.value = `${c.street}, ${c.district ? ' – ' + c.district : ''}`; addr.dataset.cepFill = addr.value;
+      addr.focus(); addr.setSelectionRange(c.street.length + 2, c.street.length + 2);
+    }
+    toast(c.street ? 'Endereço preenchido pelo CEP. Complete o número.' : 'Cidade preenchida pelo CEP. Complete o endereço.', 'ok');
+  } catch (err) { delete el.dataset.cepDone; toast(err.message === 'nf' ? 'CEP não encontrado. Confira os números.' : 'Não consegui buscar o CEP agora. Preencha o endereço à mão.', 'bad'); }
+});
 function formData(f) {
   const o = {};
   f.querySelectorAll('[name]').forEach(el => {
