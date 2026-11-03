@@ -99,6 +99,7 @@ async function searchPatients(q, limit = 12) {
 
 /* ---------- login / cadastro ---------- */
 const SU = { type: 'clinica', code: '' };
+const SHOW_DEMO = () => /[?&]demo\b/.test(location.search) || ['localhost', '127.0.0.1'].includes(location.hostname) || !(CFG.url && CFG.key);
 function renderAuth(mode = 'login') {
   const app = document.getElementById('app');
   const remoteOk = !!(CFG.url && CFG.key);
@@ -130,10 +131,10 @@ function renderAuth(mode = 'login') {
         <label class="f"><span>Senha (mín. 6 caracteres) <i>*</i></span><input class="in" type="password" name="password" minlength="6" required autocomplete="new-password"></label>
         <button class="btn primary block" type="submit">Criar conta</button>
       </form>`}
-    <div class="sep" style="height:1px;background:var(--line);margin:18px 0"></div>
+    ${SHOW_DEMO() ? html`<div class="sep" style="height:1px;background:var(--line);margin:18px 0"></div>
     <div class="grid g2"><button class="btn" data-act="enterDemo" data-u="demo-user">${icon('sparkle')} Demo clínica</button><button class="btn" data-act="enterDemo" data-u="demo-patient">${icon('user')} Demo paciente</button></div>
     <a class="btn ghost block small" style="margin-top:6px" href="#/agendar/demonstracao" data-act="demoBookPage">${icon('globe')} Ver a página pública de agendamento (demo)</a>
-    <p class="tiny muted" style="text-align:center;margin:10px 0 0">A demonstração usa pessoas fictícias e fica salva só neste navegador.</p>
+    <p class="tiny muted" style="text-align:center;margin:10px 0 0">A demonstração usa pessoas fictícias e fica salva só neste navegador.</p>` : ''}
     ${!remoteOk ? html`<p class="tiny" style="color:var(--bad)">Servidor não configurado: apenas o modo demonstração está disponível.</p>` : ''}
   </div></div>`);
 }

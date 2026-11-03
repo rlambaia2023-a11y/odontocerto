@@ -115,6 +115,15 @@ const Remote = {
   },
   async updateWhere(t, eq, patch) { const r = await Remote.req(`/rest/v1/${t}?${Remote.qs({ eq })}`, { method: 'PATCH', body: patch, headers: { Prefer: 'return=representation' } }); return r[0]; },
   removeWhere(t, eq) { return Remote.req(`/rest/v1/${t}?${Remote.qs({ eq })}`, { method: 'DELETE' }); },
+  async storageFetch(path, opt = {}, retry = true) {
+    const auth = LS.get('pepmh_auth'); const headers = { apikey: CFG.key, ...(opt.headers || {}) }; if (auth?.access_token) headers.Authorization = 'Bearer ' + auth.access_token;
+    const res = await fetch(CFG.url + '/storage/v1/' + path, { ...opt, headers });
+    if ((res.status === 401 || res.status === 400 || res.status === 403) && retry && auth?.refresh_token && Date.now() > (auth.expires_at || 0) - 60000) { if (await Auth.refresh()) return Remote.storageFetch(path, opt, false); }
+    if (!res.ok) { let m = 'Erro ' + res.status; try { const j = await res.json(); m = j.message || j.error || m; } catch { } throw new Error(m); }
+    return res;
+  },
+  upload(bucket, path, file) { return Remote.storageFetch(`object/${bucket}/${path}`, { method: 'POST', body: file, headers: { 'Content-Type': file.type || 'application/pdf', 'x-upsert': 'true' } }); },
+  async download(bucket, path) { return (await Remote.storageFetch(`object/authenticated/${bucket}/${path}`)).blob(); },
   rpc(fn, args = {}) { return Remote.req(`/rest/v1/rpc/${fn}`, { method: 'POST', body: args }); },
 };
 
@@ -138,7 +147,7 @@ const Demo = {
   },
   async insert(t, row) {
     const d = Demo.load(); d[t] = d[t] || [];
-    const DEF = { treatment_items: { status: 'pendente', faces: [], price: 0 }, treatment_plans: { status: 'orcamento', discount: 0, title: 'Plano de tratamento' }, appointments: { status: 'agendado', kind: 'consulta' }, odontogram: { faces: [], status: 'existente' }, documents: { no_date: false }, finance_entries: { due_date: ymd(new Date()) }, stock_items: { quantity: 0, min_quantity: 0, unit_cost: 0, unit: 'un' }, crm_leads: { stage: 'novo', value: 0 }, return_alerts: { done: false }, ideas: { votes: 0, status: 'nova' }, insurances: { active: true, discount_pct: 0 }, procedures: { active: true, duration_min: 30, material_cost: 0, hour_cost: 0, tax_pct: 0, margin_pct: 30, price: 0 }, campaigns: { audience: 'todos' } };
+    const DEF = { treatment_items: { status: 'pendente', faces: [], price: 0 }, treatment_plans: { status: 'orcamento', discount: 0, title: 'Plano de tratamento' }, appointments: { status: 'agendado', kind: 'consulta' }, odontogram: { faces: [], status: 'existente' }, documents: { no_date: false, verify_code: Array.from(crypto.getRandomValues(new Uint8Array(10)), b => '0123456789ABCDEF'[b % 16]).join('') }, finance_entries: { due_date: ymd(new Date()) }, stock_items: { quantity: 0, min_quantity: 0, unit_cost: 0, unit: 'un' }, crm_leads: { stage: 'novo', value: 0 }, return_alerts: { done: false }, ideas: { votes: 0, status: 'nova' }, insurances: { active: true, discount_pct: 0 }, procedures: { active: true, duration_min: 30, material_cost: 0, hour_cost: 0, tax_pct: 0, margin_pct: 30, price: 0 }, campaigns: { audience: 'todos' }, appointment_requests: { status: 'pendente', period: 'qualquer', modality: 'presencial' }, clinic_invites: { expires_at: new Date(Date.now() + 14 * 864e5).toISOString() } };
     const one = r => {
       const x = { id: uid(), created_at: new Date().toISOString(), ...(DEF[t] || {}), ...r };
       if (t === 'patients') { x.record_number = (Math.max(0, ...d.patients.map(p => p.record_number || 0)) + 1); x.tags = x.tags || []; x.active = x.active ?? true; }

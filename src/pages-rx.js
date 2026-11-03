@@ -56,6 +56,7 @@ route('/prescrever', async (_, q) => {
       <div class="doctype" style="margin-top:8px">${Object.entries(DOCT).map(([k, [l, ic]]) => html`<button type="button" class="${k === type ? 'on' : ''}" data-act="rxType" data-t="${k}">${icon(ic)}${l}</button>`)}</div></div>
       <div class="grid g2 collapse" style="align-items:end"><label class="f"><span>Modelo personalizado</span><select class="in" id="rxtpl" data-change="rxTpl"><option value="">Selecione…</option>${tpls.filter(t => t.doc_type === type).map(t => html`<option value="${t.id}">${t.title}</option>`)}</select></label>
         <div class="row"><button type="button" class="btn sm" data-act="manageTpl">${icon('edit')} Editar lista de modelos</button></div></div>
+      ${examBox(type)}
       <div id="medbox" class="${type === 'receituario' ? '' : 'hidden'}"><div class="grid g2 collapse" style="align-items:end"><label class="f"><span>Adicionar medicamento</span><select class="in" id="rxmed" data-change="rxMed"><option value="">Selecione…</option>${curMeds().map((m, i) => html`<option value="${i}">${m[0]}</option>`)}</select></label>
         <label class="f"><span>Quantidade</span><input class="in" id="rxqty"></label></div>
         <label class="f" style="margin-top:10px"><span>Posologia</span><input class="in" id="rxpos"></label>
@@ -92,6 +93,7 @@ act('rxType', el => {
   const f = document.getElementById('rxform'); f.doc_type.value = el.dataset.t;
   f.querySelectorAll('.doctype button').forEach(b => b.classList.toggle('on', b === el));
   document.getElementById('medbox').classList.toggle('hidden', el.dataset.t !== 'receituario');
+  document.getElementById('exambox')?.classList.toggle('hidden', el.dataset.t !== 'exames');
   document.getElementById('rxtypebox').classList.toggle('hidden', el.dataset.t !== 'receituario');
   document.getElementById('rxtpl').innerHTML = fv(html`<option value="">Selecione…</option>${(window.__tpls || []).filter(t => t.doc_type === el.dataset.t).map(t => html`<option value="${t.id}">${t.title}</option>`)}`);
 });
@@ -121,7 +123,7 @@ act('rxSave', async el => {
     const p = await db.get('patients', pid);
     if (d.phone && onlyDigits(d.phone) !== (p.phone || '')) { await db.update('patients', pid, { phone: onlyDigits(d.phone) }); p.phone = onlyDigits(d.phone); }
     const prof = S.members.find(m => m.user_id === d.professional_id) || S.me;
-    const doc = await db.insert('documents', { patient_id: pid, professional_id: prof.user_id, professional_name: prof.full_name, doc_type: d.doc_type, rx_type: d.doc_type === 'receituario' ? d.rx_type : null, content, no_date: !!d.no_date, sent_to: el.dataset.mode === 'send' ? nz(p.phone) : null });
+    const doc = await db.insert('documents', { content_hash: await sha256(content), patient_id: pid, professional_id: prof.user_id, professional_name: prof.full_name, doc_type: d.doc_type, rx_type: d.doc_type === 'receituario' ? d.rx_type : null, content, no_date: !!d.no_date, sent_to: el.dataset.mode === 'send' ? nz(p.phone) : null });
     if (d.save_tpl) { const title = prompt('Nome do modelo:', DOCT[d.doc_type][0] + ' – ' + fDate(new Date())); if (title) await db.insert('document_templates', { doc_type: d.doc_type, title, content }); }
     if (el.dataset.mode === 'print') printDocument(doc, p, prof); else sendDocument(doc, p, prof);
     toast('Documento salvo com sucesso!', 'ok'); go(`#/paciente/${pid}?tab=documentos`);
@@ -135,7 +137,7 @@ function printDocument(doc, p, prof) {
     <p><b>Paciente:</b> ${esc(p.name)}${doc.rx_type === 'controle_especial' ? `<br><b>Endereço:</b> ${esc([p.address, p.city, p.state].filter(Boolean).join(', ') || '________________________________')}` : ''}</p>
     <div style="min-height:260px">${sanitize(doc.content).replace(/\{paciente\}/g, esc(p.name))}</div>${dateLine}${signature(prof.full_name, councilOf(prof))}
     ${doc.rx_type === 'controle_especial' ? `<div style="display:flex;gap:12px;margin-top:20px"><div class="box" style="flex:1"><b>Identificação do comprador</b><br>Nome:<br>RG:<br>Endereço:<br>Telefone:</div><div class="box" style="flex:1"><b>Identificação do fornecedor</b><br><br><br>Assinatura do farmacêutico &nbsp; Data: __/__/__</div></div>` : ''}
-    <div class="ft">${esc(S.clinic.name)} · ${esc(fPhone(S.clinic.phone))}</div></div>`;
+    <div class="ft">${esc(S.clinic.name)} · ${esc(fPhone(S.clinic.phone))}${doc.verify_code ? ` · Código de verificação <b>${esc(doc.verify_code)}</b> — confira em ${esc(verifyUrl(doc.verify_code))}` : ''}</div></div>`;
   printDoc(title + ' – ' + p.name, doc.rx_type === 'controle_especial' ? body('1ª via – Farmácia') + body('2ª via – Paciente') : body(''));
 }
 function sendDocument(doc, p, prof) {
