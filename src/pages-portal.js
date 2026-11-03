@@ -65,7 +65,7 @@ pubRoute('/agendar/:slug', async ({ slug }) => {
   Object.assign(BK, { slug, clinic: c, pro: null, modality: null, date: null, slots: [], slot: null, done: null, embedded: false });
   if (c.professionals.length === 1) after(() => ACT.bkPro({ dataset: { id: c.professionals[0].user_id } }));
   return html`<div style="min-height:100vh;background:var(--bg)">
-    <header class="topbar"><span class="logo"><span class="mark">PE</span>${c.name}</span><span class="sp"></span>${S.mode === 'patient' ? html`<a class="btn sm" style="background:#fff" href="#/">Minha área</a>` : html`<a class="btn sm" style="background:#fff" href="#/" data-act="bkLoginLink">Entrar</a>`}</header>
+    <header class="topbar"><span class="logo">${safeLogo(c.logo_url) ? html`<span style="background:#fff;border-radius:10px;padding:4px 10px;display:inline-flex"><img src="${c.logo_url}" alt="${c.name}" style="height:34px"></span>` : html`<span class="mark">PE</span>${c.name}`}</span><span class="sp"></span>${S.mode === 'patient' ? html`<a class="btn sm" style="background:#fff" href="#/">Minha área</a>` : html`<a class="btn sm" style="background:#fff" href="#/" data-act="bkLoginLink">Entrar</a>`}</header>
     <main style="max-width:860px;margin:0 auto;padding:18px 16px 60px">
       <div class="card"><h1>Marque sua consulta</h1><p class="muted" style="margin:6px 0 0">${[c.address, c.city && c.city + (c.state ? '/' + c.state : '')].filter(Boolean).join(' · ')}${c.phone ? ' · ' + fPhone(c.phone) : ''}</p>${c.note ? html`<p class="small" style="margin:8px 0 0">${c.note}</p>` : ''}
         <p class="tiny muted" style="margin:8px 0 0">Cadastro gratuito para pacientes. Consultas online acontecem pelo Google Meet.</p></div>

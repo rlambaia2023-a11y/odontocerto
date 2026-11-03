@@ -21,7 +21,7 @@ function renderShell(active) {
     app.innerHTML = fv(html`
     <header class="topbar">
       <button class="iconbtn only-m" data-act="toggleMenu" aria-label="Menu">${icon('menu')}</button>
-      <a class="logo" href="#/"><span class="mark">PE</span>PEPMH${patient ? html`<span class="small hide-m" style="font-weight:500;opacity:.85;letter-spacing:0"> · ${S.clinic.name}</span>` : ''}</a>
+      <a class="logo" href="#/">${patient && safeLogo(S.clinic.logo_url) ? html`<span style="background:#fff;border-radius:9px;padding:3px 8px;display:inline-flex"><img src="${S.clinic.logo_url}" alt="${S.clinic.name}" style="height:30px"></span>` : html`<span class="mark">PE</span>PEPMH`}${patient && !safeLogo(S.clinic.logo_url) ? html`<span class="small hide-m" style="font-weight:500;opacity:.85;letter-spacing:0"> · ${S.clinic.name}</span>` : ''}</a>
       <span class="sp"></span>
       ${!patient ? html`<button class="iconbtn" data-act="globalSearch" aria-label="Buscar paciente">${icon('search')}</button>
       <div class="rel"><button class="iconbtn" data-act="openNotif" aria-label="Notificações" id="bellbtn">${icon('bell')}</button></div>` : S.clinic.phone ? html`<a class="iconbtn" target="_blank" rel="noopener" href="${waLink(S.clinic.phone, 'Olá! Sou paciente e gostaria de falar com a clínica.')}" aria-label="Falar com a clínica">${icon('wa')}</a>` : ''}

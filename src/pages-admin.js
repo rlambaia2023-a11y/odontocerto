@@ -224,7 +224,11 @@ route('/configuracoes', async (_, q) => {
     <label class="f"><span>Nome do consultório <i>*</i></span><input class="in" name="name" required value="${c.name || ''}"></label><div class="grid g2"><label class="f"><span>CNPJ</span><input class="in" name="cnpj" value="${c.cnpj || ''}"></label><label class="f"><span>Telefone</span><input class="in" name="phone" value="${fPhone(c.phone)}"></label></div>
     <label class="f"><span>E-mail</span><input class="in" name="email" type="email" value="${c.email || ''}"></label><label class="f"><span>Endereço</span><input class="in" name="address" value="${c.address || ''}"></label>
     <div class="grid g2"><label class="f"><span>Cidade</span><input class="in" name="city" value="${c.city || ''}"></label><label class="f"><span>UF</span><input class="in" name="state" maxlength="2" value="${c.state || ''}"></label></div>
-    <button class="btn primary" type="submit">Salvar consultório</button></fieldset></form></div>
+    <button class="btn primary" type="submit">Salvar consultório</button></fieldset></form>
+    <div style="margin-top:16px"><span class="small" style="font-weight:600;color:var(--ink-2)">Logo (aparece em receitas, atestados, orçamentos e na página de agendamento)</span>
+    <div class="row" style="margin-top:8px">${safeLogo(c.logo_url) ? html`<img src="${c.logo_url}" alt="Logo" style="height:56px;max-width:260px;border:1px solid var(--line);border-radius:8px;padding:4px;background:#fff">` : html`<span class="small muted">Sem logo.</span>`}
+    ${owner ? html`<label class="btn sm">${icon('up')} Enviar logo<input type="file" accept="image/svg+xml,image/png,image/jpeg,image/webp" data-change="logoFile" style="display:none"></label>${c.logo_url ? html`<button class="btn sm danger" data-act="logoDel">${icon('trash')} Remover</button>` : ''}` : ''}</div>
+    <p class="tiny muted">SVG, PNG, JPG ou WEBP de até 250 KB. De preferência com fundo transparente e formato horizontal.</p></div></div>
   <div class="stack"><div class="card"><h2>Meus dados profissionais</h2><form data-form="saveMe" class="stack" style="margin-top:10px"><label class="f"><span>Nome como aparece na assinatura <i>*</i></span><input class="in" name="full_name" required value="${m.full_name || ''}"></label>
     ${S.me.role !== 'secretaria' ? html`<label class="f"><span>Área</span><select class="in" name="profession">${Object.entries(PROF).map(([k, v]) => html`<option value="${k}" ${m.profession === k ? 'selected' : ''}>${v}</option>`)}</select></label>` : ''}
     <div class="grid g3"><label class="f"><span>Conselho</span><select class="in" name="council">${['CRO', 'CRM', 'CRF', 'CRN', 'CREFITO', 'CRP'].map(x => html`<option ${m.council === x ? 'selected' : ''}>${x}</option>`)}</select></label><label class="f"><span>Número</span><input class="in" name="council_number" value="${m.council_number || ''}"></label><label class="f"><span>UF</span><input class="in" name="council_uf" maxlength="2" value="${m.council_uf || ''}"></label></div>
@@ -236,3 +240,12 @@ route('/configuracoes', async (_, q) => {
 onForm('saveClinic', async d => { const row = { ...d, phone: nz(onlyDigits(d.phone)), state: nz((d.state || '').toUpperCase()) }; S.clinic = { ...S.clinic, ...(await B().updateWhere('clinics', { id: S.clinic.id }, row)) }; toast('Dados do consultório salvos.', 'ok'); });
 onForm('saveMe', async d => { const row = { ...d, cpf: nz(onlyDigits(d.cpf)), council_uf: nz((d.council_uf || '').toUpperCase()) }; await B().updateWhere('clinic_members', { clinic_id: S.clinic.id, user_id: S.me.user_id }, row); Object.assign(S.me, row); S.members = await db.list('clinic_members', { eq: { clinic_id: S.clinic.id } }); toast('Seus dados foram salvos.', 'ok'); });
 onForm('savePass', async (d, f) => { await Remote.req('/auth/v1/user', { method: 'PUT', body: { password: d.password } }); f.reset(); toast('Senha alterada.', 'ok'); });
+
+onInput('logoFile', async el => {
+  const f = el.files[0]; if (!f) return;
+  if (!/^image\/(svg\+xml|png|jpeg|webp)$/.test(f.type)) return toast('Use SVG, PNG, JPG ou WEBP.', 'bad');
+  if (f.size > 250 * 1024) return toast('A imagem passa de 250 KB. Reduza e tente de novo.', 'bad');
+  const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+  const r = await B().updateWhere('clinics', { id: S.clinic.id }, { logo_url: url }); Object.assign(S.clinic, r || { logo_url: url }); toast('Logo atualizada.', 'ok'); router();
+});
+act('logoDel', async () => { if (!(await confirmBox('Remover a logo da clínica?', 'Remover'))) return; await B().updateWhere('clinics', { id: S.clinic.id }, { logo_url: null }); S.clinic.logo_url = null; router(); });

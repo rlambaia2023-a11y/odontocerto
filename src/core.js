@@ -311,9 +311,10 @@ function printDoc(title, bodyHtml, extraCss = '') {
   @media print{body{padding:0 10mm}} ${extraCss}</style></head><body>${bodyHtml}<script>setTimeout(()=>print(),300)<\/script></body></html>`);
   w.document.close();
 }
+const safeLogo = u => /^data:image\/(svg\+xml|png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(u || '') ? u : '';
 function docHeader() {
   const c = S.clinic || {};
-  return `<div class="hd"><div><b>${esc(c.name || 'Consultório')}</b><small>${esc([c.address, c.city && (c.city + (c.state ? '/' + c.state : ''))].filter(Boolean).join(' · '))}</small></div><small style="text-align:right">${esc(fPhone(c.phone))}${c.email ? '<br>' + esc(c.email) : ''}${c.cnpj ? '<br>CNPJ ' + esc(c.cnpj) : ''}</small></div>`;
+  return `<div class="hd"><div>${safeLogo(c.logo_url) ? `<img src="${c.logo_url}" alt="${esc(c.name)}" style="height:52px;display:block;margin-bottom:4px">` : `<b>${esc(c.name || 'Consultório')}</b>`}<small>${esc([c.address, c.city && (c.city + (c.state ? '/' + c.state : ''))].filter(Boolean).join(' · '))}</small></div><small style="text-align:right">${esc(fPhone(c.phone))}${c.email ? '<br>' + esc(c.email) : ''}${c.cnpj ? '<br>CNPJ ' + esc(c.cnpj) : ''}</small></div>`;
 }
 function signature(name, council) { return `<div class="sig"><div class="ln"></div>${esc(name || '')}<br><small>${esc(council || '')}</small></div>`; }
 
