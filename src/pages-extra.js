@@ -117,3 +117,117 @@ async function remindersBlock() {
   return html`<div class="card"><h2>Lembretes de amanhã (${ap.length})</h2><p class="small muted" style="margin:4px 0 8px">Um toque abre o WhatsApp com a mensagem pronta${ap.some(a => a.modality === 'online') ? ', já com o link do Meet nas teleconsultas' : ''}.</p>
     ${ap.length ? html`<div class="list">${ap.map(a => { const p = pm[a.patient_id]; return html`<div class="li"><b class="small" style="width:46px">${fTime(a.starts_at)}</b><span class="grow"><span class="t">${p?.name || ''}</span><span class="tiny muted">${MOD[a.modality || 'presencial']} · ${proName(a.professional_id)}</span></span>${statusPill(a.status)}${p?.phone ? html`<a class="btn sm" target="_blank" rel="noopener" href="${waLink(p.phone, msg(p, a))}">${icon('wa')} Lembrar</a>` : html`<span class="tiny muted">sem celular</span>`}</div>`; })}</div>` : html`<p class="muted small">Nenhuma consulta amanhã.</p>`}</div>`;
 }
+
+/* ---------- importação de pacientes (CSV / Excel) ---------- */
+const IMP_FIELDS = [
+  ['name', 'Nome *', /^(nome|paciente|nome completo|nome do paciente|cliente)$|nome/],
+  ['cpf', 'CPF', /cpf/], ['birth_date', 'Nascimento', /nasc|data de nasc|dt nasc|aniver/], ['sex', 'Sexo', /^sexo$|genero|gênero/],
+  ['phone', 'Celular / WhatsApp', /celular|whats|telefone|fone|contato/], ['email', 'E-mail', /e-?mail/],
+  ['zip', 'CEP', /cep/], ['address', 'Endereço (pode juntar colunas)', /endere|logradouro|^rua|numero|número|bairro|complemento/],
+  ['city', 'Cidade', /cidade|municipio|município/], ['state', 'UF', /^uf$|estado/],
+  ['insurance', 'Convênio', /conv[eê]nio|plano/], ['insurance_card', 'Carteirinha', /carteir|matr[ií]cula/],
+  ['rg', 'RG', /^rg$|identidade/], ['occupation', 'Profissão', /profiss|ocupa/], ['guardian_name', 'Responsável', /respons/],
+  ['alerts', 'Alergias / alertas clínicos', /alerg|alerta/],
+  ['notes', 'Observações (pode juntar colunas)', /obs|anota|nota|etiqueta|tag/],
+];
+const MULTI = new Set(['address', 'notes']);
+function parseCSV(text) {
+  text = text.replace(/^﻿/, ''); const first = text.split(/\r?\n/)[0] || '';
+  const delim = [';', ',', '\t'].sort((a, b) => first.split(b).length - first.split(a).length)[0];
+  const rows = []; let row = [], cur = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+    else if (c === '"') q = true; else if (c === delim) { row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cur); rows.push(row); row = []; cur = ''; }
+    else cur += c;
+  }
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  return rows;
+}
+function loadScript(src) { return new Promise((res, rej) => { if (document.querySelector(`script[src="${src}"]`)) return res(); const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Não consegui carregar o leitor de Excel. Salve a planilha como CSV e tente de novo.')); document.head.appendChild(s); }); }
+async function readSheet(file) {
+  if (/\.(xlsx|xls|ods)$/i.test(file.name)) {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
+  }
+  const buf = await file.arrayBuffer(); let text = new TextDecoder('utf-8').decode(buf);
+  if (text.includes('�')) text = new TextDecoder('windows-1252').decode(buf);
+  return parseCSV(text);
+}
+function impDate(v) {
+  if (v instanceof Date && !isNaN(v)) return ymd(new Date(v.getTime() + v.getTimezoneOffset() * 60000 + 12 * 3600000));
+  if (typeof v === 'number' && v > 1000 && v < 80000) return ymd(new Date(Date.UTC(1899, 11, 30) + v * 864e5 + 12 * 3600000));
+  const s = String(v || '').trim(); let m;
+  if ((m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/))) { let y = +m[3]; if (y < 100) y += y > (new Date().getFullYear() % 100) ? 1900 : 2000; const d = new Date(y, +m[2] - 1, +m[1]); return d.getMonth() === +m[2] - 1 ? ymd(d) : null; }
+  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return `${m[1]}-${m[2]}-${m[3]}`;
+  return null;
+}
+const impSex = v => { const s = norm(v); return /^f|fem/.test(s) ? 'F' : /^m|masc/.test(s) ? 'M' : s ? 'O' : null; };
+const titleCase = s => String(s || '').toLowerCase().replace(/(^|\s|-)(\p{L})/gu, (a, b, c) => b + c.toUpperCase()).replace(/\b(Da|De|Do|Das|Dos|E)\b/g, w => w.toLowerCase());
+act('importPatients', () => {
+  window.__imp = null;
+  modal('Importar pacientes', html`<p class="small" style="margin-top:0">Envie a planilha exportada do sistema anterior (CSV ou Excel). Nada é gravado antes de você conferir a prévia.</p>
+    <input type="file" class="in" style="padding-top:8px" accept=".csv,.txt,.xlsx,.xls,.ods" data-change="impFile"><div id="impbody" style="margin-top:12px"></div>`, { wide: true });
+});
+onInput('impFile', async el => {
+  const f = el.files[0]; if (!f) return; const box = document.getElementById('impbody'); box.innerHTML = '<div class="loading">Lendo a planilha…</div>';
+  try {
+    const rows = (await readSheet(f)).filter(r => r.some(c => String(c ?? '').trim()));
+    const hi = rows.findIndex(r => r.filter(c => String(c ?? '').trim()).length >= 2); if (hi < 0) throw new Error('Não encontrei cabeçalho com colunas.');
+    const header = rows[hi].map(h => String(h ?? '').trim()), data = rows.slice(hi + 1);
+    const map = {}; const used = new Set();
+    IMP_FIELDS.forEach(([k, , re]) => { const cols = header.map((h, i) => [norm(h), i]).filter(([h, i]) => h && re.test(h) && (MULTI.has(k) || !used.has(i))); if (!cols.length) return; if (MULTI.has(k)) map[k] = cols.map(c => c[1]); else { map[k] = [cols[0][1]]; used.add(cols[0][1]); } });
+    if (map.name) map.name = [header.findIndex((h, i) => /^(nome|paciente|nome completo|nome do paciente)$/.test(norm(h))) >= 0 ? header.findIndex(h => /^(nome|paciente|nome completo|nome do paciente)$/.test(norm(h))) : map.name[0]];
+    ['address', 'notes'].forEach(k => map[k] && (map[k] = map[k].filter(i => !Object.entries(map).some(([kk, v]) => kk !== k && !MULTI.has(kk) && v.includes(i)))));
+    const existing = await db.list('patients', { select: 'id,name,cpf,birth_date', limit: 10000 });
+    window.__imp = { file: f.name, header, data, map, existing };
+    impRender();
+  } catch (e) { box.innerHTML = fv(html`<p style="color:var(--bad)">${e.message}</p>`); }
+});
+function impRows() {
+  const { data, map, existing } = window.__imp; const get = (r, k) => (map[k] || []).map(i => r[i]).filter(v => String(v ?? '').trim() !== '');
+  const byCpf = new Set(existing.map(p => p.cpf).filter(Boolean)), byNameBirth = new Set(existing.map(p => norm(p.name) + '|' + (p.birth_date || '')));
+  const seen = new Set();
+  return data.map(r => {
+    const one = k => get(r, k)[0];
+    const name = titleCase(String(one('name') || '').replace(/\s+/g, ' ').trim());
+    let cpf = onlyDigits(one('cpf')); if (cpf && cpf.length < 11 && cpf.length >= 9) cpf = cpf.padStart(11, '0'); if (cpf.length !== 11) cpf = null;
+    const birth = impDate(one('birth_date')); let phone = onlyDigits(one('phone')); if (phone.startsWith('55') && phone.length > 11) phone = phone.slice(2); if (phone.length < 10) phone = phone || null;
+    const insName = String(one('insurance') || '').trim();
+    const notes = [...get(r, 'notes').map(String), insName && !/particular/i.test(insName) && !S.insurances.some(i => norm(i.name) === norm(insName)) ? 'Convênio no sistema anterior: ' + insName : ''].filter(Boolean).join(' · ');
+    const row = { name, cpf, birth_date: birth, sex: impSex(one('sex')), phone: phone || null, email: (String(one('email') || '').trim().toLowerCase().match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/) || [null])[0],
+      zip: onlyDigits(one('zip')) || null, address: get(r, 'address').map(v => String(v).trim()).join(', ') || null, city: titleCase(one('city')) || null, state: (String(one('state') || '').trim().toUpperCase().slice(0, 2)) || null,
+      insurance_id: S.insurances.find(i => norm(i.name) === norm(insName) && !/particular/i.test(i.name))?.id || null, insurance_card: String(one('insurance_card') || '').trim() || null,
+      rg: String(one('rg') || '').trim() || null, occupation: String(one('occupation') || '').trim() || null, guardian_name: titleCase(one('guardian_name')) || null, alerts: get(r, 'alerts').map(String).join(' · ') || null, notes: notes || null };
+    let status = 'novo';
+    if (!name || name.length < 2) status = 'sem nome';
+    else if ((cpf && byCpf.has(cpf)) || byNameBirth.has(norm(name) + '|' + (birth || ''))) status = 'já cadastrado';
+    else { const k = cpf || norm(name) + '|' + (birth || ''); if (seen.has(k)) status = 'repetido na planilha'; seen.add(k); }
+    return { row, status };
+  });
+}
+function impRender() {
+  const imp = window.__imp, rows = impRows(), cnt = groupBy(rows, r => r.status);
+  const opt = (k, i) => html`<option value="${i}" ${(imp.map[k] || []).includes(i) ? 'selected' : ''}>${imp.header[i] || 'Coluna ' + (i + 1)}</option>`;
+  document.getElementById('impbody').innerHTML = fv(html`
+    <div class="row" style="gap:6px;margin-bottom:10px"><span class="pill">${imp.file}</span><span class="pill ok">${(cnt['novo'] || []).length} novos</span>${cnt['já cadastrado'] ? html`<span class="pill gray">${cnt['já cadastrado'].length} já cadastrados (serão pulados)</span>` : ''}${cnt['repetido na planilha'] ? html`<span class="pill warn">${cnt['repetido na planilha'].length} repetidos na planilha</span>` : ''}${cnt['sem nome'] ? html`<span class="pill bad">${cnt['sem nome'].length} sem nome</span>` : ''}</div>
+    <details ${Object.keys(imp.map).length < 3 ? 'open' : ''}><summary class="small" style="cursor:pointer;font-weight:600">Conferir quais colunas vão para cada campo</summary>
+      <div class="grid g3 collapse" style="margin-top:8px">${IMP_FIELDS.map(([k, l]) => html`<label class="f"><span>${l}</span><select class="in" ${MULTI.has(k) ? 'multiple size="3" style="height:auto"' : ''} data-change="impMap" data-k="${k}">${!MULTI.has(k) ? html`<option value="">— não importar —</option>` : ''}${imp.header.map((_, i) => opt(k, i))}</select></label>`)}</div></details>
+    <div class="tblwrap" style="margin-top:12px;max-height:300px;overflow:auto"><table class="tbl"><tr><th></th><th>Nome</th><th>CPF</th><th>Nascimento</th><th>Celular</th><th>E-mail</th><th>Cidade</th></tr>
+      ${rows.slice(0, 50).map(({ row: r, status }) => html`<tr style="${status !== 'novo' ? 'opacity:.55' : ''}"><td><span class="pill ${status === 'novo' ? 'ok' : status === 'sem nome' ? 'bad' : 'gray'}">${status}</span></td><td>${r.name}</td><td class="small">${fCPF(r.cpf)}</td><td class="small">${fDate(r.birth_date)}</td><td class="small">${fPhone(r.phone)}</td><td class="small">${r.email || ''}</td><td class="small">${r.city || ''}</td></tr>`)}</table></div>
+    ${rows.length > 50 ? html`<p class="tiny muted">Mostrando 50 de ${rows.length} linhas.</p>` : ''}
+    <label class="check small" style="margin-top:10px"><input type="checkbox" id="impok"> Confirmo que estes pacientes pertencem a esta clínica/profissional (ou há autorização do responsável pelos dados) e que posso tratá-los conforme a LGPD.</label>
+    <div class="row between" style="margin-top:10px"><span class="small muted">Os importados recebem a etiqueta <b>importado</b>.</span><button class="btn primary" data-act="impRun" ${(cnt['novo'] || []).length ? '' : 'disabled'}>${icon('up')} Importar ${(cnt['novo'] || []).length} paciente(s)</button></div>`);
+}
+onInput('impMap', el => { const k = el.dataset.k; const vals = [...el.selectedOptions].map(o => o.value).filter(v => v !== '').map(Number); if (vals.length) window.__imp.map[k] = vals; else delete window.__imp.map[k]; impRender(); });
+act('impRun', async el => {
+  if (!document.getElementById('impok').checked) throw new Error('Marque a confirmação antes de importar.');
+  const novos = impRows().filter(r => r.status === 'novo').map(r => ({ ...r.row, tags: ['importado'], origin: 'Sistema anterior', active: true }));
+  el.disabled = true; let done = 0;
+  try {
+    for (let i = 0; i < novos.length; i += 200) { await db.insert('patients', novos.slice(i, i + 200)); done += Math.min(200, novos.length - i); el.textContent = `Importando… ${done}/${novos.length}`; }
+    closeModal(); toast(`${done} paciente(s) importado(s).`, 'ok'); go('#/pacientes');
+  } catch (e) { el.disabled = false; el.textContent = 'Tentar de novo'; throw new Error(`Parou depois de ${done} pacientes: ${e.message}`); }
+});

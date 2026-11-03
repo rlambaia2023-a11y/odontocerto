@@ -16,7 +16,7 @@ const KEY_SB = Bun.env.SUPABASE_KEY || "";
 const page = HTML.replace('/*CONFIG*/{url:"",key:""}', JSON.stringify({ url: URL_SB, key: KEY_SB }).replace(/</g, "\\\\u003c"));
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src https://fonts.gstatic.com",
   "img-src 'self' data:",
