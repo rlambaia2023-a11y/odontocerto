@@ -150,24 +150,25 @@ act('delEvent', async el => {
   for (const x of list) { await db.remove('work_events', x.id); if (x.google_event_id) gpush('deleteRemote', { google_event_id: x.google_event_id }); }
   closeModal(); toast('Compromisso excluído.'); router();
 });
-act('gsyncNow', async el => { el.disabled = true; const r = await gcall('sync'); el.disabled = false; if (r.ok) { toast(`Google Agenda atualizado (${r.imported} eventos).`, 'ok'); router(); } else toast(r.configured === false ? 'O Google da clínica ainda não está conectado (Configurações → Google da clínica).' : 'Google: ' + (r.message || 'falhou'), 'bad'); });
+act('gsyncNow', async el => { el.disabled = true; const r = await gcall('status'); el.disabled = false; if (r.ok) toast(`A agenda do Google é lida a cada 5 minutos. Última leitura: ${r.last_sync_at ? fDT(r.last_sync_at) : '—'}.`, 'ok'); else toast(r.configured === false ? 'O Google da clínica ainda não está conectado (Configurações → Google da clínica).' : (r.message || 'O script do Google ainda não se comunicou.'), 'bad'); });
 
 /* ---------- configurações: Google da clínica ---------- */
+/* O script roda na conta Google da clínica e, a cada 5 minutos, busca as tarefas no PEPMH (nada fica aberto na internet). */
 async function googleCard() {
   const [g] = isDemo() ? [null] : await db.list('clinic_integrations', { eq: { clinic_id: S.clinic.id } }).catch(() => []);
+  const on = g?.last_seen_at && (Date.now() - new Date(g.last_seen_at)) < 3 * 864e5;
   return html`<div class="card" id="sec-google" style="grid-column:1/-1"><h2>${icon('globe')} Google da clínica (Agenda, Gmail e Drive)</h2>
-    <p class="small muted">Liga o PEPMH à conta Google da clínica: as consultas e compromissos vão para o Google Agenda, os eventos que já estão no Google bloqueiam a agenda, os avisos de acompanhamento chegam por e-mail e as fotos dos pacientes ficam guardadas no Drive.</p>
-    ${g?.gas_url ? html`<p class="small"><span class="pill ok">conectado</span> ${g.last_sync_at ? 'Última sincronização: ' + fDT(g.last_sync_at) : ''}</p>` : html`<p class="small"><span class="pill warn">não conectado</span></p>`}
+    <p class="small muted">Liga o PEPMH à conta Google da clínica: consultas e compromissos vão para o Google Agenda, o que já está no Google bloqueia a agenda do PEPMH, os acompanhamentos dos pacientes chegam por e-mail e as fotos ficam guardadas no Drive. O script roda dentro da conta da clínica e conversa com o PEPMH a cada 5 minutos.</p>
+    ${on ? html`<p class="small"><span class="pill ok">conectado</span> ${g.account_email ? html`<b>${g.account_email}</b> · ` : ''}último contato ${fDT(g.last_seen_at)}${g.last_sync_at ? ' · agenda lida ' + fDT(g.last_sync_at) : ''}</p>`
+      : html`<p class="small"><span class="pill warn">${g?.last_seen_at ? 'sem contato há mais de 3 dias' : 'não conectado'}</span></p>
     <ol class="small" style="padding-left:18px;line-height:1.7">
-      <li>Entre em <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener">script.google.com</a> com a conta <b>${S.clinic.email || 'da clínica'}</b> e crie um projeto novo.</li>
-      <li>Apague o que vier escrito e cole o código abaixo (ele já leva o código secreto desta clínica).</li>
-      <li>Clique em <b>Implantar → Nova implantação → App da Web</b>. Executar como: <b>Eu</b>. Quem pode acessar: <b>Qualquer pessoa</b>. Autorize.</li>
-      <li>Copie o endereço que termina em <b>/exec</b> e cole aqui embaixo.</li></ol>
-    <div class="row"><button class="btn" data-act="gasCode">${icon('clip')} ${g?.gas_secret ? 'Ver o código do script' : 'Gerar o código do script'}</button></div>
-    <form data-form="saveGoogle" class="stack" style="margin-top:12px"><label class="f"><span>Endereço do script (termina em /exec)</span><input class="in" name="gas_url" value="${g?.gas_url || ''}" placeholder="https://script.google.com/macros/s/…/exec"></label>
-      <div class="grid g2"><label class="f"><span>E-mail que recebe os avisos</span><input class="in" type="email" name="notify_email" value="${g?.notify_email || S.clinic.email || ''}"></label>
-      <label class="check" style="align-self:end"><input type="checkbox" name="calendar_sync" ${!g || g.calendar_sync ? 'checked' : ''}> Sincronizar com o Google Agenda</label></div>
-      <div class="row"><button class="btn primary" type="submit">Salvar</button>${g?.gas_url ? html`<button type="button" class="btn" data-act="gasTest">Testar conexão</button><button type="button" class="btn" data-act="gsyncNow">Sincronizar agora</button>` : ''}</div></form>
+      <li>Entre em <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener">script.google.com</a> com a conta <b>${S.clinic.email || 'da clínica'}</b> e crie um projeto.</li>
+      <li>Apague o que vier escrito e cole o código do script (botão abaixo; ele já leva a chave desta clínica).</li>
+      <li>Salve, escolha a função <b>instalar</b> no topo e clique em <b>Executar</b>. Autorize com a conta da clínica.</li></ol>`}
+    <div class="row"><button class="btn" data-act="gasCode">${icon('clip')} Código do script</button>${on ? html`<button class="btn" data-act="gasTest">${icon('send')} Enviar e-mail de teste</button>` : ''}</div>
+    <form data-form="saveGoogle" class="stack" style="margin-top:12px"><div class="grid g2"><label class="f"><span>E-mail que recebe os avisos</span><input class="in" type="email" name="notify_email" value="${g?.notify_email || S.clinic.email || ''}"></label>
+      <label class="check" style="align-self:end"><input type="checkbox" name="calendar_sync" ${!g || g.calendar_sync ? 'checked' : ''}> Ler o Google Agenda para evitar conflitos</label></div>
+      <div class="row"><button class="btn primary" type="submit">Salvar</button></div></form>
     ${g?.last_error ? html`<p class="tiny" style="color:var(--bad)">${g.last_error}</p>` : ''}</div>`;
 }
 const randSecret = () => Array.from(crypto.getRandomValues(new Uint8Array(24)), b => b.toString(16).padStart(2, '0')).join('');
@@ -176,15 +177,12 @@ act('gasCode', async () => {
   let [g] = await db.list('clinic_integrations', { eq: { clinic_id: S.clinic.id } });
   if (!g?.gas_secret) { const sec = randSecret(); g = g ? await db.updateWhere('clinic_integrations', { clinic_id: S.clinic.id }, { gas_secret: sec }) : await B().insert('clinic_integrations', { clinic_id: S.clinic.id, gas_secret: sec, notify_email: S.clinic.email || null }); }
   const code = GAS_CODE.replace('__PEPMH_SECRET__', g.gas_secret);
-  modal('Código do script do Google', html`<p class="small muted" style="margin-top:0">Cole tudo no editor do Google Apps Script (arquivo Código.gs). Não compartilhe: ele contém a chave desta clínica.</p><textarea class="in" rows="14" readonly style="font-family:monospace;font-size:12px">${code}</textarea><div class="row" style="margin-top:10px"><button class="btn primary" data-act="copyText" data-t="${code}">${icon('clip')} Copiar código</button><a class="btn" target="_blank" rel="noopener" href="https://script.google.com/home/projects/create">Abrir o Google Apps Script</a></div>`, { wide: true });
+  modal('Código do script do Google', html`<p class="small muted" style="margin-top:0">Cole tudo no editor do Google Apps Script (arquivo Código.gs), salve e rode a função <b>instalar</b>. Não compartilhe: ele contém a chave desta clínica.</p><textarea class="in" rows="14" readonly style="font-family:monospace;font-size:12px">${code}</textarea><div class="row" style="margin-top:10px"><button class="btn primary" data-act="copyText" data-t="${code}">${icon('clip')} Copiar código</button><a class="btn" target="_blank" rel="noopener" href="https://script.google.com/home/projects/create">Abrir o Google Apps Script</a></div>`, { wide: true });
 });
 onForm('saveGoogle', async d => {
-  if (d.gas_url && !/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(d.gas_url)) throw new Error('O endereço precisa ser do tipo https://script.google.com/macros/s/…/exec');
-  const row = { gas_url: nz(d.gas_url), notify_email: nz(d.notify_email), calendar_sync: !!d.calendar_sync, updated_at: new Date().toISOString() };
+  const row = { notify_email: nz(d.notify_email), calendar_sync: !!d.calendar_sync, updated_at: new Date().toISOString() };
   const [g] = await db.list('clinic_integrations', { eq: { clinic_id: S.clinic.id } });
   if (g) await db.updateWhere('clinic_integrations', { clinic_id: S.clinic.id }, row); else await B().insert('clinic_integrations', { clinic_id: S.clinic.id, gas_secret: randSecret(), ...row });
-  toast('Salvo.', 'ok');
-  if (row.gas_url) { const r = await gcall('status'); if (r.ok) toast(`Conectado à conta ${r.email}.`, 'ok'); else toast('Salvo, mas o teste falhou: ' + (r.message || ''), 'bad'); }
-  router();
+  toast('Salvo.', 'ok'); router();
 });
-act('gasTest', async el => { el.disabled = true; const r = await gcall('status'); el.disabled = false; if (r.ok) toast(`Tudo certo: conta ${r.email}, agenda "${r.calendar}".`, 'ok'); else toast('Falhou: ' + (r.message || ''), 'bad'); });
+act('gasTest', async el => { el.disabled = true; const r = await gcall('test'); el.disabled = false; if (r.ok) toast('Teste na fila: o e-mail chega em até 5 minutos.', 'ok'); else toast('Falhou: ' + (r.message || ''), 'bad'); });

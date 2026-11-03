@@ -62,7 +62,7 @@ onForm('sendCheckin', async (d, f) => {
   catch (e) { if (/duplicate|unique/i.test(e.message)) throw new Error('Você já enviou o acompanhamento desta semana.'); throw e; }
   if (peso != null) await db.insert('weight_logs', { patient_id: p.id, data: row.data, peso, observacao: 'Acompanhamento semanal', registrado_pelo_paciente: true }).catch(() => { });
   const r = await gcall('checkin', { id });
-  toast(r.ok || r.demo ? 'Enviado! A clínica já foi avisada.' : 'Enviado! A clínica vai ver no sistema.', 'ok');
+  toast(r.ok || r.demo ? 'Enviado! A clínica recebe o aviso por e-mail.' : 'Enviado! A clínica vai ver no sistema.', 'ok');
   router();
 });
 
