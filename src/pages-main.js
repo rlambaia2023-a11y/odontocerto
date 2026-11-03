@@ -26,7 +26,7 @@ route('/', async () => {
   const aReceber = sum(fin.filter(f => f.kind === 'receita' && !f.paid_at), f => f.amount);
   const despesas = sum(monthFin.filter(f => f.kind === 'despesa'), f => f.amount);
   const np = next && pm[next.patient_id];
-  const q = [['#/agenda?novo=1', 'cal', 'Agendar paciente'], isClinical() ? ['#/prescrever', 'pill', 'Prescrever'] : ['#/solicitacoes', 'globe', 'Agendamentos online'], ['#/pacientes', 'clip', 'Abrir prontuário'], ['#/financeiro?novo=despesa', 'receipt', 'Lançar despesa'], ['#/financeiro?novo=receita', 'money', 'Receber pagamento'], ['#/marketing', 'chat', 'Falar com paciente']];
+  const q = [['#/agenda?novo=1', 'cal', 'Agendar paciente'], isClinical() ? ['#/prescrever', 'pill', 'Prescrever'] : ['#/solicitacoes', 'globe', 'Agendamentos online'], ['#/pacientes', 'clip', 'Abrir prontuário'], ...(isAdmin() ? [['#/financeiro?novo=despesa', 'receipt', 'Lançar despesa'], ['#/financeiro?novo=receita', 'money', 'Receber pagamento']] : [['#/minha-agenda', 'calme', 'Minha agenda'], ['#/solicitacoes', 'globe', 'Agendamentos online']]), ['#/marketing', 'chat', 'Falar com paciente']];
   return html`
   <div class="pagehead"><div><h1>Olá, ${(S.me.full_name || '').split(' ').slice(0, 2).join(' ') || 'bem-vindo(a)'}</h1><div class="muted small">${fLong(now)} · ${S.clinic.name}</div></div></div>
   <div class="quick">${q.map(([h, i, l]) => html`<a href="${h}">${icon(i)}<span>${l}</span></a>`)}</div>
@@ -40,9 +40,9 @@ route('/', async () => {
     </div>
     <div class="grid g2">
       <div class="card kpi"><div class="l">Consultas hoje</div><div class="v">${active.length}</div><div class="tiny muted">${today.filter(a => a.status === 'confirmado').length} confirmadas</div></div>
-      <div class="card kpi"><div class="l">Recebido no mês</div><div class="v" style="color:var(--ok)">${BRL(recebido)}</div></div>
-      <div class="card kpi"><div class="l">A receber</div><div class="v">${BRL(aReceber)}</div></div>
-      <div class="card kpi"><div class="l">Novos pacientes</div><div class="v">${newPats.length}</div><div class="tiny muted">neste mês · despesas ${BRL(despesas)}</div></div>
+      ${isAdmin() ? html`<div class="card kpi"><div class="l">Recebido no mês</div><div class="v" style="color:var(--ok)">${BRL(recebido)}</div></div>
+      <div class="card kpi"><div class="l">A receber</div><div class="v">${BRL(aReceber)}</div></div>` : ''}
+      <div class="card kpi"><div class="l">Novos pacientes</div><div class="v">${newPats.length}</div><div class="tiny muted">neste mês${isAdmin() ? ' · despesas ' + BRL(despesas) : ''}</div></div>
     </div>
   </div>
   <div class="grid g2 collapse" style="margin-top:14px">

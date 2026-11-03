@@ -32,7 +32,7 @@ function renderShell(active) {
     <div class="shell"><nav class="side" id="side"></nav><div class="scrim" data-act="toggleMenu"></div><main id="view"></main></div>`);
     if (!patient) updateNotif();
   }
-  const items = patient ? PNAV : NAV.filter(n => n[4] !== 'clin' || isClinical());
+  const items = patient ? PNAV : NAV.filter(n => (n[4] !== 'clin' || isClinical()) && (!ADM_NAV.includes(n[0]) || isAdmin())).filter((n, i, a) => !(n[0] === 'sep' && n[1] === 'Gestão' && !isAdmin()));
   document.getElementById('side').innerHTML = fv(items.map(n => n[0] === 'sep' ? html`<div class="sep"></div>${n[1] ? html`<div class="label">${n[1]}</div>` : ''}` : html`<a href="${n[1]}" class="${active === n[0] ? 'on' : ''}">${icon(n[2])}<span>${n[3]}</span>${n[0] === 'online' && NOTIF.pending ? html`<span class="pill accent" style="margin-left:auto">${NOTIF.pending}</span>` : ''}</a>`));
 }
 act('toggleMenu', () => document.body.classList.toggle('menu-open'));

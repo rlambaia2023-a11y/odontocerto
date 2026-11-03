@@ -68,7 +68,7 @@ const fLong = d => `${WD[d.getDay()]}, ${d.toLocaleDateString('pt-BR', { day: '2
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const startOfDay = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 const age = b => { if (!b) return null; const d = parseYmd(b), n = new Date(); let a = n.getFullYear() - d.getFullYear(); if (n.getMonth() < d.getMonth() || (n.getMonth() === d.getMonth() && n.getDate() < d.getDate())) a--; return a; };
-const initials = n => String(n || '?').trim().split(/\s+/).filter(Boolean).map(w => w[0]).filter((_, i, a) => i === 0 || i === a.length - 1).join('').toUpperCase();
+const initials = n => String(n || '?').trim().split(/\s+/).filter(w => /^\p{L}/u.test(w) && !/^(dr|dra|de|da|do|das|dos|e)\.?$/i.test(w)).map(w => w[0]).filter((_, i, a) => i === 0 || i === a.length - 1).join('').toUpperCase() || '?';
 const onlyDigits = s => String(s || '').replace(/\D/g, '');
 const waLink = (phone, text) => { let p = onlyDigits(phone); if (p && p.length <= 11) p = '55' + p; return `https://wa.me/${p}?text=${encodeURIComponent(text || '')}`; };
 const fPhone = p => { const d = onlyDigits(p); if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`; if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`; return p || ''; };
@@ -220,6 +220,8 @@ async function refreshRefs() {
 const proName = id => S.members.find(m => m.user_id === id)?.full_name || '';
 const insName = id => S.insurances.find(i => i.id === id)?.name || 'Particular';
 const isOwner = () => S.me?.role === 'owner';
+const isAdmin = () => ['owner', 'secretaria'].includes(S.me?.role);
+const ADM_NAV = ['financeiro', 'precificador', 'convenios', 'relatorios', 'estoque', 'marketing', 'crm'];
 const isClinical = () => ['owner', 'dentista'].includes(S.me?.role);
 const pros = () => S.members.filter(m => ['owner', 'dentista'].includes(m.role || 'dentista'));
 const hasDentists = () => pros().some(m => (m.profession || 'odontologia') === 'odontologia');
@@ -325,7 +327,8 @@ async function router() {
   }
   if (!S.clinic) return renderAuth();
   const list = S.mode === 'patient' ? PROUTES : ROUTES;
-  const r = list.find(r => r.re.test(h)) || list[0];
+  let r = list.find(r => r.re.test(h)) || list[0];
+  if (S.mode === 'staff' && ADM_NAV.includes(r.nav) && !isAdmin()) r = { nav: r.nav, fn: async () => html`<div class="card empty">${icon('money')}<h2>Área de gestão</h2><p class="muted">Financeiro, relatórios e demais telas de gestão ficam com o responsável pela clínica e a recepção.</p><a class="btn" href="#/">Voltar ao início</a></div>` };
   const params = h.match(r.re)?.groups || {};
   document.body.classList.remove('menu-open'); closeModal();
   renderShell(r.nav);

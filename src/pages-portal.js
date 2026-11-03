@@ -132,6 +132,7 @@ onForm('bkConfirm', async d => {
   BK.done = { ...BK.slot, meeting_url: r.meeting_url, pro: BK.pro };
   if (S.mode !== 'patient') { S.clinic = null; document.getElementById('view')?.remove(); try { await loadContext(); } catch { } }
   bkRender(); window.scrollTo(0, 0);
+  const hb = document.querySelector('.topbar .btn'); if (hb) { hb.textContent = 'Minha área'; hb.removeAttribute('data-act'); hb.setAttribute('href', '#/'); hb.addEventListener('click', e => { e.preventDefault(); ACT.bkGoHome(); }); }
 });
 function bookingDone() {
   const b = BK.done, start = new Date(b.starts_at), end = new Date(+start + (b.pro.slot_min || 30) * 60000); const c = BK.clinic;
