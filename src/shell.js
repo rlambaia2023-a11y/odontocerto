@@ -188,7 +188,8 @@ async function boot() {
     LS.set('pepmh_mode', 'remote');
     try { const u = await Remote.req('/auth/v1/user'); const a = LS.get('pepmh_auth'); a.user = u; LS.set('pepmh_auth', a); } catch { }
     const isRecovery = p.get('type') === 'recovery'; const back = new URLSearchParams(location.search).get('agendar');
-    history.replaceState(null, '', location.pathname + (isRecovery ? '#/configuracoes?senha=1' : back ? '#/agendar/' + back : '#/'));
+    history.replaceState(null, '', location.pathname + (isRecovery ? '#/nova-senha' : back ? '#/agendar/' + back : '#/'));
+    if (isRecovery) { await router(); return; }
   }
   const loggedIn = isDemo() ? !!LS.get('pepmh_demo_user') : !!LS.get('pepmh_auth');
   const h = (location.hash.slice(1) || '/').split('?')[0];
