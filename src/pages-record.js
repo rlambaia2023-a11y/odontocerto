@@ -10,8 +10,9 @@ const ANAM = [
   ['gengiva_sangra', 'Gengiva sangra ao escovar', 'bool'], ['sensibilidade', 'Sensibilidade dentária', 'bool'], ['ultima_visita', 'Última visita ao dentista', 'text'], ['observacoes', 'Observações', 'text'],
 ];
 
+const tabsFor = () => isClinical() ? TABS.filter(([k]) => k !== 'odontograma' || hasDentists()).flatMap(t => t[0] === 'evolucao' ? [t, ['sinais', 'Sinais vitais']] : [t]) : TABS.filter(([k]) => ['plano', 'financeiro', 'retornos', 'consultas'].includes(k));
 route('/paciente/:id', async ({ id }, q) => {
-  const tab = q.get('tab') || 'resumo';
+  const allowed = tabsFor().map(t => t[0]); let tab = q.get('tab') || allowed[0]; if (!allowed.includes(tab)) tab = allowed[0];
   const p = await db.get('patients', id); if (!p) return html`<div class="card empty">Paciente não encontrado. <a href="#/pacientes">Voltar</a></div>`;
   const content = await (TABRENDER[tab] || TABRENDER.resumo)(p, q);
   return html`
@@ -23,12 +24,13 @@ route('/paciente/:id', async ({ id }, q) => {
     ${p.alerts ? html`<div class="pill bad" style="margin-top:8px;white-space:normal">⚠ ${p.alerts}</div>` : ''}</div>
     <div class="row" style="gap:4px;flex-wrap:nowrap">${p.phone ? html`<a class="btn sm" target="_blank" rel="noopener" href="${waLink(p.phone, `Olá, ${p.name.split(' ')[0]}! Aqui é do ${S.clinic.name}.`)}" title="WhatsApp">${icon('wa')}</a>` : ''}<button class="btn sm" data-act="editPatient" data-id="${p.id}" title="Editar">${icon('edit')}</button></div></div>
     <div class="grid g4" style="margin-top:14px">
-      <button class="btn primary" data-act="newEvolution" data-id="${p.id}">${icon('edit')} Evoluir</button>
-      <a class="btn accent" href="#/prescrever?p=${p.id}">${icon('pill')} Prescrever</a>
+      ${isClinical() ? html`<button class="btn primary" data-act="newEvolution" data-id="${p.id}">${icon('edit')} Evoluir</button>
+      <a class="btn accent" href="#/prescrever?p=${p.id}">${icon('pill')} Prescrever</a>` : html`<button class="btn primary" data-act="apptForPatient" data-id="${p.id}" data-name="${p.name}">${icon('cal')} Agendar</button>`}
       <button class="btn" data-act="newReturn" data-id="${p.id}">${icon('alarm')} Retorno</button>
-      <button class="btn" data-act="printRecord" data-id="${p.id}">${icon('print')} Imprimir</button>
+      <button class="btn" data-act="patientAccess" data-id="${p.id}">${icon(p.user_id ? 'check' : 'globe')} ${p.user_id ? 'Tem acesso' : 'Acesso online'}</button>
+      ${isClinical() ? html`<button class="btn" data-act="printRecord" data-id="${p.id}">${icon('print')} Imprimir</button>` : ''}
     </div></div>
-  <nav class="tabs">${TABS.map(([k, l]) => html`<a class="${tab === k ? 'on' : ''}" href="#/paciente/${p.id}?tab=${k}">${l}</a>`)}</nav>
+  <nav class="tabs">${tabsFor().map(([k, l]) => html`<a class="${tab === k ? 'on' : ''}" href="#/paciente/${p.id}?tab=${k}">${l}</a>`)}</nav>
   ${content}`;
 }, 'pacientes');
 
@@ -94,7 +96,7 @@ const TABRENDER = {
     const ev = await db.list('evolutions', { eq: { patient_id: p.id }, order: 'created_at.desc' });
     return html`<div class="card"><div class="row between" style="margin-bottom:12px"><h2>Evolução clínica</h2><button class="btn primary sm" data-act="newEvolution" data-id="${p.id}">${icon('plus')} Nova evolução</button></div>
     ${ev.length ? html`<div class="tl">${ev.map(e => html`<div class="it"><div class="row between"><b class="small">${fDT(e.created_at)}</b><button class="btn sm ghost danger" data-act="delEvo" data-id="${e.id}" title="Excluir">${icon('trash')}</button></div>
-      <div class="card" style="padding:12px;margin-top:6px"><div class="tiny muted">${e.professional_name || ''}</div>${e.chief_complaint ? html`<div class="small"><b>Queixa / motivo:</b> ${e.chief_complaint}</div>` : ''}<div class="prose small" style="margin-top:6px">${e.content}</div></div></div>`)}</div>` : html`<div class="empty">${icon('edit')}<div>Nenhuma evolução registrada.</div></div>`}</div>`;
+      <div class="card" style="padding:12px;margin-top:6px"><div class="tiny muted">${e.professional_name || ''}</div>${e.chief_complaint ? html`<div class="small"><b>Queixa / motivo:</b> ${e.chief_complaint}</div>` : ''}${e.cid ? html`<div class="small"><b>CID-10:</b> ${e.cid}</div>` : ''}<div class="prose small" style="margin-top:6px">${e.content}</div></div></div>`)}</div>` : html`<div class="empty">${icon('edit')}<div>Nenhuma evolução registrada.</div></div>`}</div>`;
   },
 
   /* ---- plano de tratamento ---- */
@@ -163,15 +165,15 @@ act('printAnam', async el => {
 act('newEvolution', async el => {
   const tpls = ['Exame clínico realizado. ', 'Anestesia infiltrativa com lidocaína 2% c/ epinefrina 1:100.000. ', 'Isolamento absoluto. ', 'Restauração em resina composta, cor __, face __. ', 'Profilaxia com pasta e taça de borracha. ', 'Orientações de higiene oral fornecidas. ', 'Paciente sem queixas. '];
   modal('Nova evolução', html`<form data-form="saveEvo" class="stack"><input type="hidden" name="patient_id" value="${el.dataset.id}">
-    <label class="f"><span>Queixa / motivo do atendimento</span><input class="in" name="chief_complaint"></label>
+    <div class="grid g2"><label class="f"><span>Queixa / motivo do atendimento</span><input class="in" name="chief_complaint"></label><label class="f"><span>CID-10 (opcional)</span><input class="in" name="cid" placeholder="Ex.: K02.1" maxlength="12" style="text-transform:uppercase"></label></div>
     <label class="f"><span>Descrição do atendimento <i>*</i></span><textarea class="in" name="content" id="evotext" rows="7" required></textarea></label>
-    <div class="row" style="gap:6px">${tpls.map(t => html`<button type="button" class="btn sm" data-act="evoIns" data-t="${t}">+ ${t.split(' ').slice(0, 2).join(' ')}</button>`)}</div>
+    <div class="row" style="gap:6px">${S.me.profession === 'medicina' ? [['S: ', 'S (subjetivo)'], ['\nO: ', 'O (objetivo)'], ['\nA: ', 'A (avaliação)'], ['\nP: ', 'P (plano)']].map(([t, l]) => html`<button type="button" class="btn sm" data-act="evoIns" data-t="${t}">+ ${l}</button>`) : ''}${(S.me.profession === 'medicina' ? ['Exame físico sem alterações. ', 'Orientado(a) sobre sinais de alarme. ', 'Retorno em ___ dias. ', 'Paciente atendido(a) por teleconsulta, com termo de consentimento aceito. '] : tpls).map(t => html`<button type="button" class="btn sm" data-act="evoIns" data-t="${t}">+ ${t.split(' ').slice(0, 2).join(' ')}</button>`)}</div>
     <label class="check"><input type="checkbox" name="mark_done" checked> Marcar a consulta de hoje como atendida</label>
     <div class="row between"><span class="tiny muted">Registrado por ${S.me.full_name}</span><button class="btn primary" type="submit">Salvar evolução</button></div></form>`, { wide: true });
 });
 act('evoIns', el => { const t = document.getElementById('evotext'); t.value += el.dataset.t; t.focus(); });
 onForm('saveEvo', async d => {
-  await db.insert('evolutions', { patient_id: d.patient_id, chief_complaint: nz(d.chief_complaint), content: d.content, professional_id: Auth.userId(), professional_name: S.me.full_name });
+  await db.insert('evolutions', { patient_id: d.patient_id, cid: nz((d.cid || '').toUpperCase()), chief_complaint: nz(d.chief_complaint), content: d.content, professional_id: Auth.userId(), professional_name: S.me.full_name });
   if (d.mark_done) { const t0 = startOfDay(new Date()); const ap = await db.list('appointments', { eq: { patient_id: d.patient_id }, gte: { starts_at: t0.toISOString() }, lt: { starts_at: addDays(t0, 1).toISOString() } }); for (const a of ap) if (!['cancelado', 'faltou'].includes(a.status)) await db.update('appointments', a.id, { status: 'atendido' }); }
   closeModal(); toast('Evolução registrada.', 'ok'); go(`#/paciente/${d.patient_id}?tab=evolucao`);
 });

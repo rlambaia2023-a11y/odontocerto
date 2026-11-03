@@ -1,13 +1,13 @@
 /* ===== Início, Agenda, Pacientes ===== */
 const STATUS = { agendado: ['Agendado', 'gray'], confirmado: ['Confirmado', 'ok'], em_atendimento: ['Em atendimento', 'warn'], atendido: ['Atendido', ''], faltou: ['Faltou', 'bad'], cancelado: ['Cancelado', 'bad'] };
-const KINDS = { consulta: 'Consulta', avaliacao: 'Avaliação', retorno: 'Retorno', procedimento: 'Procedimento', urgencia: 'Urgência', manutencao: 'Manutenção' };
+const KINDS = { consulta: 'Consulta', teleconsulta: 'Teleconsulta (online)', avaliacao: 'Avaliação', retorno: 'Retorno', procedimento: 'Procedimento', urgencia: 'Urgência', manutencao: 'Manutenção' };
 const statusPill = s => html`<span class="pill ${STATUS[s]?.[1] || ''}">${STATUS[s]?.[0] || s}</span>`;
 async function patientMap(ids) {
   const u = [...new Set(ids.filter(Boolean))]; if (!u.length) return {};
   const rows = await db.list('patients', { in: { id: u }, select: 'id,name,phone,birth_date,insurance_id' });
   return Object.fromEntries(rows.map(p => [p.id, p]));
 }
-const confirmMsg = (p, a) => `Olá, ${p.name.split(' ')[0]}! Aqui é do ${S.clinic.name}. Passando para confirmar sua consulta em ${fDate(a.starts_at)} às ${fTime(a.starts_at)}. Podemos confirmar?`;
+const confirmMsg = (p, a) => `Olá, ${p.name.split(' ')[0]}! Aqui é do ${S.clinic.name}. Passando para confirmar sua consulta em ${fDate(a.starts_at)} às ${fTime(a.starts_at)}. Podemos confirmar?${a.modality === 'online' && a.meeting_url ? ` A consulta será online, pelo Google Meet: ${a.meeting_url}` : ''}`;
 
 /* ---------- INÍCIO ---------- */
 route('/', async () => {
@@ -26,7 +26,7 @@ route('/', async () => {
   const aReceber = sum(fin.filter(f => f.kind === 'receita' && !f.paid_at), f => f.amount);
   const despesas = sum(monthFin.filter(f => f.kind === 'despesa'), f => f.amount);
   const np = next && pm[next.patient_id];
-  const q = [['#/agenda?novo=1', 'cal', 'Agendar paciente'], ['#/prescrever', 'pill', 'Prescrever'], ['#/pacientes', 'clip', 'Abrir prontuário'], ['#/financeiro?novo=despesa', 'receipt', 'Lançar despesa'], ['#/financeiro?novo=receita', 'money', 'Receber pagamento'], ['#/marketing', 'chat', 'Falar com paciente']];
+  const q = [['#/agenda?novo=1', 'cal', 'Agendar paciente'], isClinical() ? ['#/prescrever', 'pill', 'Prescrever'] : ['#/solicitacoes', 'globe', 'Agendamentos online'], ['#/pacientes', 'clip', 'Abrir prontuário'], ['#/financeiro?novo=despesa', 'receipt', 'Lançar despesa'], ['#/financeiro?novo=receita', 'money', 'Receber pagamento'], ['#/marketing', 'chat', 'Falar com paciente']];
   return html`
   <div class="pagehead"><div><h1>Olá, ${(S.me.full_name || '').split(' ').slice(0, 2).join(' ') || 'bem-vindo(a)'}</h1><div class="muted small">${fLong(now)} · ${S.clinic.name}</div></div></div>
   <div class="quick">${q.map(([h, i, l]) => html`<a href="${h}">${icon(i)}<span>${l}</span></a>`)}</div>
@@ -34,7 +34,7 @@ route('/', async () => {
     <div class="card">
       <div class="row between"><h2>Próximo paciente</h2>${next ? statusPill(next.status) : ''}</div>
       ${np ? html`<div class="row" style="margin:14px 0"><span class="avatar lg">${initials(np.name)}</span><div><div style="font-weight:700;font-size:1.05rem">${np.name}</div><div class="muted small">${fTime(next.starts_at)} – ${fTime(next.ends_at)} · ${KINDS[next.kind] || 'Consulta'}${np.birth_date ? ' · ' + age(np.birth_date) + ' anos' : ''}</div></div></div>
-        <div class="row">${next.status !== 'em_atendimento' ? html`<button class="btn primary" data-act="startAppt" data-id="${next.id}" data-p="${np.id}">${icon('check')} Iniciar atendimento</button>` : html`<a class="btn primary" href="#/paciente/${np.id}?tab=evolucao">${icon('clip')} Abrir prontuário</a>`}
+        <div class="row">${next.modality === 'online' && next.meeting_url ? html`<a class="btn accent" target="_blank" rel="noopener" href="${next.meeting_url}">${icon('video')} Entrar na teleconsulta</a>` : ''}${next.status !== 'em_atendimento' ? html`<button class="btn primary" data-act="startAppt" data-id="${next.id}" data-p="${np.id}">${icon('check')} Iniciar atendimento</button>` : html`<a class="btn primary" href="#/paciente/${np.id}?tab=evolucao">${icon('clip')} Abrir prontuário</a>`}
         ${np.phone ? html`<a class="btn" target="_blank" rel="noopener" href="${waLink(np.phone, confirmMsg(np, next))}">${icon('wa')} WhatsApp</a>` : ''}</div>`
       : html`<div class="empty">${icon('user')}<div>Nenhum próximo paciente para hoje.</div><a class="btn sm" style="margin-top:10px" href="#/agenda?novo=1">Agendar</a></div>`}
     </div>
@@ -95,7 +95,7 @@ function agendaPage(mine) {
     const appts = await db.list('appointments', qq); const pm = await patientMap(appts.map(a => a.patient_id));
     const base = mine ? '#/minha-agenda' : '#/agenda'; const link = (dd, v = view) => `${base}?d=${ymd(dd)}&v=${v}${pro && !mine ? '&pro=' + pro : ''}`;
     const step = view === 'semana' ? 7 : 1;
-    const card = a => { const p = pm[a.patient_id]; return html`<div class="appt ${a.status}" data-act="editAppt" data-id="${a.id}"><div class="grow" style="min-width:0"><div class="t">${fTime(a.starts_at)} ${p?.name || a.title || 'Compromisso'}</div><div class="tiny muted">${KINDS[a.kind] || ''} · ${STATUS[a.status]?.[0]}${S.members.length > 1 ? ' · ' + proName(a.professional_id) : ''}</div></div></div>`; };
+    const card = a => { const p = pm[a.patient_id]; return html`<div class="appt ${a.status}" data-act="editAppt" data-id="${a.id}"><div class="grow" style="min-width:0"><div class="t">${a.modality === 'online' ? icon('video', 'small') : ''}${fTime(a.starts_at)} ${p?.name || a.title || 'Compromisso'}</div><div class="tiny muted">${KINDS[a.kind] || ''} · ${STATUS[a.status]?.[0]}${S.members.length > 1 ? ' · ' + proName(a.professional_id) : ''}</div></div></div>`; };
     let body;
     if (view === 'semana') {
       body = html`<div class="week">${[...Array(7)].map((_, i) => { const day = addDays(from, i), k = ymd(day), list = appts.filter(a => ymd(a.starts_at) === k); return html`<div class="day ${k === ymd(new Date()) ? 'today' : ''}"><h4 class="row between"><a href="${link(day, 'dia')}">${WD[day.getDay()].slice(0, 3)} ${pad(day.getDate())}/${pad(day.getMonth() + 1)}</a><button class="btn sm ghost" data-act="newAppt" data-date="${k}" data-time="08:00" aria-label="Novo">${icon('plus')}</button></h4>${list.map(card)}${!list.length ? html`<div class="tiny muted">Livre</div>` : ''}</div>`; })}</div>`;
@@ -120,14 +120,18 @@ onInput('agPro', el => go(`#/agenda?d=${el.dataset.d}&v=${el.dataset.v}${el.valu
 
 function apptForm(a = {}, p = null) {
   const s = a.starts_at ? new Date(a.starts_at) : null; const dur = a.starts_at ? Math.round((new Date(a.ends_at) - s) / 60000) : 45;
-  return html`<form data-form="saveAppt" class="stack" id="apptform"><input type="hidden" name="id" value="${a.id || ''}">
+  return html`<form data-form="saveAppt" class="stack" id="apptform"><input type="hidden" name="id" value="${a.id || ''}"><input type="hidden" name="request_id" value="${a._request || ''}">
     <label class="f"><span>Paciente <i>*</i></span>${patientPicker(p)}</label>
     <div class="grid g3"><label class="f"><span>Data</span><input class="in" type="date" name="date" required value="${s ? ymd(s) : a._date || ymd(new Date())}"></label>
     <label class="f"><span>Início</span><input class="in" type="time" name="time" required step="300" value="${s ? fTime(s) : a._time || '08:00'}"></label>
     <label class="f"><span>Duração</span><select class="in" name="dur">${[15, 20, 30, 40, 45, 60, 90, 120, 180].map(m => html`<option value="${m}" ${m === dur ? 'selected' : ''}>${m} min</option>`)}</select></label></div>
     <div class="grid g3"><label class="f"><span>Tipo</span><select class="in" name="kind">${Object.entries(KINDS).map(([k, v]) => html`<option value="${k}" ${a.kind === k ? 'selected' : ''}>${v}</option>`)}</select></label>
     <label class="f"><span>Status</span><select class="in" name="status">${Object.entries(STATUS).map(([k, v]) => html`<option value="${k}" ${(a.status || 'agendado') === k ? 'selected' : ''}>${v[0]}</option>`)}</select></label>
-    <label class="f"><span>Profissional</span><select class="in" name="professional_id">${S.members.map(m => html`<option value="${m.user_id}" ${(a.professional_id || Auth.userId()) === m.user_id ? 'selected' : ''}>${m.full_name}</option>`)}</select></label></div>
+    <label class="f"><span>Profissional</span><select class="in" name="professional_id" data-change="apptPro">${pros().map(m => html`<option value="${m.user_id}" ${(a.professional_id || Auth.userId()) === m.user_id ? 'selected' : ''}>${m.full_name}</option>`)}</select></label></div>
+    <div class="grid g2"><label class="f"><span>Modalidade</span><select class="in" name="modality" data-change="apptMod"><option value="presencial">Presencial</option><option value="online" ${a.modality === 'online' ? 'selected' : ''}>Online (Google Meet)</option></select></label>
+    <label class="f ${a.modality === 'online' ? '' : 'hidden'}" id="meetbox"><span>Link da chamada</span><input class="in" name="meeting_url" type="url" placeholder="https://meet.google.com/…" value="${a.meeting_url || (pros().find(m => m.user_id === (a.professional_id || Auth.userId())) || {}).meet_url || ''}"></label></div>
+    ${a.id && a.modality === 'online' && a.meeting_url ? html`<div class="row"><a class="btn accent" target="_blank" rel="noopener" href="${a.meeting_url}">${icon('video')} Entrar na chamada</a>${p?.phone ? html`<a class="btn" target="_blank" rel="noopener" href="${waLink(p.phone, `Olá, ${p.name.split(' ')[0]}! Segue o link da sua teleconsulta de ${fDate(a.starts_at)} às ${fTime(a.starts_at)}: ${a.meeting_url}`)}">${icon('wa')} Enviar link</a>` : ''}${a.tele_consent_at ? html`<span class="pill ok">termo aceito ${fDT(a.tele_consent_at)}</span>` : html`<span class="pill warn">sem termo registrado</span>`}</div>` : ''}
+    ${a.reason ? html`<p class="small" style="margin:0"><b>Motivo informado pelo paciente:</b> ${a.reason}</p>` : ''}
     <label class="f"><span>Telefone (se for paciente novo)</span><input class="in" name="phone" inputmode="tel" placeholder="(11) 90000-0000"></label>
     <label class="f"><span>Observações</span><textarea class="in" name="notes" rows="2">${a.notes || ''}</textarea></label>
     <div class="row between"><div class="row">${a.id ? html`<button type="button" class="btn danger" data-act="delAppt" data-id="${a.id}">${icon('trash')} Excluir</button>` : ''}
@@ -143,8 +147,10 @@ onForm('saveAppt', async d => {
   const s = new Date(`${d.date}T${d.time}`); const e = new Date(s.getTime() + (+d.dur) * 60000);
   const clash = (await db.list('appointments', { eq: { professional_id: d.professional_id }, lt: { starts_at: e.toISOString() }, gt: { ends_at: s.toISOString() } })).filter(x => x.id !== d.id && !['cancelado', 'faltou'].includes(x.status));
   if (clash.length && !(await confirmBox(`Já existe ${clash.length} agendamento nesse horário para esse profissional. Agendar mesmo assim?`, 'Agendar assim mesmo'))) return;
-  const row = { patient_id: pid, starts_at: s.toISOString(), ends_at: e.toISOString(), kind: d.kind, status: d.status, professional_id: d.professional_id, notes: nz(d.notes) };
+  if (d.modality === 'online' && d.meeting_url && !/^https:\/\//.test(d.meeting_url)) throw new Error('O link da chamada precisa começar com https://');
+  const row = { patient_id: pid, starts_at: s.toISOString(), ends_at: e.toISOString(), kind: d.modality === 'online' && d.kind === 'consulta' ? 'teleconsulta' : d.kind, status: d.status, professional_id: d.professional_id, notes: nz(d.notes), modality: d.modality, meeting_url: d.modality === 'online' ? nz(d.meeting_url) : null };
   if (d.id) await db.update('appointments', d.id, row); else await db.insert('appointments', row);
+  if (d.request_id) { await db.update('appointment_requests', d.request_id, { status: 'agendado', response: `Agendado para ${fDT(s)}` }); updateNotif(); }
   closeModal(); toast('Agendamento salvo.', 'ok'); router();
 });
 
@@ -198,3 +204,6 @@ onForm('savePatient', async d => {
   if (d.id) { row.active = !!d.active; await db.update('patients', d.id, row); closeModal(); toast('Paciente atualizado.', 'ok'); router(); }
   else { const p = await db.insert('patients', row); closeModal(); toast('Paciente cadastrado.', 'ok'); go(`#/paciente/${p.id}`); }
 });
+
+onInput('apptMod', el => { document.getElementById('meetbox').classList.toggle('hidden', el.value !== 'online'); });
+onInput('apptPro', el => { const m = pros().find(x => x.user_id === el.value); const f = el.form.meeting_url; if (m?.meet_url && f) f.value = m.meet_url; });

@@ -48,6 +48,7 @@ const IC = {
   send: 'M22 2 11 13M22 2l-7 20-4-9-9-4z', check: 'M20 6 9 17l-5-5', clip: 'M9 4h6v3H9zM8 5H5v16h14V5h-3M9 12h6M9 16h4', tooth: 'M7 3c-2.5 0-4 2-4 4.5 0 2 .8 3.4 1.5 5 .8 2 .9 8.5 3 8.5 1.6 0 1.6-5 4.5-5s2.9 5 4.5 5c2.1 0 2.2-6.5 3-8.5.7-1.6 1.5-3 1.5-5C21 5 19.5 3 17 3c-2 0-3 1-5 1S9 3 7 3z',
   alarm: 'M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 9v4l2 2M5 3 2 6M22 6l-3-3', cake: 'M4 21V11h16v10M2 21h20M4 15c2 0 2 1.5 4 1.5s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5M12 11V7M12 4.5v.01',
   down: 'M12 3v12M7 10l5 5 5-5M5 21h14', repeat: 'M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3', star: 'M12 2l3 7 7 .6-5.4 4.7 1.7 7L12 17.6 5.7 21.3l1.7-7L2 9.6 9 9z',
+  globe: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20', video: 'M15 10l5-3v10l-5-3zM3 6h12v12H3z',
   logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9', sparkle: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 17l.8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8z',
   receipt: 'M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2zM9 8h6M9 12h6M9 16h3', up: 'M12 19V5M5 12l7-7 7 7', wa: 'M3 21l1.7-5A9 9 0 1 1 8 19.3zM9 9.5c0 3 2.5 5.5 5.5 5.5l1.2-1.4-2-1-1 .8a4 4 0 0 1-2-2l.8-1-1-2z',
 };
@@ -114,12 +115,13 @@ const Remote = {
   },
   async updateWhere(t, eq, patch) { const r = await Remote.req(`/rest/v1/${t}?${Remote.qs({ eq })}`, { method: 'PATCH', body: patch, headers: { Prefer: 'return=representation' } }); return r[0]; },
   removeWhere(t, eq) { return Remote.req(`/rest/v1/${t}?${Remote.qs({ eq })}`, { method: 'DELETE' }); },
+  rpc(fn, args = {}) { return Remote.req(`/rest/v1/rpc/${fn}`, { method: 'POST', body: args }); },
 };
 
 /* Demonstração: mesmas operações sobre localStorage, com dados fictícios */
 const Demo = {
-  load() { let d = LS.get('pepmh_demo_db'); if (!d) { d = seedDemo(); LS.set('pepmh_demo_db', d); } return d; },
-  save(d) { LS.set('pepmh_demo_db', d); },
+  load() { let d = LS.get('pepmh_demo_db_v2'); if (!d) { d = seedDemo(); LS.set('pepmh_demo_db_v2', d); } return d; },
+  save(d) { LS.set('pepmh_demo_db_v2', d); },
   match(r, q = {}) {
     const ok = (o, f) => Object.entries(o || {}).every(([k, v]) => f(r[k], v));
     const cmp = (a, b) => (a ?? '') < b ? -1 : (a ?? '') > b ? 1 : 0;
@@ -163,11 +165,13 @@ const db = {
   update: (t, id, patch) => B().updateWhere(t, { id }, patch),
   updateWhere: (t, eq, patch) => B().updateWhere(t, eq, patch),
   remove: (t, id) => B().removeWhere(t, { id }),
+  rpc: (fn, args) => isDemo() ? DemoRPC[fn](args || {}) : Remote.rpc(fn, args),
 };
 
 function traduzErro(m) {
   const map = { 'Invalid login credentials': 'E-mail ou senha incorretos.', 'Email not confirmed': 'Confirme seu e-mail antes de entrar (veja sua caixa de entrada).', 'User already registered': 'Já existe uma conta com esse e-mail.', 'Password should be at least 6 characters': 'A senha precisa ter pelo menos 6 caracteres.' };
   for (const k in map) if (String(m).includes(k)) return map[k];
+  if (/Database error saving new user/i.test(m)) return 'Não foi possível concluir o cadastro: confira o código de convite/acesso ou o link da clínica.';
   if (/rate limit/i.test(m)) return 'Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.';
   return m;
 }
@@ -186,15 +190,24 @@ const Auth = {
   async refresh() { try { const a = LS.get('pepmh_auth'); const d = await Auth.call('token?grant_type=refresh_token', { refresh_token: a.refresh_token }); Auth.store(d); return true; } catch { LS.del('pepmh_auth'); return false; } },
   async recover(email) { await Auth.call('recover?redirect_to=' + encodeURIComponent(location.origin + '/'), { email }); },
   signOut() { const a = LS.get('pepmh_auth'); if (a && !isDemo()) fetch(CFG.url + '/auth/v1/logout', { method: 'POST', headers: { apikey: CFG.key, Authorization: 'Bearer ' + a.access_token } }).catch(() => { }); LS.del('pepmh_auth'); LS.del('pepmh_mode'); location.hash = '#/'; location.reload(); },
-  userId() { return isDemo() ? 'demo-user' : LS.get('pepmh_auth')?.user?.id; },
+  userId() { return isDemo() ? (LS.get('pepmh_demo_user') || 'demo-user') : LS.get('pepmh_auth')?.user?.id; },
 };
 
 /* ---------- estado global ---------- */
-const S = { clinic: null, me: null, members: [], insurances: [], procedures: [] };
+const S = { mode: 'staff', clinic: null, me: null, patient: null, members: [], insurances: [], procedures: [] };
 async function loadContext() {
   const uidv = Auth.userId(); if (!uidv) return false;
   const mine = await db.list('clinic_members', { eq: { user_id: uidv }, limit: 1 });
-  if (!mine.length) return false;
+  if (!mine.length) {
+    const pat = await B().list('patients', { eq: { user_id: uidv }, limit: 1 });
+    if (!pat.length) return 'orphan';
+    S.mode = 'patient'; S.patient = pat[0];
+    S.clinic = (await B().list('clinics', { eq: { id: S.patient.clinic_id } }))[0];
+    S.members = await db.rpc('clinic_professionals');
+    S.me = { user_id: uidv, full_name: S.patient.name, role: 'patient' };
+    return true;
+  }
+  S.mode = 'staff';
   S.me = mine[0];
   S.clinic = (await B().list('clinics', { eq: { id: S.me.clinic_id } }))[0];
   S.members = await db.list('clinic_members', { eq: { clinic_id: S.clinic.id } });
@@ -206,7 +219,13 @@ async function refreshRefs() {
 }
 const proName = id => S.members.find(m => m.user_id === id)?.full_name || '';
 const insName = id => S.insurances.find(i => i.id === id)?.name || 'Particular';
-const councilOf = m => m?.council_number ? `${m.council || 'CRO'}-${m.council_uf || ''} ${m.council_number}` : '';
+const isOwner = () => S.me?.role === 'owner';
+const isClinical = () => ['owner', 'dentista'].includes(S.me?.role);
+const pros = () => S.members.filter(m => ['owner', 'dentista'].includes(m.role || 'dentista'));
+const hasDentists = () => pros().some(m => (m.profession || 'odontologia') === 'odontologia');
+const PROF = { odontologia: 'Odontologia', medicina: 'Medicina', outra: 'Outra área da saúde' };
+const ROLE = { owner: 'Responsável', dentista: 'Profissional de saúde', secretaria: 'Secretária / recepção', patient: 'Paciente' };
+const councilOf = m => m?.council_number ? `${m.council || (m.profession === 'medicina' ? 'CRM' : 'CRO')}-${m.council_uf || ''} ${m.council_number}` : '';
 
 /* ---------- UI: ações delegadas, modal, toast ---------- */
 const ACT = {}, FORMS = {}, INPUTS = {};
@@ -288,13 +307,25 @@ function docHeader() {
 function signature(name, council) { return `<div class="sig"><div class="ln"></div>${esc(name || '')}<br><small>${esc(council || '')}</small></div>`; }
 
 /* ---------- roteador ---------- */
-const ROUTES = [];
-const route = (pattern, fn, nav) => ROUTES.push({ re: new RegExp('^' + pattern.replace(/:(\w+)/g, '(?<$1>[^/]+)') + '$'), fn, nav });
+const ROUTES = [], PROUTES = [], PUB = [];
+const mkRoute = (pattern, fn, nav) => ({ re: new RegExp('^' + pattern.replace(/:(\w+)/g, '(?<$1>[^/]+)') + '$'), fn, nav });
+const route = (pattern, fn, nav) => ROUTES.push(mkRoute(pattern, fn, nav));
+const proute = (pattern, fn, nav) => PROUTES.push(mkRoute(pattern, fn, nav));
+const pubRoute = (pattern, fn) => PUB.push(mkRoute(pattern, fn));
 function currentQuery() { const h = location.hash.slice(1); const i = h.indexOf('?'); return new URLSearchParams(i >= 0 ? h.slice(i + 1) : ''); }
 async function router() {
   const h = (location.hash.slice(1) || '/').split('?')[0];
+  const pub = PUB.find(r => r.re.test(h));
+  if (pub) {
+    closeModal(); const app = document.getElementById('app'); app.innerHTML = '<div class="loading">Carregando…</div>';
+    try { const out = await pub.fn(h.match(pub.re)?.groups || {}, currentQuery()); if (out !== undefined) app.innerHTML = fv(out); window.scrollTo(0, 0); }
+    catch (err) { console.error(err); app.innerHTML = fv(html`<div class="auth"><div class="card"><h2>Não foi possível carregar</h2><p class="muted">${err.message}</p></div></div>`); }
+    if (typeof AFTER === 'function') { const f = AFTER; AFTER = null; f(); }
+    return;
+  }
   if (!S.clinic) return renderAuth();
-  const r = ROUTES.find(r => r.re.test(h)) || ROUTES[0];
+  const list = S.mode === 'patient' ? PROUTES : ROUTES;
+  const r = list.find(r => r.re.test(h)) || list[0];
   const params = h.match(r.re)?.groups || {};
   document.body.classList.remove('menu-open'); closeModal();
   renderShell(r.nav);

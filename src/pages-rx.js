@@ -1,6 +1,6 @@
 /* ===== Prescrições e laudos ===== */
 /* Posologias de referência usuais em odontologia — sempre revisar conforme o caso clínico. */
-const MEDS = [
+const MEDS_ODO = [
   ['Amoxicilina 500 mg', 'uso oral', '21 cápsulas', 'Tomar 1 cápsula de 8 em 8 horas, por 7 dias.'],
   ['Amoxicilina 500 mg (profilaxia antibiótica)', 'uso oral', '4 cápsulas', 'Tomar 4 cápsulas (2 g) em dose única, 30 a 60 minutos antes do procedimento.'],
   ['Amoxicilina + clavulanato de potássio 875/125 mg', 'uso oral', '14 comprimidos', 'Tomar 1 comprimido de 12 em 12 horas, por 7 dias.'],
@@ -19,6 +19,22 @@ const MEDS = [
   ['Aciclovir creme 5%', 'uso tópico', '1 bisnaga', 'Aplicar sobre a lesão 5 vezes ao dia, por 5 a 7 dias.'],
   ['Fluoreto de sódio 0,05% (solução para bochecho)', 'uso tópico', '1 frasco', 'Bochechar 10 mL por 1 minuto, 1 vez ao dia, à noite, após a escovação. Não engolir.'],
 ];
+/* Referências usuais para adultos em clínica médica — revisar dose, intervalo e duração para cada paciente. */
+const MEDS_MED = [
+  ['Dipirona sódica 1 g', 'uso oral', '10 comprimidos', 'Tomar 1 comprimido de 6 em 6 horas, se dor ou febre.'],
+  ['Paracetamol 750 mg', 'uso oral', '12 comprimidos', 'Tomar 1 comprimido de 6 em 6 horas, se dor ou febre. Não ultrapassar 4 comprimidos por dia.'],
+  ['Ibuprofeno 600 mg', 'uso oral', '9 comprimidos', 'Tomar 1 comprimido de 8 em 8 horas, após as refeições, por 3 dias.'],
+  ['Amoxicilina 500 mg', 'uso oral', '21 cápsulas', 'Tomar 1 cápsula de 8 em 8 horas, por 7 dias.'],
+  ['Azitromicina 500 mg', 'uso oral', '3 comprimidos', 'Tomar 1 comprimido ao dia, por 3 dias.'],
+  ['Cefalexina 500 mg', 'uso oral', '28 cápsulas', 'Tomar 1 cápsula de 6 em 6 horas, por 7 dias.'],
+  ['Omeprazol 20 mg', 'uso oral', '30 cápsulas', 'Tomar 1 cápsula em jejum, 30 minutos antes do café da manhã, por 30 dias.'],
+  ['Loratadina 10 mg', 'uso oral', '5 comprimidos', 'Tomar 1 comprimido ao dia, por 5 dias.'],
+  ['Ondansetrona 4 mg (orodispersível)', 'uso oral', '10 comprimidos', 'Dissolver 1 comprimido na boca de 8 em 8 horas, se náusea ou vômito.'],
+  ['Butilbrometo de escopolamina 10 mg', 'uso oral', '10 comprimidos', 'Tomar 1 comprimido de 8 em 8 horas, se cólica.'],
+  ['Prednisona 20 mg', 'uso oral', '5 comprimidos', 'Tomar 1 comprimido pela manhã, após o café, por 5 dias.'],
+  ['Sais para reidratação oral', 'uso oral', '4 envelopes', 'Diluir 1 envelope em 1 litro de água filtrada e tomar aos poucos ao longo do dia, principalmente após cada evacuação líquida.'],
+];
+const curMeds = () => S.me?.profession === 'medicina' ? MEDS_MED : MEDS_ODO;
 const RXTYPES = { simples: 'Simples (uma via)', controle_especial: 'Controle especial (duas vias)' };
 
 route('/prescrever', async (_, q) => {
@@ -40,7 +56,7 @@ route('/prescrever', async (_, q) => {
       <div class="doctype" style="margin-top:8px">${Object.entries(DOCT).map(([k, [l, ic]]) => html`<button type="button" class="${k === type ? 'on' : ''}" data-act="rxType" data-t="${k}">${icon(ic)}${l}</button>`)}</div></div>
       <div class="grid g2 collapse" style="align-items:end"><label class="f"><span>Modelo personalizado</span><select class="in" id="rxtpl" data-change="rxTpl"><option value="">Selecione…</option>${tpls.filter(t => t.doc_type === type).map(t => html`<option value="${t.id}">${t.title}</option>`)}</select></label>
         <div class="row"><button type="button" class="btn sm" data-act="manageTpl">${icon('edit')} Editar lista de modelos</button></div></div>
-      <div id="medbox" class="${type === 'receituario' ? '' : 'hidden'}"><div class="grid g2 collapse" style="align-items:end"><label class="f"><span>Adicionar medicamento</span><select class="in" id="rxmed" data-change="rxMed"><option value="">Selecione…</option>${MEDS.map((m, i) => html`<option value="${i}">${m[0]}</option>`)}</select></label>
+      <div id="medbox" class="${type === 'receituario' ? '' : 'hidden'}"><div class="grid g2 collapse" style="align-items:end"><label class="f"><span>Adicionar medicamento</span><select class="in" id="rxmed" data-change="rxMed"><option value="">Selecione…</option>${curMeds().map((m, i) => html`<option value="${i}">${m[0]}</option>`)}</select></label>
         <label class="f"><span>Quantidade</span><input class="in" id="rxqty"></label></div>
         <label class="f" style="margin-top:10px"><span>Posologia</span><input class="in" id="rxpos"></label>
         <div class="row" style="margin-top:10px"><button type="button" class="btn" data-act="rxClearMed">${icon('x')} Remover</button><button type="button" class="btn ok" data-act="rxAddMed">${icon('plus')} Adicionar</button></div>
@@ -84,10 +100,10 @@ onInput('rxTpl', el => {
   const name = document.querySelector('#rxform [name=patient_name]').value || '______________';
   const ed = document.getElementById('rxed'); ed.innerHTML = (ed.innerHTML.trim() ? ed.innerHTML : '') + sanitize(t.content).replace(/\{paciente\}/g, esc(name));
 });
-onInput('rxMed', el => { const m = MEDS[el.value]; document.getElementById('rxqty').value = m ? m[2] : ''; document.getElementById('rxpos').value = m ? m[3] : ''; });
+onInput('rxMed', el => { const m = curMeds()[el.value]; document.getElementById('rxqty').value = m ? m[2] : ''; document.getElementById('rxpos').value = m ? m[3] : ''; });
 act('rxClearMed', () => { document.getElementById('rxmed').value = ''; document.getElementById('rxqty').value = ''; document.getElementById('rxpos').value = ''; });
 act('rxAddMed', async () => {
-  const m = MEDS[document.getElementById('rxmed').value]; if (!m) return toast('Escolha um medicamento.', 'bad');
+  const m = curMeds()[document.getElementById('rxmed').value]; if (!m) return toast('Escolha um medicamento.', 'bad');
   if (allergyHit(m[0]) && !(await confirmBox(`Atenção: o paciente tem registro de "${window.__allergy}". ${m[0]} pode estar relacionado. Incluir mesmo assim?`, 'Incluir mesmo assim'))) return;
   const ed = document.getElementById('rxed'); const n = (ed.querySelectorAll('[data-med]').length || ed.innerHTML.match(/<p>\d+\./g)?.length || 0) + 1;
   const via = m[1]; const hasVia = ed.textContent.toLowerCase().includes(via);
@@ -98,7 +114,7 @@ act('rxCmd', el => { document.getElementById('rxed').focus(); document.execComma
 act('rxSave', async el => {
   const f = document.getElementById('rxform'); const d = formData(f); const content = sanitize(document.getElementById('rxed').innerHTML);
   if (!htmlToText(content)) throw new Error('Escreva o conteúdo do documento.');
-  if (d.doc_type === 'receituario' && window.__allergy) { const hit = MEDS.find(m => norm(htmlToText(content)).includes(norm(m[0].split(' ')[0])) && allergyHit(m[0])); if (hit && !(await confirmBox(`O texto inclui ${hit[0].split(' ')[0]} e o paciente tem registro de "${window.__allergy}". Salvar mesmo assim?`, 'Salvar mesmo assim'))) return; }
+  if (d.doc_type === 'receituario' && window.__allergy) { const hit = curMeds().find(m => norm(htmlToText(content)).includes(norm(m[0].split(' ')[0])) && allergyHit(m[0])); if (hit && !(await confirmBox(`O texto inclui ${hit[0].split(' ')[0]} e o paciente tem registro de "${window.__allergy}". Salvar mesmo assim?`, 'Salvar mesmo assim'))) return; }
   el.disabled = true;
   try {
     const pid = await resolvePatient(d, { phone: onlyDigits(d.phone), email: d.email });
