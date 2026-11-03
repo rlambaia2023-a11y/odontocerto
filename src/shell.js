@@ -172,9 +172,26 @@ pubRoute('/convite/:code', async ({ code }) => {
   SU.type = 'equipe'; SU.code = code.toUpperCase(); history.replaceState(null, '', location.pathname + '#/'); renderAuth('signup');
 });
 pubRoute('/acesso/:code', async ({ code }) => {
-  if (LS.get('pepmh_auth') && !isDemo()) return orphanScreen(html`A clínica liberou seu acesso de paciente.`, code.toUpperCase(), 'paciente');
-  SU.type = 'paciente'; SU.code = code.toUpperCase(); history.replaceState(null, '', location.pathname + '#/'); renderAuth('signup');
+  code = code.toUpperCase();
+  if (LS.get('pepmh_auth') && !isDemo()) {
+    // só oferece vincular se a conta aberta ainda não for de ninguém; senão o código seria gasto na conta errada
+    let ctx = false; try { ctx = await loadContext(); } catch { }
+    S.clinic = null;
+    if (ctx === 'orphan') return orphanScreen(html`A clínica liberou seu acesso de paciente.`, code, 'paciente');
+    if (ctx) return html`<div class="auth"><div class="card stack"><div class="brand"><span class="mark">PE</span><h1>PEPMH</h1></div>
+      <p style="margin:0">Este navegador está conectado com <b>${S.me?.full_name || 'outra conta'}</b>${S.mode === 'patient' ? ', que já é a conta de um paciente' : ', que é uma conta da equipe da clínica'}.</p>
+      <p class="small muted" style="margin:0">O código <b>${code}</b> é para o paciente criar a própria conta. Cada paciente tem o seu login e vê só a própria ficha e as próprias consultas.</p>
+      <button class="btn primary" data-act="logoutToCode" data-code="${code}">Sair e criar a conta do paciente</button>
+      <button class="btn ghost" data-act="stayLogged">Continuar como estou</button></div></div>`;
+    LS.del('pepmh_auth'); LS.del('pepmh_mode');
+  }
+  SU.type = 'paciente'; SU.code = code; history.replaceState(null, '', location.pathname + '#/'); renderAuth('signup');
 });
+act('logoutToCode', el => {
+  const a = LS.get('pepmh_auth'); if (a) fetch(CFG.url + '/auth/v1/logout', { method: 'POST', headers: { apikey: CFG.key, Authorization: 'Bearer ' + a.access_token } }).catch(() => { });
+  LS.del('pepmh_auth'); LS.del('pepmh_mode'); location.hash = '#/acesso/' + el.dataset.code; location.reload();
+});
+act('stayLogged', () => { history.replaceState(null, '', location.pathname + '#/'); boot(); });
 function orphanScreen(msg = '', code = '', kind = 'equipe') {
   return html`<div class="auth"><div class="card stack"><div class="brand"><span class="mark">PE</span><h1>PEPMH</h1></div>
     <p style="margin:0">${msg || 'Sua conta ainda não está ligada a nenhuma clínica.'} Informe o código que você recebeu:</p>
