@@ -16,12 +16,13 @@ const PNAV = [
 let NOTIF = { count: 0, items: [] };
 
 function renderShell(active) {
-  const app = document.getElementById('app'); const patient = S.mode === 'patient';
+  const app = document.getElementById('app'); const patient = S.mode === 'patient'; const hasLogo = !!safeLogo(S.clinic.logo_url);
   if (!document.getElementById('view')) {
+    applyTheme(S.clinic);
     app.innerHTML = fv(html`
-    <header class="topbar">
+    <header class="topbar ${hasLogo ? 'light' : ''}">
       <button class="iconbtn only-m" data-act="toggleMenu" aria-label="Menu">${icon('menu')}</button>
-      <a class="logo" href="#/">${patient && safeLogo(S.clinic.logo_url) ? html`<span style="background:#fff;border-radius:9px;padding:3px 8px;display:inline-flex"><img src="${S.clinic.logo_url}" alt="${S.clinic.name}" style="height:30px"></span>` : html`<span class="mark">PE</span>PEPMH`}${patient && !safeLogo(S.clinic.logo_url) ? html`<span class="small hide-m" style="font-weight:500;opacity:.85;letter-spacing:0"> · ${S.clinic.name}</span>` : ''}</a>
+      <a class="logo" href="#/">${hasLogo ? brandLogo(S.clinic) : html`<span class="mark">PE</span>PEPMH${patient ? html`<span class="small hide-m" style="font-weight:500;opacity:.85;letter-spacing:0"> · ${S.clinic.name}</span>` : ''}`}</a>
       <span class="sp"></span>
       ${!patient ? html`<button class="iconbtn" data-act="globalSearch" aria-label="Buscar paciente">${icon('search')}</button>
       <div class="rel"><button class="iconbtn" data-act="openNotif" aria-label="Notificações" id="bellbtn">${icon('bell')}</button></div>` : S.clinic.phone ? html`<a class="iconbtn" target="_blank" rel="noopener" href="${waLink(S.clinic.phone, 'Olá! Sou paciente e gostaria de falar com a clínica.')}" aria-label="Falar com a clínica">${icon('wa')}</a>` : ''}
@@ -30,10 +31,12 @@ function renderShell(active) {
     <template id="usermenu"><div style="padding:8px 10px 6px"><b>${S.me.full_name || 'Usuário'}</b><div class="tiny muted">${ROLE[S.me.role] || ''} · ${S.clinic.name}${isDemo() ? ' · demonstração' : ''}</div></div>
       ${!patient ? html`<a href="#/configuracoes">${icon('gear')} Configurações</a>` : html`<a href="#/meus-dados">${icon('user')} Meus dados</a>`}${isDemo() ? html`<button data-act="resetDemo">${icon('repeat')} Reiniciar demonstração</button>` : ''}<button data-act="logout">${icon('logout')} Sair</button></template>
     <div class="shell"><nav class="side" id="side"></nav><div class="scrim" data-act="toggleMenu"></div><main id="view"></main></div>`);
+    if (hasLogo) document.getElementById('side').classList.add('withfoot');
     if (!patient) updateNotif();
   }
   const items = patient ? PNAV : NAV.filter(n => (n[4] !== 'clin' || isClinical()) && (!ADM_NAV.includes(n[0]) || isAdmin())).filter((n, i, a) => !(n[0] === 'sep' && n[1] === 'Gestão' && !isAdmin()));
-  document.getElementById('side').innerHTML = fv(items.map(n => n[0] === 'sep' ? html`<div class="sep"></div>${n[1] ? html`<div class="label">${n[1]}</div>` : ''}` : html`<a href="${n[1]}" class="${active === n[0] ? 'on' : ''}">${icon(n[2])}<span>${n[3]}</span>${n[0] === 'online' && NOTIF.pending ? html`<span class="pill accent" style="margin-left:auto">${NOTIF.pending}</span>` : ''}</a>`));
+  document.getElementById('side').innerHTML = fv(html`${items.map(n => n[0] === 'sep' ? html`<div class="sep"></div>${n[1] ? html`<div class="label">${n[1]}</div>` : ''}` : html`<a href="${n[1]}" class="${active === n[0] ? 'on' : ''}">${icon(n[2])}<span>${n[3]}</span>${n[0] === 'online' && NOTIF.pending ? html`<span class="pill accent" style="margin-left:auto">${NOTIF.pending}</span>` : ''}</a>`)}
+    ${safeLogo(S.clinic.logo_url) ? html`<div class="sidefoot">${brandLogo(S.clinic)}<span class="tiny muted">${[S.clinic.city, S.clinic.state].filter(Boolean).join('/')}${S.clinic.phone ? ' · ' + fPhone(S.clinic.phone) : ''}</span><span class="tiny muted">sistema PEPMH</span></div>` : ''}`);
 }
 act('toggleMenu', () => document.body.classList.toggle('menu-open'));
 act('logout', () => { LS.del('pepmh_demo_user'); Auth.signOut(); });

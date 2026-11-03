@@ -311,6 +311,18 @@ function printDoc(title, bodyHtml, extraCss = '') {
   @media print{body{padding:0 10mm}} ${extraCss}</style></head><body>${bodyHtml}<script>setTimeout(()=>print(),300)<\/script></body></html>`);
   w.document.close();
 }
+/* Cores e logo da clínica aplicadas no sistema inteiro */
+const hexOk = v => /^#[0-9a-f]{6}$/i.test(v || '');
+const hexMix = (a, b, t) => { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); const x = p(a), y = p(b); return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join(''); };
+function applyTheme(c) {
+  const r = document.documentElement.style;
+  if (hexOk(c?.theme_primary)) { const b = c.theme_primary; r.setProperty('--brand', b); r.setProperty('--brand-600', hexMix(b, '#000000', .18)); r.setProperty('--brand-50', hexMix(b, '#ffffff', .93)); r.setProperty('--brand-100', hexMix(b, '#ffffff', .83)); document.querySelector('meta[name=theme-color]')?.setAttribute('content', b); }
+  else ['--brand', '--brand-600', '--brand-50', '--brand-100'].forEach(k => r.removeProperty(k));
+  if (hexOk(c?.theme_accent)) { r.setProperty('--accent', c.theme_accent); r.setProperty('--accent-50', hexMix(c.theme_accent, '#ffffff', .9)); } else ['--accent', '--accent-50'].forEach(k => r.removeProperty(k));
+  document.body.classList.toggle('branded', !!safeLogo(c?.logo_url));
+  if (c?.name) document.title = c.name + ' · PEPMH';
+}
+const brandLogo = (c, cls = '') => html`<img class="brandimg ${cls}" src="${c.logo_url}" alt="${c.name}">`;
 const safeLogo = u => /^data:image\/(svg\+xml|png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(u || '') ? u : '';
 function docHeader() {
   const c = S.clinic || {};

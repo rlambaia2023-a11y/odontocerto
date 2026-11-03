@@ -228,7 +228,12 @@ route('/configuracoes', async (_, q) => {
     <div style="margin-top:16px"><span class="small" style="font-weight:600;color:var(--ink-2)">Logo (aparece em receitas, atestados, orçamentos e na página de agendamento)</span>
     <div class="row" style="margin-top:8px">${safeLogo(c.logo_url) ? html`<img src="${c.logo_url}" alt="Logo" style="height:56px;max-width:260px;border:1px solid var(--line);border-radius:8px;padding:4px;background:#fff">` : html`<span class="small muted">Sem logo.</span>`}
     ${owner ? html`<label class="btn sm">${icon('up')} Enviar logo<input type="file" accept="image/svg+xml,image/png,image/jpeg,image/webp" data-change="logoFile" style="display:none"></label>${c.logo_url ? html`<button class="btn sm danger" data-act="logoDel">${icon('trash')} Remover</button>` : ''}` : ''}</div>
-    <p class="tiny muted">SVG, PNG, JPG ou WEBP de até 250 KB. De preferência com fundo transparente e formato horizontal.</p></div></div>
+    <p class="tiny muted">SVG, PNG, JPG ou WEBP de até 250 KB. De preferência com fundo transparente e formato horizontal. A logo também aparece no topo do sistema, no menu e na área do paciente.</p></div>
+    ${owner ? html`<form data-form="saveTheme" style="margin-top:14px"><span class="small" style="font-weight:600;color:var(--ink-2)">Cores do sistema</span>
+      <div class="row" style="margin-top:8px;align-items:end"><label class="f"><span>Cor principal</span><input type="color" class="in" style="width:72px;padding:4px" name="theme_primary" value="${hexOk(c.theme_primary) ? c.theme_primary : '#0b57b3'}"></label>
+      <label class="f"><span>Cor de destaque</span><input type="color" class="in" style="width:72px;padding:4px" name="theme_accent" value="${hexOk(c.theme_accent) ? c.theme_accent : '#e8603c'}"></label>
+      <button class="btn primary" type="submit">Aplicar cores</button><button class="btn" type="button" data-act="themeReset">Cores padrão</button></div>
+      <p class="tiny muted">Dica: use as cores da logo. Menu, botões e destaques passam a seguir essas cores para toda a equipe e para os pacientes.</p></form>` : ''}</div>
   <div class="stack"><div class="card"><h2>Meus dados profissionais</h2><form data-form="saveMe" class="stack" style="margin-top:10px"><label class="f"><span>Nome como aparece na assinatura <i>*</i></span><input class="in" name="full_name" required value="${m.full_name || ''}"></label>
     ${S.me.role !== 'secretaria' ? html`<label class="f"><span>Área</span><select class="in" name="profession">${Object.entries(PROF).map(([k, v]) => html`<option value="${k}" ${m.profession === k ? 'selected' : ''}>${v}</option>`)}</select></label>` : ''}
     <div class="grid g3"><label class="f"><span>Conselho</span><select class="in" name="council">${['CRO', 'CRM', 'CRF', 'CRN', 'CREFITO', 'CRP'].map(x => html`<option ${m.council === x ? 'selected' : ''}>${x}</option>`)}</select></label><label class="f"><span>Número</span><input class="in" name="council_number" value="${m.council_number || ''}"></label><label class="f"><span>UF</span><input class="in" name="council_uf" maxlength="2" value="${m.council_uf || ''}"></label></div>
@@ -246,6 +251,9 @@ onInput('logoFile', async el => {
   if (!/^image\/(svg\+xml|png|jpeg|webp)$/.test(f.type)) return toast('Use SVG, PNG, JPG ou WEBP.', 'bad');
   if (f.size > 250 * 1024) return toast('A imagem passa de 250 KB. Reduza e tente de novo.', 'bad');
   const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
-  const r = await B().updateWhere('clinics', { id: S.clinic.id }, { logo_url: url }); Object.assign(S.clinic, r || { logo_url: url }); toast('Logo atualizada.', 'ok'); router();
+  const r = await B().updateWhere('clinics', { id: S.clinic.id }, { logo_url: url }); Object.assign(S.clinic, r || { logo_url: url }); toast('Logo atualizada.', 'ok'); rebuildShell();
 });
-act('logoDel', async () => { if (!(await confirmBox('Remover a logo da clínica?', 'Remover'))) return; await B().updateWhere('clinics', { id: S.clinic.id }, { logo_url: null }); S.clinic.logo_url = null; router(); });
+act('logoDel', async () => { if (!(await confirmBox('Remover a logo da clínica?', 'Remover'))) return; await B().updateWhere('clinics', { id: S.clinic.id }, { logo_url: null }); S.clinic.logo_url = null; rebuildShell(); });
+function rebuildShell() { document.getElementById('app').innerHTML = ''; applyTheme(S.clinic); router(); }
+onForm('saveTheme', async d => { if (!hexOk(d.theme_primary) || !hexOk(d.theme_accent)) throw new Error('Cor inválida.'); const r = await B().updateWhere('clinics', { id: S.clinic.id }, { theme_primary: d.theme_primary, theme_accent: d.theme_accent }); Object.assign(S.clinic, r || d); toast('Cores aplicadas.', 'ok'); rebuildShell(); });
+act('themeReset', async () => { const r = await B().updateWhere('clinics', { id: S.clinic.id }, { theme_primary: null, theme_accent: null }); Object.assign(S.clinic, r || { theme_primary: null, theme_accent: null }); rebuildShell(); });
