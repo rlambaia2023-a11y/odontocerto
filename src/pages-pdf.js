@@ -72,7 +72,6 @@ async function buildDocPdf({ doc, patient, prof, clinic }) {
   const council = councilOf(prof); const logo = await logoToJpeg(clinic.logo_url);
   const addr = [clinic.address, clinic.city && clinic.city + (clinic.state ? '/' + clinic.state : '')].filter(Boolean).join(' · ');
   const contact = [fPhone(clinic.phone), clinic.email].filter(Boolean).join(' · ');
-  const verify = doc.verify_code ? `Código de verificação ${doc.verify_code} · confira em ${verifyUrl(doc.verify_code)}` : '';
   const wrap = (runs, maxW, size) => { // quebra de linha com estilos misturados
     const lines = [[]]; let lw = 0;
     runs.forEach(r => r.t.split(/(\s+)/).forEach(w => { if (!w) return; const ww = textW(w, size, r.st); if (lw + ww > maxW && lw > 0 && w.trim()) { lines.push([]); lw = 0; if (!w.trim()) return; } if (!lines[lines.length - 1].length && !w.trim()) return; lines[lines.length - 1].push({ t: w, st: r.st, w: ww }); lw += ww; }));
@@ -94,7 +93,14 @@ async function buildDocPdf({ doc, patient, prof, clinic }) {
     if (doc.rx_type === 'controle_especial') { y += 16; const a = [patient.address, patient.city, patient.state].filter(Boolean).join(', ') || '______________________________________'; pdf.text(M, y, 'Endereço: ', 11, 'b'); pdf.text(M + textW('Endereço: ', 11, 'b'), y, a, 11); }
     return y + 24;
   };
-  const footer = () => { pdf.line(M, pdf.H - 46, pdf.W - M, pdf.H - 46, 0.5, '#bbbbbb'); const f1 = [clinic.name, addr, fPhone(clinic.phone)].filter(Boolean).join(' · '); pdf.text((pdf.W - textW(f1, 8)) / 2, pdf.H - 33, f1, 8, 'r', '#555555'); if (verify) pdf.text((pdf.W - textW(verify, 7.5)) / 2, pdf.H - 21, verify, 7.5, 'r', '#777777'); };
+  // rodapé à direita: o canto inferior esquerdo fica livre para o carimbo do assinador (o VIDaaS assina ali, sem escolha de posição)
+  const footer = () => {
+    const x0 = M + 190, rx = pdf.W - M, avail = rx - x0; pdf.line(x0, pdf.H - 58, rx, pdf.H - 58, 0.5, '#bbbbbb');
+    const f1 = [clinic.name, addr, fPhone(clinic.phone)].filter(Boolean).join(' · ');
+    const rows = [[f1, 7.5, '#555555'], ...(doc.verify_code ? [[`Código de verificação ${doc.verify_code}`, 7.5, '#777777'], [`confira em ${verifyUrl(doc.verify_code)}`, 7, '#777777']] : [])]
+      .flatMap(([t, s, c]) => wrap([{ t, st: 'r' }], avail, s).map(ln => [ln.map(w => w.t).join(''), s, c]));
+    let y = pdf.H - 47; rows.slice(0, 4).forEach(([t, s, c]) => { pdf.text(rx - textW(t, s), y, t, s, 'r', c); y += 9.5; });
+  };
   const body = via => {
     let y = header(via); const size = 11.5, lh = 16.5; const blocks = htmlBlocks(String(doc.content || '').replace(/\{paciente\}/g, esc(patient.name || '')));
     blocks.forEach(b => {
