@@ -49,6 +49,7 @@ async function updateNotif() {
       db.list('appointment_requests', { eq: { status: 'pendente' } }),
       db.list('appointments', { eq: { booked_by_patient: true }, gte: { ends_at: new Date().toISOString() } }),
     ]);
+    const cks = isClinical() ? await db.list('weight_checkins', { is: { reviewed_at: 'null' }, order: 'created_at.desc', limit: 20 }).catch(() => []) : [];
     const md = today.slice(5);
     const bdays = pats.filter(p => p.birth_date && p.birth_date.slice(5, 10) === md);
     const low = stock.filter(s => +s.quantity <= +s.min_quantity);
@@ -59,6 +60,7 @@ async function updateNotif() {
       ...toApprove.map(a => ({ ic: 'check', t: `Aprovar consulta: ${pm[a.patient_id]?.name || ''}`, s: `${fDT(a.starts_at)} · ${a.modality === 'online' ? 'online' : 'presencial'}`, h: '#/solicitacoes' })),
       ...reqs.map(r => ({ ic: 'globe', t: `Pedido de consulta: ${pm[r.patient_id]?.name || 'paciente'}`, s: r.reason || 'Aguardando resposta', h: '#/solicitacoes' })),
       ...online.filter(a => a.status !== 'cancelado').map(a => ({ ic: a.modality === 'online' ? 'video' : 'cal', t: `Agendado pelo paciente: ${pm[a.patient_id]?.name || ''}`, s: `${fDT(a.starts_at)} · ${a.modality === 'online' ? 'online' : 'presencial'}`, h: '#/solicitacoes' })),
+      ...cks.map(c => ({ ic: 'scale', t: `Acompanhamento semanal: ${pm[c.patient_id]?.name || 'paciente'}`, s: `${fDate(c.data)}${c.sintomas?.length ? ' · ' + c.sintomas.join(', ') : ''}`, h: `#/paciente/${c.patient_id}?tab=emagrecimento` })),
       ...rets.map(r => ({ ic: 'alarm', t: `Retorno: ${pm[r.patient_id]?.name || 'paciente'}`, s: `${r.due_date <= today ? 'Vencido/hoje' : 'Em ' + fDate(r.due_date)} · ${r.reason || ''}`, h: `#/paciente/${r.patient_id}?tab=retornos` })),
       ...bdays.map(p => ({ ic: 'cake', t: `Aniversário: ${p.name}`, s: 'Mande uma mensagem hoje', h: `#/marketing` })),
       ...low.map(s => ({ ic: 'box', t: `Estoque baixo: ${s.name}`, s: `Restam ${s.quantity}`, h: '#/estoque' })),

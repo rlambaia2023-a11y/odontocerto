@@ -228,3 +228,13 @@ table.tbl{width:100%;border-collapse:collapse;font-size:.9rem}
 .wday.has{background:var(--brand-50);border-color:var(--brand-100);color:var(--brand)}
 .wday.has b{color:var(--brand)}
 .wday.today{outline:2px solid var(--brand);outline-offset:-2px}
+
+.dotc{width:12px;height:12px;border-radius:50%;flex:none}
+.appt.evx{border-left-width:4px;border-left-style:solid}
+.ckgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.ckph{aspect-ratio:3/4;border-radius:12px;background:#eef1f5;object-fit:cover;width:100%;display:block}
+.ckph.empty{display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:.8rem;text-align:center;padding:8px}
+.weeks{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.weeks .w{border:1px dashed var(--line);border-radius:12px;padding:8px;text-align:center;font-size:.8rem;color:var(--ink-3)}
+.weeks .w.done{border-style:solid;border-color:var(--ok);color:var(--ok);background:var(--ok-50)}
+.weeks .w.now{border-color:var(--brand);color:var(--brand)}

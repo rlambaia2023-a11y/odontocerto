@@ -93,25 +93,26 @@ function agendaPage(mine) {
     const pro = mine ? Auth.userId() : (q.get('pro') || '');
     const from = view === 'semana' ? addDays(d, -((d.getDay() + 6) % 7)) : d; const to = addDays(from, view === 'semana' ? 7 : 1);
     const qq = { gte: { starts_at: from.toISOString() }, lt: { starts_at: to.toISOString() }, order: 'starts_at' }; if (pro) qq.eq = { professional_id: pro };
-    const appts = await db.list('appointments', qq); const pm = await patientMap(appts.map(a => a.patient_id));
+    const [appts, evs] = await Promise.all([db.list('appointments', qq), loadEvents(from, to, pro)]); const pm = await patientMap(appts.map(a => a.patient_id));
+    if (mine) gsyncMaybe().then(ch => { if (ch && location.hash.startsWith('#/minha-agenda')) router(); });
     const base = mine ? '#/minha-agenda' : '#/agenda'; const link = (dd, v = view) => `${base}?d=${ymd(dd)}&v=${v}${pro && !mine ? '&pro=' + pro : ''}`;
     const step = view === 'semana' ? 7 : 1;
     const card = a => { const p = pm[a.patient_id]; return html`<div class="appt ${a.status}" data-act="editAppt" data-id="${a.id}"><div class="grow" style="min-width:0"><div class="t">${a.modality === 'online' ? icon('video', 'small') : ''}${fTime(a.starts_at)} ${p?.name || a.title || 'Compromisso'}</div><div class="tiny muted">${KINDS[a.kind] || ''} · ${STATUS[a.status]?.[0]}${S.members.length > 1 ? ' · ' + proName(a.professional_id) : ''}</div></div></div>`; };
     let body;
     if (view === 'semana') {
-      body = html`<div class="week">${[...Array(7)].map((_, i) => { const day = addDays(from, i), k = ymd(day), list = appts.filter(a => ymd(a.starts_at) === k); return html`<div class="day ${k === ymd(new Date()) ? 'today' : ''}"><h4 class="row between"><a href="${link(day, 'dia')}">${WD[day.getDay()].slice(0, 3)} ${pad(day.getDate())}/${pad(day.getMonth() + 1)}</a><button class="btn sm ghost" data-act="newAppt" data-date="${k}" data-time="08:00" aria-label="Novo">${icon('plus')}</button></h4>${list.map(card)}${!list.length ? html`<div class="tiny muted">Livre</div>` : ''}</div>`; })}</div>`;
+      body = html`<div class="week">${[...Array(7)].map((_, i) => { const day = addDays(from, i), k = ymd(day), list = appts.filter(a => ymd(a.starts_at) === k), el = evs.filter(e => ymd(e.starts_at) === k || (ymd(e.starts_at) < k && ymd(e.ends_at) >= k && fTime(e.ends_at) !== '00:00')); return html`<div class="day ${k === ymd(new Date()) ? 'today' : ''}"><h4 class="row between"><a href="${link(day, 'dia')}">${WD[day.getDay()].slice(0, 3)} ${pad(day.getDate())}/${pad(day.getMonth() + 1)}</a><button class="btn sm ghost" data-act="newAppt" data-date="${k}" data-time="08:00" aria-label="Novo">${icon('plus')}</button></h4>${[...list.map(a => [new Date(a.starts_at), card(a)]), ...el.map(e => [new Date(e.starts_at), evCard(e)])].sort((x, y) => x[0] - y[0]).map(x => x[1])}${!list.length && !el.length ? html`<div class="tiny muted">Livre</div>` : ''}</div>`; })}</div>`;
     } else {
-      const slots = []; for (let h = 7; h < 21; h++) for (const m of [0, 30]) slots.push([h, m]);
-      body = html`<div class="slots">${slots.map(([h, m]) => { const list = appts.filter(a => { const s = new Date(a.starts_at); return s.getHours() === h && (m === 0 ? s.getMinutes() < 30 : s.getMinutes() >= 30); }); return html`<div class="slot"><div class="h">${pad(h)}:${pad(m)}</div><div class="c">${list.map(card)}${!list.length ? html`<button class="add" data-act="newAppt" data-date="${ymd(d)}" data-time="${pad(h)}:${pad(m)}">+ agendar às ${pad(h)}:${pad(m)}</button>` : ''}</div></div>`; })}</div>`;
+      const slots = []; for (let h = 7; h < 21; h++) for (const m of [0, 30]) slots.push([h, m]); const dayEvs = evs.filter(e => new Date(e.starts_at) < addDays(d, 1) && new Date(e.ends_at) > d);
+      body = html`${dayEvs.length ? html`<div class="stack" style="gap:6px;margin-bottom:10px">${dayEvs.map(evCard)}</div>` : ''}<div class="slots">${slots.map(([h, m]) => { const list = appts.filter(a => { const s = new Date(a.starts_at); return s.getHours() === h && (m === 0 ? s.getMinutes() < 30 : s.getMinutes() >= 30); }); return html`<div class="slot"><div class="h">${pad(h)}:${pad(m)}</div><div class="c">${list.map(card)}${!list.length ? html`<button class="add" data-act="newAppt" data-date="${ymd(d)}" data-time="${pad(h)}:${pad(m)}">+ agendar às ${pad(h)}:${pad(m)}</button>` : ''}</div></div>`; })}</div>`;
     }
     if (q.get('novo')) after(() => ACT.newAppt({ dataset: { date: ymd(d), time: '' } }));
-    return html`<div class="pagehead"><h1>${mine ? 'Minha agenda' : 'Agenda'}</h1><button class="btn primary" data-act="newAppt" data-date="${ymd(d)}" data-time="">${icon('plus')} Agendar</button></div>
+    return html`<div class="pagehead"><h1>${mine ? 'Minha agenda' : 'Agenda'}</h1><div class="row">${mine ? html`<button class="btn" data-act="managePlaces">${icon('building')} Locais</button><button class="btn" data-act="newEvent" data-date="${ymd(d)}">${icon('plus')} Compromisso externo</button>` : ''}<button class="btn primary" data-act="newAppt" data-date="${ymd(d)}" data-time="">${icon('plus')} Agendar</button></div></div>
     <div class="card" style="padding:10px;margin-bottom:12px"><div class="row between"><div class="row"><a class="btn sm" href="${link(addDays(d, -step))}" aria-label="Anterior">${icon('chevl')}</a><a class="btn sm" href="${link(new Date())}">Hoje</a><a class="btn sm" href="${link(addDays(d, step))}" aria-label="Próximo">${icon('chev')}</a>
       <input type="date" class="in" style="height:32px;width:auto" value="${ymd(d)}" data-change="agDate" data-base="${base}" data-v="${view}"><b class="small">${view === 'semana' ? `${fDate(from)} – ${fDate(addDays(to, -1))}` : fLong(d)}</b></div>
       <div class="row">${!mine && S.members.length > 1 ? html`<select class="in" style="height:32px;width:auto" data-change="agPro" data-d="${ymd(d)}" data-v="${view}"><option value="">Todos os profissionais</option>${S.members.map(m => html`<option value="${m.user_id}" ${pro === m.user_id ? 'selected' : ''}>${m.full_name}</option>`)}</select>` : ''}
       <div class="seg"><a class="${view === 'dia' ? 'on' : ''}" href="${link(d, 'dia')}">Dia</a><a class="${view === 'semana' ? 'on' : ''}" href="${link(d, 'semana')}">Semana</a></div></div></div></div>
     ${body}
-    <div class="legend" style="margin-top:10px">${Object.entries(STATUS).map(([k, v]) => html`<span>${statusPill(k)}</span>`)}</div>`;
+    <div class="legend" style="margin-top:10px">${Object.entries(STATUS).map(([k, v]) => html`<span>${statusPill(k)}</span>`)}<span class="pill" style="background:#7c3aed14;color:#7c3aed">compromisso externo</span><span class="pill gray">Google Agenda</span>${mine && !isDemo() && isOwner() ? html`<button class="btn sm ghost" data-act="gsyncNow">${icon('repeat')} Atualizar do Google</button>` : ''}</div>`;
   };
 }
 route('/agenda', agendaPage(false), 'agenda');
@@ -142,15 +143,14 @@ function apptForm(a = {}, p = null) {
 }
 act('newAppt', el => modal('Novo agendamento', apptForm({ _date: el.dataset.date, _time: el.dataset.time || '08:00' }, null)));
 act('editAppt', async el => { const a = await db.get('appointments', el.dataset.id); const p = a.patient_id ? await db.get('patients', a.patient_id) : null; modal('Agendamento', apptForm(a, p)); });
-act('delAppt', async el => { if (await confirmBox('Excluir este agendamento?', 'Excluir')) { await db.remove('appointments', el.dataset.id); closeModal(); toast('Agendamento excluído.'); router(); } });
+act('delAppt', async el => { if (await confirmBox('Excluir este agendamento?', 'Excluir')) { const old = await db.get('appointments', el.dataset.id); await db.remove('appointments', el.dataset.id); if (old?.google_event_id) gpush('deleteRemote', { google_event_id: old.google_event_id }); closeModal(); toast('Agendamento excluído.'); router(); } });
 onForm('saveAppt', async d => {
   const pid = await resolvePatient(d, { phone: d.phone });
   const s = new Date(`${d.date}T${d.time}`); const e = new Date(s.getTime() + (+d.dur) * 60000);
-  const clash = (await db.list('appointments', { eq: { professional_id: d.professional_id }, lt: { starts_at: e.toISOString() }, gt: { ends_at: s.toISOString() } })).filter(x => x.id !== d.id && !['cancelado', 'faltou'].includes(x.status));
-  if (clash.length && !(await confirmBox(`Já existe ${clash.length} agendamento nesse horário para esse profissional. Agendar mesmo assim?`, 'Agendar assim mesmo'))) return;
+  if (!['cancelado', 'faltou'].includes(d.status)) { const clash = await findConflicts({ pro: d.professional_id, start: s, end: e, online: d.modality === 'online', ignoreAppt: d.id || null }); if (!(await conflictGate(clash))) return; }
   if (d.modality === 'online' && d.meeting_url && !/^https:\/\//.test(d.meeting_url)) throw new Error('O link da chamada precisa começar com https://');
   const row = { patient_id: pid, starts_at: s.toISOString(), ends_at: e.toISOString(), kind: d.modality === 'online' && d.kind === 'consulta' ? 'teleconsulta' : d.kind, status: d.status, professional_id: d.professional_id, notes: nz(d.notes), modality: d.modality, meeting_url: d.modality === 'online' ? nz(d.meeting_url) : null };
-  if (d.id) await db.update('appointments', d.id, row); else await db.insert('appointments', row);
+  const saved = d.id ? (await db.update('appointments', d.id, row) || { id: d.id }) : await db.insert('appointments', row); if (saved?.id) gpush('pushAppt', { id: saved.id });
   if (d.request_id) { await db.update('appointment_requests', d.request_id, { status: 'agendado', response: `Agendado para ${fDT(s)}` }); updateNotif(); }
   closeModal(); toast('Agendamento salvo.', 'ok'); router();
 });
