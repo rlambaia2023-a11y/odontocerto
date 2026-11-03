@@ -47,14 +47,16 @@ async function updateNotif() {
       db.list('patients', { eq: { active: true }, select: 'id,name,birth_date,phone' }),
       db.list('stock_items', { select: 'id,name,quantity,min_quantity' }),
       db.list('appointment_requests', { eq: { status: 'pendente' } }),
-      db.list('appointments', { eq: { booked_by_patient: true }, gte: { created_at: addDays(t0, -2).toISOString() } }),
+      db.list('appointments', { eq: { booked_by_patient: true }, gte: { ends_at: new Date().toISOString() } }),
     ]);
     const md = today.slice(5);
     const bdays = pats.filter(p => p.birth_date && p.birth_date.slice(5, 10) === md);
     const low = stock.filter(s => +s.quantity <= +s.min_quantity);
     const pm = Object.fromEntries(pats.map(p => [p.id, p]));
-    NOTIF.pending = reqs.length;
+    const toApprove = online.filter(a => a.approval === 'pendente' && a.status !== 'cancelado');
+    NOTIF.pending = reqs.length + toApprove.length;
     NOTIF.items = [
+      ...toApprove.map(a => ({ ic: 'check', t: `Aprovar consulta: ${pm[a.patient_id]?.name || ''}`, s: `${fDT(a.starts_at)} · ${a.modality === 'online' ? 'online' : 'presencial'}`, h: '#/solicitacoes' })),
       ...reqs.map(r => ({ ic: 'globe', t: `Pedido de consulta: ${pm[r.patient_id]?.name || 'paciente'}`, s: r.reason || 'Aguardando resposta', h: '#/solicitacoes' })),
       ...online.filter(a => a.status !== 'cancelado').map(a => ({ ic: a.modality === 'online' ? 'video' : 'cal', t: `Agendado pelo paciente: ${pm[a.patient_id]?.name || ''}`, s: `${fDT(a.starts_at)} · ${a.modality === 'online' ? 'online' : 'presencial'}`, h: '#/solicitacoes' })),
       ...rets.map(r => ({ ic: 'alarm', t: `Retorno: ${pm[r.patient_id]?.name || 'paciente'}`, s: `${r.due_date <= today ? 'Vencido/hoje' : 'Em ' + fDate(r.due_date)} · ${r.reason || ''}`, h: `#/paciente/${r.patient_id}?tab=retornos` })),
@@ -64,7 +66,7 @@ async function updateNotif() {
     const b = document.getElementById('bellbtn'); if (!b) return;
     b.querySelector('.dot')?.remove();
     if (NOTIF.items.length) b.insertAdjacentHTML('beforeend', `<span class="dot">${NOTIF.items.length > 9 ? '9+' : NOTIF.items.length}</span>`);
-    const on = document.querySelector('.side a[href="#/solicitacoes"]'); if (on && reqs.length && !on.querySelector('.pill')) on.insertAdjacentHTML('beforeend', `<span class="pill accent" style="margin-left:auto">${reqs.length}</span>`);
+    const on = document.querySelector('.side a[href="#/solicitacoes"]'); if (on && NOTIF.pending && !on.querySelector('.pill')) on.insertAdjacentHTML('beforeend', `<span class="pill accent" style="margin-left:auto">${NOTIF.pending}</span>`);
   } catch (e) { console.warn(e); }
 }
 act('openNotif', el => {

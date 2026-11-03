@@ -115,7 +115,7 @@ async function remindersBlock() {
   const pm = await patientMap(ap.map(a => a.patient_id));
   const msg = (p, a) => `Olá, ${p.name.split(' ')[0]}! Lembrete da sua consulta amanhã (${fDate(a.starts_at)}) às ${fTime(a.starts_at)} no ${S.clinic.name}.${a.modality === 'online' && a.meeting_url ? ` É online: entre por este link no horário ${a.meeting_url} (teste câmera e microfone antes).` : ` Endereço: ${[S.clinic.address, S.clinic.city].filter(Boolean).join(', ')}.`} Pode confirmar sua presença?`;
   return html`<div class="card"><h2>Lembretes de amanhã (${ap.length})</h2><p class="small muted" style="margin:4px 0 8px">Um toque abre o WhatsApp com a mensagem pronta${ap.some(a => a.modality === 'online') ? ', já com o link do Meet nas teleconsultas' : ''}.</p>
-    ${ap.length ? html`<div class="list">${ap.map(a => { const p = pm[a.patient_id]; return html`<div class="li"><b class="small" style="width:46px">${fTime(a.starts_at)}</b><span class="grow"><span class="t">${p?.name || ''}</span><span class="tiny muted">${MOD[a.modality || 'presencial']} · ${proName(a.professional_id)}</span></span>${statusPill(a.status)}${p?.phone ? html`<a class="btn sm" target="_blank" rel="noopener" href="${waLink(p.phone, msg(p, a))}">${icon('wa')} Lembrar</a>` : html`<span class="tiny muted">sem celular</span>`}</div>`; })}</div>` : html`<p class="muted small">Nenhuma consulta amanhã.</p>`}</div>`;
+    ${ap.length ? html`<div class="list">${ap.map(a => { const p = pm[a.patient_id]; return html`<div class="li"><b class="small" style="width:46px">${fTime(a.starts_at)}</b><span class="grow"><span class="t">${p?.name || ''}</span><span class="tiny muted">${MOD[a.modality || 'presencial']} · ${proName(a.professional_id)}</span></span>${apPill(a)}${p?.phone ? html`<a class="btn sm" target="_blank" rel="noopener" href="${waLink(p.phone, msg(p, a))}">${icon('wa')} Lembrar</a>` : html`<span class="tiny muted">sem celular</span>`}</div>`; })}</div>` : html`<p class="muted small">Nenhuma consulta amanhã.</p>`}</div>`;
 }
 
 /* ---------- importação de pacientes (CSV / Excel) ---------- */
@@ -230,4 +230,37 @@ act('impRun', async el => {
     for (let i = 0; i < novos.length; i += 200) { await db.insert('patients', novos.slice(i, i + 200)); done += Math.min(200, novos.length - i); el.textContent = `Importando… ${done}/${novos.length}`; }
     closeModal(); toast(`${done} paciente(s) importado(s).`, 'ok'); go('#/pacientes');
   } catch (e) { el.disabled = false; el.textContent = 'Tentar de novo'; throw new Error(`Parou depois de ${done} pacientes: ${e.message}`); }
+});
+
+/* ---------- aprovação das consultas marcadas pelos pacientes ---------- */
+async function approvalsBlock() {
+  const ap = (await db.list('appointments', { eq: { approval: 'pendente' }, gte: { ends_at: new Date().toISOString() }, order: 'starts_at' })).filter(a => a.status !== 'cancelado' && (isOwner() || a.professional_id === Auth.userId() || S.me.role === 'secretaria'));
+  if (!ap.length && !S.clinic.booking_requires_approval) return '';
+  const pm = await patientMap(ap.map(a => a.patient_id));
+  return html`<div class="card" style="${ap.length ? 'border-color:var(--warn)' : ''}"><h2>Aguardando aprovação (${ap.length})</h2>
+    ${ap.length ? html`<div class="list" style="margin-top:10px">${ap.map(a => html`<div class="li"><b class="small" style="width:110px">${fDT(a.starts_at)}</b><span class="grow"><span class="t">${pm[a.patient_id]?.name || ''}</span><span class="tiny muted">${MOD[a.modality]} · ${proName(a.professional_id)}${a.reason ? ' · ' + a.reason : ''}${a.tele_consent_at ? ' · termo aceito' : ''}</span></span>
+      ${isClinical() ? html`<button class="btn sm ok" data-act="approveAppt" data-id="${a.id}">${icon('check')} Aprovar</button>` : ''}<button class="btn sm" data-act="declineAppt" data-id="${a.id}">Recusar</button></div>`)}</div>` : html`<p class="muted small">Nenhuma consulta esperando aprovação.</p>`}</div>`;
+}
+act('approveAppt', async el => {
+  const a = await db.get('appointments', el.dataset.id); const p = await db.get('patients', a.patient_id); const pro = pros().find(m => m.user_id === a.professional_id) || S.me;
+  modal('Aprovar consulta', html`<p style="margin-top:0"><b>${p.name}</b> · ${fLong(new Date(a.starts_at))} às ${fTime(a.starts_at)} · ${MOD[a.modality]}</p>${a.reason ? html`<p class="small"><b>Motivo:</b> ${a.reason}</p>` : ''}
+    <form data-form="approveAppt" class="stack"><input type="hidden" name="id" value="${a.id}">
+    ${a.modality === 'online' ? html`<label class="f"><span>Link da chamada (Google Meet) <i>*</i></span><input class="in" name="meeting_url" type="url" required placeholder="https://meet.google.com/abc-defg-hij" value="${a.meeting_url || pro.meet_url || ''}"></label>
+      <p class="small muted" style="margin:0">Não tem sala fixa? <a href="https://meet.google.com/new" target="_blank" rel="noopener">Abra o Meet</a> logado(a) na conta da clínica, copie o link da reunião e cole aqui. Para não repetir isso, cadastre uma sala fixa em Configurações → Meu atendimento online.</p>` : ''}
+    <button class="btn ok" type="submit">${icon('check')} Aprovar e avisar o paciente</button></form>`);
+});
+onForm('approveAppt', async d => {
+  if (d.meeting_url && !/^https:\/\//.test(d.meeting_url)) throw new Error('O link precisa começar com https://');
+  const a = await db.update('appointments', d.id, { approval: 'aprovado', status: 'confirmado', ...(d.meeting_url ? { meeting_url: d.meeting_url } : {}) });
+  const full = a || await db.get('appointments', d.id); const p = await db.get('patients', full.patient_id);
+  const txt = `Olá, ${p.name.split(' ')[0]}! Sua consulta ${full.modality === 'online' ? 'online ' : ''}com ${proName(full.professional_id)} está CONFIRMADA para ${fDate(full.starts_at)} às ${fTime(full.starts_at)}.${full.modality === 'online' ? ` Entre por este link no horário: ${d.meeting_url} (teste câmera e microfone antes). O link também está na sua área do paciente.` : ''}`;
+  updateNotif(); await router();
+  modal('Consulta aprovada', html`<p style="margin-top:0">${icon('check')} Aprovada. O paciente já vê ${full.modality === 'online' ? 'o link ' : 'a confirmação '}na área dele.</p>${p.phone ? html`<a class="btn primary" target="_blank" rel="noopener" href="${waLink(p.phone, txt)}" data-act="closeAfterOpen">${icon('wa')} Avisar no WhatsApp</a>` : html`<p class="small muted">Paciente sem celular cadastrado.</p>`}`);
+});
+act('closeAfterOpen', el => { window.open(el.href, '_blank', 'noopener'); closeModal(); });
+act('declineAppt', async el => {
+  const why = prompt('Motivo (vai na mensagem ao paciente):', 'Infelizmente não conseguiremos atender neste horário. Por favor, escolha outro na página de agendamento.'); if (why === null) return;
+  const a = await db.update('appointments', el.dataset.id, { approval: 'recusado', status: 'cancelado', notes: 'Recusada: ' + why }); const full = a || await db.get('appointments', el.dataset.id); const p = await db.get('patients', full.patient_id);
+  updateNotif(); await router();
+  if (p.phone) modal('Consulta recusada', html`<p style="margin-top:0">O horário foi liberado.</p><a class="btn" target="_blank" rel="noopener" href="${waLink(p.phone, `Olá, ${p.name.split(' ')[0]}! Sobre sua consulta de ${fDate(full.starts_at)} às ${fTime(full.starts_at)}: ${why}`)}" data-act="closeAfterOpen">${icon('wa')} Avisar no WhatsApp</a>`);
 });

@@ -2,6 +2,7 @@
 const STATUS = { agendado: ['Agendado', 'gray'], confirmado: ['Confirmado', 'ok'], em_atendimento: ['Em atendimento', 'warn'], atendido: ['Atendido', ''], faltou: ['Faltou', 'bad'], cancelado: ['Cancelado', 'bad'] };
 const KINDS = { consulta: 'Consulta', teleconsulta: 'Teleconsulta (online)', avaliacao: 'Avaliação', retorno: 'Retorno', procedimento: 'Procedimento', urgencia: 'Urgência', manutencao: 'Manutenção' };
 const statusPill = s => html`<span class="pill ${STATUS[s]?.[1] || ''}">${STATUS[s]?.[0] || s}</span>`;
+const apPill = a => a && a.approval === 'pendente' && !['cancelado', 'faltou'].includes(a.status) ? html`<span class="pill warn">aguardando aprovação</span>` : statusPill(a?.status);
 async function patientMap(ids) {
   const u = [...new Set(ids.filter(Boolean))]; if (!u.length) return {};
   const rows = await db.list('patients', { in: { id: u }, select: 'id,name,phone,birth_date,insurance_id' });
@@ -32,7 +33,7 @@ route('/', async () => {
   <div class="quick">${q.map(([h, i, l]) => html`<a href="${h}">${icon(i)}<span>${l}</span></a>`)}</div>
   <div class="grid g2 collapse" style="margin-top:14px">
     <div class="card">
-      <div class="row between"><h2>Próximo paciente</h2>${next ? statusPill(next.status) : ''}</div>
+      <div class="row between"><h2>Próximo paciente</h2>${next ? apPill(next) : ''}</div>
       ${np ? html`<div class="row" style="margin:14px 0"><span class="avatar lg">${initials(np.name)}</span><div><div style="font-weight:700;font-size:1.05rem">${np.name}</div><div class="muted small">${fTime(next.starts_at)} – ${fTime(next.ends_at)} · ${KINDS[next.kind] || 'Consulta'}${np.birth_date ? ' · ' + age(np.birth_date) + ' anos' : ''}</div></div></div>
         <div class="row">${next.modality === 'online' && next.meeting_url ? (isClinical() ? html`<button class="btn accent" data-act="startTele" data-id="${next.id}">${icon('video')} Iniciar teleconsulta</button>` : html`<a class="btn accent" target="_blank" rel="noopener" href="${next.meeting_url}">${icon('video')} Link da teleconsulta</a>`) : ''}${next.status !== 'em_atendimento' ? html`<button class="btn primary" data-act="startAppt" data-id="${next.id}" data-p="${np.id}">${icon('check')} Iniciar atendimento</button>` : html`<a class="btn primary" href="#/paciente/${np.id}?tab=evolucao">${icon('clip')} Abrir prontuário</a>`}
         ${np.phone ? html`<a class="btn" target="_blank" rel="noopener" href="${waLink(np.phone, confirmMsg(np, next))}">${icon('wa')} WhatsApp</a>` : ''}</div>`
@@ -47,7 +48,7 @@ route('/', async () => {
   </div>
   <div class="grid g2 collapse" style="margin-top:14px">
     <div class="card"><div class="row between" style="margin-bottom:10px"><h2>Agenda de hoje</h2><a class="small" href="#/agenda">Ver agenda</a></div>
-      ${today.length ? html`<div class="list">${today.map(a => html`<a class="li" href="#/paciente/${a.patient_id}"><b style="width:46px" class="small">${fTime(a.starts_at)}</b><span class="grow"><span class="t">${pm[a.patient_id]?.name || a.title || '—'}</span><span class="tiny muted">${KINDS[a.kind] || ''}</span></span>${statusPill(a.status)}</a>`)}</div>` : html`<div class="empty small">Agenda livre hoje.</div>`}
+      ${today.length ? html`<div class="list">${today.map(a => html`<a class="li" href="#/paciente/${a.patient_id}"><b style="width:46px" class="small">${fTime(a.starts_at)}</b><span class="grow"><span class="t">${pm[a.patient_id]?.name || a.title || '—'}</span><span class="tiny muted">${KINDS[a.kind] || ''}</span></span>${apPill(a)}</a>`)}</div>` : html`<div class="empty small">Agenda livre hoje.</div>`}
     </div>
     <div class="card"><div class="row between" style="margin-bottom:10px"><h2>Retornos próximos</h2></div>
       ${rets.length ? html`<div class="list">${rets.map(r => html`<a class="li" href="#/paciente/${r.patient_id}?tab=retornos">${icon('alarm')}<span class="grow"><span class="t">${pm[r.patient_id]?.name || ''}</span><span class="tiny muted">${r.reason || 'Retorno'}</span></span><span class="pill ${r.due_date <= T ? 'warn' : 'gray'}">${r.due_date <= T ? 'Hoje/vencido' : fDate(r.due_date)}</span></a>`)}</div>` : html`<div class="empty small">Nenhum retorno nos próximos 7 dias.</div>`}

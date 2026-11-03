@@ -150,7 +150,7 @@ const TABRENDER = {
   async consultas(p) {
     const a = await db.list('appointments', { eq: { patient_id: p.id }, order: 'starts_at.desc' });
     return html`<div class="row between" style="margin-bottom:12px"><h2>Consultas</h2><button class="btn primary" data-act="apptForPatient" data-id="${p.id}" data-name="${p.name}">${icon('plus')} Agendar</button></div>
-    ${a.length ? html`<div class="list">${a.map(x => html`<div class="li" data-act="editAppt" data-id="${x.id}" style="cursor:pointer"><b class="small" style="width:120px">${fDT(x.starts_at)}</b><span class="grow small">${KINDS[x.kind] || ''}${x.notes ? ' · ' + x.notes : ''}</span>${statusPill(x.status)}</div>`)}</div>` : html`<div class="card empty">Nenhuma consulta registrada.</div>`}`;
+    ${a.length ? html`<div class="list">${a.map(x => html`<div class="li" data-act="editAppt" data-id="${x.id}" style="cursor:pointer"><b class="small" style="width:120px">${fDT(x.starts_at)}</b><span class="grow small">${KINDS[x.kind] || ''}${x.notes ? ' · ' + x.notes : ''}</span>${apPill(x)}</div>`)}</div>` : html`<div class="card empty">Nenhuma consulta registrada.</div>`}`;
   },
 };
 
