@@ -106,7 +106,12 @@ const Remote = {
     return p.toString().replace(/\+/g, '%20');
   },
   list(t, q) { return Remote.req(`/rest/v1/${t}?${Remote.qs(q)}`); },
-  async insert(t, row) { const r = await Remote.req(`/rest/v1/${t}`, { method: 'POST', body: row, headers: { Prefer: 'return=representation' } }); return Array.isArray(row) ? r : r[0]; },
+  async insert(t, row) {
+    let body = row, cols = '';
+    if (Array.isArray(row)) { const keys = [...new Set(row.flatMap(Object.keys))]; cols = '?columns=' + keys.join(','); }
+    const r = await Remote.req(`/rest/v1/${t}${cols}`, { method: 'POST', body, headers: { Prefer: 'return=representation,missing=default' } });
+    return Array.isArray(row) ? r : r[0];
+  },
   async updateWhere(t, eq, patch) { const r = await Remote.req(`/rest/v1/${t}?${Remote.qs({ eq })}`, { method: 'PATCH', body: patch, headers: { Prefer: 'return=representation' } }); return r[0]; },
   removeWhere(t, eq) { return Remote.req(`/rest/v1/${t}?${Remote.qs({ eq })}`, { method: 'DELETE' }); },
 };
@@ -177,9 +182,9 @@ const Auth = {
   },
   store(d) { LS.set('pepmh_auth', { access_token: d.access_token, refresh_token: d.refresh_token, expires_at: Date.now() + (d.expires_in || 3600) * 1000, user: d.user }); },
   async signIn(email, password) { const d = await Auth.call('token?grant_type=password', { email, password }); Auth.store(d); LS.set('pepmh_mode', 'remote'); },
-  async signUp(email, password, meta) { const d = await Auth.call('signup', { email, password, data: meta }); if (d.access_token) { Auth.store(d); LS.set('pepmh_mode', 'remote'); return true; } return false; },
+  async signUp(email, password, meta) { const d = await Auth.call('signup?redirect_to=' + encodeURIComponent(location.origin + '/'), { email, password, data: meta }); if (d.access_token) { Auth.store(d); LS.set('pepmh_mode', 'remote'); return true; } return false; },
   async refresh() { try { const a = LS.get('pepmh_auth'); const d = await Auth.call('token?grant_type=refresh_token', { refresh_token: a.refresh_token }); Auth.store(d); return true; } catch { LS.del('pepmh_auth'); return false; } },
-  async recover(email) { await Auth.call('recover', { email }); },
+  async recover(email) { await Auth.call('recover?redirect_to=' + encodeURIComponent(location.origin + '/'), { email }); },
   signOut() { const a = LS.get('pepmh_auth'); if (a && !isDemo()) fetch(CFG.url + '/auth/v1/logout', { method: 'POST', headers: { apikey: CFG.key, Authorization: 'Bearer ' + a.access_token } }).catch(() => { }); LS.del('pepmh_auth'); LS.del('pepmh_mode'); location.hash = '#/'; location.reload(); },
   userId() { return isDemo() ? 'demo-user' : LS.get('pepmh_auth')?.user?.id; },
 };
