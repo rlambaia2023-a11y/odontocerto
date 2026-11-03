@@ -65,14 +65,14 @@ pubRoute('/verificar/:code', async ({ code }) => {
 
 /* ---------- PDF assinado com certificado ICP-Brasil ---------- */
 const ICP_HELP = html`<ol class="small" style="padding-left:18px;margin:6px 0">
-  <li>Clique em <b>Imprimir</b> no documento e escolha <b>Salvar como PDF</b>.</li>
+  <li>Baixe o <b>PDF</b> do documento (botão abaixo).</li>
   <li>Assine o PDF com o seu certificado digital ICP-Brasil (A1, token A3 ou certificado em nuvem como BirdID, VIDaaS, SafeID ou NeoID), no assinador da sua certificadora ou no Assinador ITI/SERPRO, no padrão <b>PAdES</b>.</li>
   <li>Volte aqui e envie o PDF assinado. O paciente passa a baixar essa versão na área dele, e a farmácia confere em <a href="https://validar.iti.gov.br" target="_blank" rel="noopener">validar.iti.gov.br</a>.</li></ol>
   <p class="tiny muted" style="margin:0">Receitas de controle especial e de antimicrobianos em formato digital exigem assinatura ICP-Brasil. Medicamentos das listas que exigem notificação de receita (A, B2 e similares) seguem em papel até a integração com o SNCR.</p>`;
 act('signDoc', async el => {
   const d = await db.get('documents', el.dataset.id);
   modal('Assinatura digital ICP-Brasil', html`${ICP_HELP}<div class="docprev" style="margin:12px 0">Código de verificação: <b>${d.verify_code || '—'}</b></div>
-    <div class="row"><button class="btn" data-act="printDocId" data-id="${d.id}">${icon('print')} 1. Imprimir / salvar PDF</button></div>
+    <div class="row"><button class="btn" data-act="pdfDoc" data-id="${d.id}">${icon('down')} 1. Baixar PDF</button></div>
     <label class="f" style="margin-top:12px"><span>3. PDF assinado</span><input type="file" class="in" accept="application/pdf" id="signedpdf" style="padding-top:8px"></label>
     <button class="btn primary" style="margin-top:12px" data-act="uploadSigned" data-id="${d.id}">${icon('up')} Enviar PDF assinado</button>`, { wide: true });
 });

@@ -3,7 +3,7 @@ root = pathlib.Path(__file__).resolve().parent.parent
 src = root / 'src'
 html = (src / 'index.html').read_text()
 css = (src / 'styles.css').read_text()
-js = '\n'.join((src / f).read_text() for f in ['core.js', 'shell.js', 'pages-main.js', 'pages-record.js', 'pages-rx.js', 'pages-admin.js', 'pages-portal.js', 'pages-extra.js'])
+js = '\n'.join((src / f).read_text() for f in ['core.js', 'shell.js', 'pages-main.js', 'pages-record.js', 'pages-rx.js', 'pages-admin.js', 'pages-portal.js', 'pages-extra.js', 'pages-pdf.js'])
 out = html.replace('/*CSS*/', css).replace('/*JS*/', js)
 dist = root / 'dist'; dist.mkdir(exist_ok=True)
 (dist / 'index.html').write_text(out)

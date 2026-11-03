@@ -67,8 +67,8 @@ route('/prescrever', async (_, q) => {
         <div class="editor" id="rxed" contenteditable="true"></div></div>
       <div class="grid g2 collapse"><label class="f ${type === 'receituario' ? '' : 'hidden'}" id="rxtypebox"><span>Tipo de receituário</span><select class="in" name="rx_type">${Object.entries(RXTYPES).map(([k, v]) => html`<option value="${k}" ${repDoc?.rx_type === k ? 'selected' : ''}>${v}</option>`)}</select></label>
         <div class="stack"><label class="check"><input type="checkbox" name="save_tpl"> Salvar como modelo para uso futuro</label><label class="check"><input type="checkbox" name="no_date"> Emitir sem data</label></div></div>
-      <div class="tip">${icon('bulb')}<span>Cabeçalho, endereço e assinatura saem dos dados da clínica e do seu cadastro. <a href="#/configuracoes">Ajustar agora</a>. O envio por WhatsApp manda uma cópia em texto; para receita digital com validade em farmácia é preciso assinar com certificado ICP-Brasil.</span></div>
-      <div class="grid g2"><button type="button" class="btn ok" data-act="rxSave" data-mode="print">${icon('print')} Salvar e imprimir</button><button type="button" class="btn primary" data-act="rxSave" data-mode="send">${icon('send')} Salvar e enviar</button></div>
+      <div class="tip">${icon('bulb')}<span>Cabeçalho, endereço e assinatura saem dos dados da clínica e do seu cadastro. <a href="#/configuracoes">Ajustar agora</a>. O PDF sai com a logo, os dados da clínica e os seus, e pode ser enviado por WhatsApp, e-mail ou link. Para receita digital valer na farmácia, assine o PDF com certificado ICP-Brasil.</span></div>
+      <div class="grid g2"><button type="button" class="btn primary" data-act="rxSave" data-mode="pdf">${icon('down')} Salvar e gerar PDF</button><button type="button" class="btn" data-act="rxSave" data-mode="print">${icon('print')} Salvar e imprimir</button></div>
     </div>
   </form>
   ${hist.length ? html`<div class="card" style="margin-top:14px"><h3>Últimos documentos de ${p.name.split(' ')[0]}</h3><div class="list" style="margin-top:8px">${hist.map(d => html`<div class="li">${icon(DOCT[d.doc_type]?.[1])}<span class="grow small">${DOCT[d.doc_type]?.[0]} · ${fDT(d.created_at)}</span><a class="btn sm" href="#/prescrever?p=${p.id}&repetir=${d.id}">${icon('repeat')} Repetir</a></div>`)}</div></div>` : ''}`;
@@ -123,10 +123,11 @@ act('rxSave', async el => {
     const p = await db.get('patients', pid);
     if (d.phone && onlyDigits(d.phone) !== (p.phone || '')) { await db.update('patients', pid, { phone: onlyDigits(d.phone) }); p.phone = onlyDigits(d.phone); }
     const prof = S.members.find(m => m.user_id === d.professional_id) || S.me;
-    const doc = await db.insert('documents', { content_hash: await sha256(content), patient_id: pid, professional_id: prof.user_id, professional_name: prof.full_name, doc_type: d.doc_type, rx_type: d.doc_type === 'receituario' ? d.rx_type : null, content, no_date: !!d.no_date, sent_to: el.dataset.mode === 'send' ? nz(p.phone) : null });
+    const doc = await db.insert('documents', { content_hash: await sha256(content), patient_id: pid, professional_id: prof.user_id, professional_name: prof.full_name, doc_type: d.doc_type, rx_type: d.doc_type === 'receituario' ? d.rx_type : null, content, no_date: !!d.no_date, sent_to: null });
     if (d.save_tpl) { const title = prompt('Nome do modelo:', DOCT[d.doc_type][0] + ' – ' + fDate(new Date())); if (title) await db.insert('document_templates', { doc_type: d.doc_type, title, content }); }
-    if (el.dataset.mode === 'print') printDocument(doc, p, prof); else sendDocument(doc, p, prof);
+    if (el.dataset.mode === 'print') printDocument(doc, p, prof);
     toast('Documento salvo com sucesso!', 'ok'); go(`#/paciente/${pid}?tab=documentos`);
+    if (el.dataset.mode === 'pdf') setTimeout(() => shareModal(doc.id), 700);
   } finally { el.disabled = false; }
 });
 
