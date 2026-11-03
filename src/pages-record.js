@@ -10,7 +10,7 @@ const ANAM = [
   ['gengiva_sangra', 'Gengiva sangra ao escovar', 'bool'], ['sensibilidade', 'Sensibilidade dentária', 'bool'], ['ultima_visita', 'Última visita ao dentista', 'text'], ['observacoes', 'Observações', 'text'],
 ];
 
-const tabsFor = () => isClinical() ? TABS.filter(([k]) => k !== 'odontograma' || hasDentists()).flatMap(t => t[0] === 'evolucao' ? [t, ['sinais', 'Sinais vitais']] : [t]) : TABS.filter(([k]) => ['plano', 'financeiro', 'retornos', 'consultas'].includes(k));
+const tabsFor = () => isClinical() ? TABS.filter(([k]) => k !== 'odontograma' || hasDentists()).flatMap(t => t[0] === 'evolucao' ? [t, ['sinais', 'Sinais vitais'], ['emagrecimento', 'Emagrecimento']] : [t]) : TABS.filter(([k]) => ['plano', 'financeiro', 'retornos', 'consultas'].includes(k)).concat([['emagrecimento', 'Emagrecimento']]);
 route('/paciente/:id', async ({ id }, q) => {
   const allowed = tabsFor().map(t => t[0]); let tab = q.get('tab') || allowed[0]; if (!allowed.includes(tab)) tab = allowed[0];
   const p = await db.get('patients', id); if (!p) return html`<div class="card empty">Paciente não encontrado. <a href="#/pacientes">Voltar</a></div>`;

@@ -220,3 +220,11 @@ table.tbl{width:100%;border-collapse:collapse;font-size:.9rem}
   .tooth svg{width:100%;max-width:36px;height:auto}
   .tooth .n{font-size:.62rem}
 }
+
+/* Emagrecimento: calendário de 14 dias */
+.wcal{display:grid;grid-template-columns:repeat(14,minmax(42px,1fr));gap:6px;margin-top:12px;overflow-x:auto;padding-bottom:4px}
+.wday{display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 2px;border:1px solid var(--line);border-radius:10px;color:var(--ink-3);min-width:42px}
+.wday b{font-size:1.05rem;color:var(--ink-2)}
+.wday.has{background:var(--brand-50);border-color:var(--brand-100);color:var(--brand)}
+.wday.has b{color:var(--brand)}
+.wday.today{outline:2px solid var(--brand);outline-offset:-2px}
