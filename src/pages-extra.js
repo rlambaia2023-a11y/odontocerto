@@ -58,23 +58,51 @@ pubRoute('/verificar/:code', async ({ code }) => {
       <table class="tbl"><tr><td class="muted">Tipo</td><td><b>${DOCT[v.tipo]?.[0] || v.tipo}</b></td></tr><tr><td class="muted">Emitido em</td><td>${fDT(v.emitido_em)}</td></tr><tr><td class="muted">Profissional</td><td>${v.profissional || ''} ${v.conselho && !/^-\s*$/.test(v.conselho.trim()) ? '· ' + v.conselho : ''}</td></tr><tr><td class="muted">Clínica</td><td>${v.clinica}</td></tr><tr><td class="muted">Paciente</td><td>${v.paciente_iniciais} (iniciais)</td></tr>
       <tr><td class="muted">Assinatura ICP-Brasil</td><td>${v.assinado_icp ? html`<span class="pill ok">PDF assinado enviado em ${fDT(v.assinado_em)}</span>` : html`<span class="pill gray">não enviada — vale a via assinada à mão</span>`}</td></tr></table>
       ${v.hash ? html`<p class="tiny muted" style="word-break:break-all">Impressão digital (SHA-256): ${v.hash}</p>` : ''}
+      ${v.hash_pdf_assinado ? html`<p class="tiny muted" style="word-break:break-all">SHA-256 do PDF assinado: ${v.hash_pdf_assinado}</p>` : ''}
       <p class="small muted">${v.assinado_icp ? html`Para conferir a assinatura do arquivo PDF, use o validador oficial do ITI: <a href="https://validar.iti.gov.br" target="_blank" rel="noopener">validar.iti.gov.br</a>.` : 'O conteúdo não é exibido aqui para proteger os dados do paciente.'}</p>`
       : html`<div class="pill bad" style="font-size:.9rem">Documento não encontrado</div><p class="small">Confira se o código foi digitado corretamente. Se o problema continuar, fale com a clínica que emitiu.</p>`}
   </div></div>`;
 });
 
-/* ---------- PDF assinado com certificado ICP-Brasil ---------- */
+/* ---------- PDF assinado com certificado ICP-Brasil (VIDaaS e outros em nuvem) ---------- */
+const signUrl = id => `${location.origin}/#/assinar/${id}`;
+const isPhone = () => matchMedia('(pointer:coarse)').matches && innerWidth < 900;
 const ICP_HELP = html`<ol class="small" style="padding-left:18px;margin:6px 0">
-  <li>Baixe o <b>PDF</b> do documento (botão abaixo).</li>
-  <li>Assine o PDF com o seu certificado digital ICP-Brasil (A1, token A3 ou certificado em nuvem como BirdID, VIDaaS, SafeID ou NeoID), no assinador da sua certificadora ou no Assinador ITI/SERPRO, no padrão <b>PAdES</b>.</li>
+  <li><b>No celular</b>, toque em <b>Abrir no VIDaaS</b> (ou baixe o PDF e, no app VIDaaS, toque em <b>Assinar documento</b> e escolha o arquivo).</li>
+  <li>Aprove no app com a sua senha ou biometria. O VIDaaS grava o PDF assinado no padrão ICP-Brasil (PAdES).</li>
   <li>Volte aqui e envie o PDF assinado. O paciente passa a baixar essa versão na área dele, e a farmácia confere em <a href="https://validar.iti.gov.br" target="_blank" rel="noopener">validar.iti.gov.br</a>.</li></ol>
-  <p class="tiny muted" style="margin:0">Receitas de controle especial e de antimicrobianos em formato digital exigem assinatura ICP-Brasil. Medicamentos das listas que exigem notificação de receita (A, B2 e similares) seguem em papel até a integração com o SNCR.</p>`;
+  <p class="tiny muted" style="margin:0">Serve também para BirdID, SafeID, NeoID, token A3 ou A1: assine o PDF no assinador da sua certificadora e envie aqui. Depois de enviado, o documento fica travado — para corrigir, use <b>Repetir</b> e emita um novo.</p>`;
+const CONTROL_NOTE = html`<div class="tip">${icon('bulb')}<span>Receita de <b>controle especial</b> ou de <b>antimicrobiano</b> em formato digital precisa da numeração do SNCR da Anvisa, que o PEPMH ainda não emite. Para essas, use a <a href="https://prescricaoeletronica.cfm.org.br/" target="_blank" rel="noopener">Prescrição Eletrônica do CFM</a> (médicos) ou a <a href="https://prescricao.cfo.org.br/" target="_blank" rel="noopener">do CFO</a> (dentistas), ou imprima e assine à mão.</span></div>`;
+async function signPanel(d) {
+  const mine = isDemo() || d.professional_id === Auth.userId();
+  if (d.signed_file_path) return html`<div class="pill ok">Assinado com certificado ICP-Brasil em ${fDT(d.signed_at)}</div>
+    <div class="row" style="margin-top:12px"><button class="btn ok" data-act="downloadSigned" data-id="${d.id}">${icon('down')} Baixar PDF assinado</button><a class="btn" href="https://validar.iti.gov.br" target="_blank" rel="noopener">Validar no ITI</a></div>`;
+  if (!mine) return html`<p class="small">Só <b>${d.professional_name || 'o profissional que emitiu'}</b> pode assinar este documento, com o certificado dele.</p>`;
+  const wa = `https://wa.me/?text=${encodeURIComponent('Assinar no PEPMH: ' + signUrl(d.id))}`;
+  return html`${d.rx_type === 'controle_especial' ? CONTROL_NOTE : ''}${ICP_HELP}
+    <div class="docprev" style="margin:12px 0">Código de verificação: <b>${d.verify_code || '—'}</b></div>
+    <div class="row wrap"><button class="btn primary" data-act="shareToSigner" data-id="${d.id}">${icon('send')} 1. Abrir no VIDaaS</button><button class="btn" data-act="pdfDoc" data-id="${d.id}">${icon('down')} Baixar PDF</button></div>
+    ${isPhone() ? '' : html`<p class="small muted" style="margin:10px 0 0">Está no computador? <a href="${wa}" target="_blank" rel="noopener">Mande este link para o seu WhatsApp</a> e abra no celular, já logada no PEPMH: <span style="word-break:break-all">${signUrl(d.id)}</span></p>`}
+    <label class="f" style="margin-top:14px"><span>3. PDF assinado</span><input type="file" class="in" accept="application/pdf" id="signedpdf" style="padding-top:8px"></label>
+    <button class="btn primary" style="margin-top:12px" data-act="uploadSigned" data-id="${d.id}">${icon('up')} Enviar PDF assinado</button>`;
+}
 act('signDoc', async el => {
   const d = await db.get('documents', el.dataset.id);
-  modal('Assinatura digital ICP-Brasil', html`${ICP_HELP}<div class="docprev" style="margin:12px 0">Código de verificação: <b>${d.verify_code || '—'}</b></div>
-    <div class="row"><button class="btn" data-act="pdfDoc" data-id="${d.id}">${icon('down')} 1. Baixar PDF</button></div>
-    <label class="f" style="margin-top:12px"><span>3. PDF assinado</span><input type="file" class="in" accept="application/pdf" id="signedpdf" style="padding-top:8px"></label>
-    <button class="btn primary" style="margin-top:12px" data-act="uploadSigned" data-id="${d.id}">${icon('up')} Enviar PDF assinado</button>`, { wide: true });
+  modal('Assinatura digital ICP-Brasil', await signPanel(d), { wide: true });
+});
+route('/assinar/:id', async ({ id }) => {
+  const d = await db.get('documents', id); if (!d) return html`<div class="card empty">${icon('file')}<div>Documento não encontrado.</div></div>`;
+  const p = await db.get('patients', d.patient_id);
+  return html`<div class="card stack" style="max-width:640px;margin:0 auto"><h2 style="margin:0">${DOCT[d.doc_type]?.[0] || 'Documento'} · ${p?.name || ''}</h2><div class="small muted">Emitido em ${fDT(d.created_at)}</div>${await signPanel(d)}
+    <a class="btn ghost" href="#/paciente/${d.patient_id}?tab=documentos">Voltar ao prontuário</a></div>`;
+});
+act('shareToSigner', async el => {
+  const b = await docBundle(el.dataset.id); const file = new File([await buildDocPdf(b)], pdfName(b.doc, b.patient), { type: 'application/pdf' });
+  if (navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: file.name }); toast('Escolha o VIDaaS na lista. Depois de assinar, envie o PDF assinado aqui.', 'ok'); } catch (e) { if (e.name !== 'AbortError') throw e; }
+    return;
+  }
+  saveBlob(file, file.name); toast('PDF baixado. Abra o app VIDaaS → Assinar documento e escolha este arquivo.', 'ok');
 });
 act('uploadSigned', async el => {
   const f = document.getElementById('signedpdf').files[0]; if (!f) throw new Error('Escolha o arquivo PDF assinado.');
@@ -84,11 +112,13 @@ act('uploadSigned', async el => {
   if (!head.startsWith('%PDF')) throw new Error('Esse arquivo não parece ser um PDF válido.');
   const hasSig = /\/ByteRange\s*\[/.test(head) && /\/(Sig|DocTimeStamp)\b/.test(head);
   if (!hasSig && !(await confirmBox('Não encontramos uma assinatura digital dentro deste PDF. Ele foi mesmo assinado com o certificado? Enviar assim mesmo?', 'Enviar assim mesmo'))) return;
-  const d = await db.get('documents', el.dataset.id); const path = `${d.clinic_id}/${d.id}.pdf`;
+  const d = await db.get('documents', el.dataset.id);
+  if (d.signed_file_path) throw new Error('Este documento já tem PDF assinado.');
+  const path = `${d.clinic_id}/${d.id}-${Date.now()}.pdf`; const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', await f.arrayBuffer()))].map(x => x.toString(16).padStart(2, '0')).join('');
   el.disabled = true;
   try {
-    if (isDemo()) { await db.update('documents', d.id, { signed_file_path: 'demo/' + d.id + '.pdf', signed_at: new Date().toISOString() }); }
-    else { await Remote.upload('signed-docs', path, f); await db.update('documents', d.id, { signed_file_path: path, signed_at: new Date().toISOString(), signed_by: Auth.userId() }); }
+    if (isDemo()) { await db.update('documents', d.id, { signed_file_path: 'demo/' + d.id + '.pdf', signed_at: new Date().toISOString(), signed_sha256: hash }); }
+    else { await Remote.upload('signed-docs', path, f, false); await db.update('documents', d.id, { signed_file_path: path, signed_at: new Date().toISOString(), signed_by: Auth.userId(), signed_sha256: hash }); }
     closeModal(); toast('PDF assinado salvo. O paciente já pode baixar.', 'ok'); router();
   } finally { el.disabled = false; }
 });

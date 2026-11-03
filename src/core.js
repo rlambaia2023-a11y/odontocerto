@@ -122,7 +122,7 @@ const Remote = {
     if (!res.ok) { let m = 'Erro ' + res.status; try { const j = await res.json(); m = j.message || j.error || m; } catch { } throw new Error(m); }
     return res;
   },
-  upload(bucket, path, file) { return Remote.storageFetch(`object/${bucket}/${path}`, { method: 'POST', body: file, headers: { 'Content-Type': file.type || 'application/pdf', 'x-upsert': 'true' } }); },
+  upload(bucket, path, file, upsert = true) { return Remote.storageFetch(`object/${bucket}/${path}`, { method: 'POST', body: file, headers: { 'Content-Type': file.type || 'application/pdf', 'x-upsert': String(upsert) } }); },
   async download(bucket, path) { return (await Remote.storageFetch(`object/authenticated/${bucket}/${path}`)).blob(); },
   rpc(fn, args = {}) { return Remote.req(`/rest/v1/rpc/${fn}`, { method: 'POST', body: args }); },
 };
