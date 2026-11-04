@@ -8,7 +8,7 @@ Prontuário eletrônico e gestão de consultório odontológico.
 Guia para a equipe e para o paciente: 8 dietas (prato equilibrado, mediterrânea, MIND, DASH, low carb, cetogênica, cetogênica mediterrânea, jejum intermitente), receitas ricas em proteína, planos semanais de exercício (iniciante, intermediário e avançado) com treino de força em casa, cuidados com tirzepatida e sinais de alerta, suplementos, calculadoras (IMC, água, proteína, gasto calórico e meta) e dica do dia. A equipe envia qualquer conteúdo ao paciente pelo WhatsApp.
 
 ## Ícone do sistema
-Gerado por `python scripts/make_icons.py` (requer Pillow) em `src/icons/` (SVG e PNG 32/180/192/512/maskable). O build embute os arquivos no servidor. A logo da tela não muda.
+Gerado por `python scripts/make_icons.py` (requer Pillow) em `src/icons/` (SVG e PNG 32/180/192/512/maskable), com o bastão de Asclépio (símbolo da medicina). O build embute os arquivos no servidor. O mesmo símbolo aparece na tela no lugar das letras "PE" (CSS `.mark`).
 
 ## Perfis de acesso
 - **Responsável** (dono da clínica): tudo, inclusive convites e página pública.

@@ -6,12 +6,12 @@ pubRoute('/nova-senha', async (_, q) => {
       const d = await Auth.call('verify', { type: 'recovery', token_hash: th });
       Auth.store(d); LS.set('pepmh_mode', 'remote'); history.replaceState(null, '', location.pathname + '#/nova-senha');
     } catch (e) {
-      return html`<div class="auth"><div class="card stack"><div class="brand"><span class="mark">PE</span><h1>Link expirado</h1></div><p class="small">Este link de troca de senha já foi usado ou passou de 1 hora. Peça um novo à clínica ou use "Esqueci minha senha" na tela de entrada.</p><a class="btn" href="#/">Ir para a entrada</a></div></div>`;
+      return html`<div class="auth"><div class="card stack"><div class="brand"><span class="mark" role="img" aria-label="PEPMH"></span><h1>Link expirado</h1></div><p class="small">Este link de troca de senha já foi usado ou passou de 1 hora. Peça um novo à clínica ou use "Esqueci minha senha" na tela de entrada.</p><a class="btn" href="#/">Ir para a entrada</a></div></div>`;
     }
   }
   const a = LS.get('pepmh_auth');
   if (!a?.access_token) return html`<div class="auth"><div class="card stack"><h2>Sessão não encontrada</h2><p class="small">Abra de novo o link que você recebeu.</p><a class="btn" href="#/">Ir para a entrada</a></div></div>`;
-  return html`<div class="auth"><div class="card stack"><div class="brand"><span class="mark">PE</span><div><h1>Criar nova senha</h1><div class="small muted">${a.user?.email || ''}</div></div></div>
+  return html`<div class="auth"><div class="card stack"><div class="brand"><span class="mark" role="img" aria-label="PEPMH"></span><div><h1>Criar nova senha</h1><div class="small muted">${a.user?.email || ''}</div></div></div>
     <form data-form="newPass" class="stack"><label class="f"><span>Nova senha (mínimo 8 caracteres)</span><input class="in" type="password" name="p1" minlength="8" required autocomplete="new-password"></label>
     <label class="f"><span>Repita a nova senha</span><input class="in" type="password" name="p2" minlength="8" required autocomplete="new-password"></label>
     <button class="btn primary block" type="submit">Salvar nova senha</button></form><p class="tiny muted" style="margin:0">Funciona em qualquer celular ou computador. Depois de salvar, você já entra no PEPMH.</p></div></div>`;

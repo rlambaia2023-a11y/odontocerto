@@ -53,7 +53,7 @@ async function sha256(text) { const b = await crypto.subtle.digest('SHA-256', ne
 const verifyUrl = code => `${location.origin}/#/verificar/${code}`;
 pubRoute('/verificar/:code', async ({ code }) => {
   let v = null; try { v = await db.rpc('verify_document', { p_code: code }); } catch { }
-  return html`<div class="auth"><div class="card stack"><div class="brand"><span class="mark">PE</span><div><h1>Verificação de documento</h1><div class="small muted">Código ${code.toUpperCase()}</div></div></div>
+  return html`<div class="auth"><div class="card stack"><div class="brand"><span class="mark" role="img" aria-label="PEPMH"></span><div><h1>Verificação de documento</h1><div class="small muted">Código ${code.toUpperCase()}</div></div></div>
     ${v ? html`<div class="pill ok" style="font-size:.9rem">✓ Documento emitido pelo PEPMH</div>
       <table class="tbl"><tr><td class="muted">Tipo</td><td><b>${DOCT[v.tipo]?.[0] || v.tipo}</b></td></tr><tr><td class="muted">Emitido em</td><td>${fDT(v.emitido_em)}</td></tr><tr><td class="muted">Profissional</td><td>${v.profissional || ''} ${v.conselho && !/^-\s*$/.test(v.conselho.trim()) ? '· ' + v.conselho : ''}</td></tr><tr><td class="muted">Clínica</td><td>${v.clinica}</td></tr><tr><td class="muted">Paciente</td><td>${v.paciente_iniciais} (iniciais)</td></tr>
       <tr><td class="muted">Assinatura ICP-Brasil</td><td>${v.assinado_icp ? html`<span class="pill ok">PDF assinado enviado em ${fDT(v.assinado_em)}</span>` : html`<span class="pill gray">não enviada — vale a via assinada à mão</span>`}</td></tr></table>

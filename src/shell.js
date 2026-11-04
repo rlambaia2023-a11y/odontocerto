@@ -23,7 +23,7 @@ function renderShell(active) {
     app.innerHTML = fv(html`
     <header class="topbar ${hasLogo ? 'light' : ''}">
       <button class="iconbtn only-m" data-act="toggleMenu" aria-label="Menu">${icon('menu')}</button>
-      <a class="logo" href="#/">${hasLogo ? brandLogo(S.clinic) : html`<span class="mark">PE</span>PEPMH${patient ? html`<span class="small hide-m" style="font-weight:500;opacity:.85;letter-spacing:0"> · ${S.clinic.name}</span>` : ''}`}</a>
+      <a class="logo" href="#/">${hasLogo ? brandLogo(S.clinic) : html`<span class="mark" role="img" aria-label="PEPMH"></span>PEPMH${patient ? html`<span class="small hide-m" style="font-weight:500;opacity:.85;letter-spacing:0"> · ${S.clinic.name}</span>` : ''}`}</a>
       <span class="sp"></span>
       ${!patient ? html`<button class="iconbtn" data-act="globalSearch" aria-label="Buscar paciente">${icon('search')}</button>
       <div class="rel"><button class="iconbtn" data-act="openNotif" aria-label="Notificações" id="bellbtn">${icon('bell')}</button></div>` : S.clinic.phone ? html`<a class="iconbtn" target="_blank" rel="noopener" href="${waLink(S.clinic.phone, 'Olá! Sou paciente e gostaria de falar com a clínica.')}" aria-label="Falar com a clínica">${icon('wa')}</a>` : ''}
@@ -113,7 +113,7 @@ function renderAuth(mode = 'login') {
   const remoteOk = !!(CFG.url && CFG.key);
   const t = SU.type;
   app.innerHTML = fv(html`<div class="auth"><div class="card">
-    <div class="brand"><span class="mark">PE</span><div><h1>PEPMH</h1><div class="small muted">Prontuário, agenda e teleconsulta para dentistas, médicos e pacientes</div></div></div>
+    <div class="brand"><span class="mark" role="img" aria-label="PEPMH"></span><div><h1>PEPMH</h1><div class="small muted">Prontuário, agenda e teleconsulta para dentistas, médicos e pacientes</div></div></div>
     <div class="seg" style="margin:18px 0 16px;width:100%"><button class="${mode === 'login' ? 'on' : ''}" style="flex:1" data-act="authLogin">Entrar</button><button class="${mode === 'signup' ? 'on' : ''}" style="flex:1" data-act="authSignup">Criar conta</button></div>
     ${mode === 'login' ? html`
       <form data-form="login" class="stack">
@@ -179,7 +179,7 @@ pubRoute('/acesso/:code', async ({ code }) => {
     let ctx = false; try { ctx = await loadContext(); } catch { }
     S.clinic = null;
     if (ctx === 'orphan') return orphanScreen(html`A clínica liberou seu acesso de paciente.`, code, 'paciente');
-    if (ctx) return html`<div class="auth"><div class="card stack"><div class="brand"><span class="mark">PE</span><h1>PEPMH</h1></div>
+    if (ctx) return html`<div class="auth"><div class="card stack"><div class="brand"><span class="mark" role="img" aria-label="PEPMH"></span><h1>PEPMH</h1></div>
       <p style="margin:0">Este navegador está conectado com <b>${S.me?.full_name || 'outra conta'}</b>${S.mode === 'patient' ? ', que já é a conta de um paciente' : ', que é uma conta da equipe da clínica'}.</p>
       <p class="small muted" style="margin:0">O código <b>${code}</b> é para o paciente criar a própria conta. Cada paciente tem o seu login e vê só a própria ficha e as próprias consultas.</p>
       <button class="btn primary" data-act="logoutToCode" data-code="${code}">Sair e criar a conta do paciente</button>
@@ -194,7 +194,7 @@ act('logoutToCode', el => {
 });
 act('stayLogged', () => { history.replaceState(null, '', location.pathname + '#/'); boot(); });
 function orphanScreen(msg = '', code = '', kind = 'equipe') {
-  return html`<div class="auth"><div class="card stack"><div class="brand"><span class="mark">PE</span><h1>PEPMH</h1></div>
+  return html`<div class="auth"><div class="card stack"><div class="brand"><span class="mark" role="img" aria-label="PEPMH"></span><h1>PEPMH</h1></div>
     <p style="margin:0">${msg || 'Sua conta ainda não está ligada a nenhuma clínica.'} Informe o código que você recebeu:</p>
     <form data-form="useCode" class="stack"><select class="in" name="kind"><option value="equipe" ${kind === 'equipe' ? 'selected' : ''}>Convite para a equipe</option><option value="paciente" ${kind === 'paciente' ? 'selected' : ''}>Código de acesso de paciente</option></select>
     <input class="in" name="code" required value="${code}" placeholder="Ex.: 7F3A9C21" style="text-transform:uppercase"><button class="btn primary" type="submit">Continuar</button></form>
