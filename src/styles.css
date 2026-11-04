@@ -175,6 +175,32 @@ table.tbl{width:100%;border-collapse:collapse;font-size:.9rem}
 .tooth .ring{fill:none;stroke-width:3}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem;color:var(--ink-2)}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px;border:1px solid #8795a6}
+.tooth.pend .n{color:var(--bad)}
+.facepick polygon,.facepick rect{fill:#fff;stroke:#8795a6;stroke-width:.6;cursor:pointer}
+.facepick polygon:hover,.facepick rect:hover{fill:var(--brand-50)}
+.facepick .sel,.facepick .sel:hover{fill:#7fb0ef}
+#odofaces.dim{opacity:.35;pointer-events:none}
+/* periograma */
+table.perio{border-collapse:collapse;font-size:.72rem;min-width:900px}
+table.perio th,table.perio td{border:1px solid var(--line);padding:2px;text-align:center}
+table.perio th:first-child{text-align:left;white-space:nowrap;padding:2px 6px;color:var(--ink-2);font-weight:600;background:#fafbfc}
+table.perio th.tn{font-size:.78rem;background:var(--brand-50)}
+table.perio tr.fh th{background:#eef1f5;text-align:left;font-size:.74rem}
+table.perio td.aus{background:repeating-linear-gradient(45deg,#f4f6f9,#f4f6f9 4px,#e3e7ed 4px,#e3e7ed 8px);opacity:.6}
+.perio .trio{display:flex;gap:1px;justify-content:center}
+.perio .pin{width:20px;height:22px;border:1px solid #d5dce5;border-radius:4px;text-align:center;font-size:.75rem;padding:0}
+.perio .pin.w{background:#fff3cd;border-color:#e0b400}.perio .pin.b{background:#f8d0d0;border-color:var(--bad);font-weight:700}
+.perio .psel{font-size:.72rem;height:22px;width:42px}
+.perio .pchk{width:14px;height:14px;margin:3px}.perio .pchk.bop{accent-color:var(--bad)}.perio .pchk.pl{accent-color:#0b57b3}
+table.perio.view td{min-width:44px;letter-spacing:2px}
+table.perio.view span.w{color:#9a7400;font-weight:700}table.perio.view span.b{color:var(--bad);font-weight:800}table.perio.view span.bl{text-decoration:underline 2px var(--bad)}
+.bad-t{color:var(--bad)}.ok-t{color:var(--ok)}
+/* calculadora anestésica */
+.anesres{display:grid;grid-template-columns:minmax(180px,auto) 1fr;gap:16px;align-items:center;background:var(--brand-50);border-radius:12px;padding:14px;margin-top:12px}
+.anesres .big{font-size:2.2rem;font-weight:800;color:var(--brand);line-height:1.1}.anesres .big small{font-size:.9rem;font-weight:600}
+.alertline{margin-top:8px;padding:8px 10px;border-radius:8px;background:#eef1f5;font-size:.84rem}
+.alertline.warn{background:#fff3cd}.alertline.bad{background:#fbe0e0}
+@media (max-width:640px){.anesres{grid-template-columns:1fr}}
 
 /* editor */
 .editor-bar{display:flex;gap:2px;padding:6px;border:1px solid #d5dce5;border-bottom:0;border-radius:10px 10px 0 0;background:#fafbfc;flex-wrap:wrap}

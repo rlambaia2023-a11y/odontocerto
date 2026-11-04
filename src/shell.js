@@ -2,7 +2,7 @@
 const NAV = [
   ['inicio', '#/', 'home', 'Início'], ['agenda', '#/agenda', 'cal', 'Agenda'], ['minha', '#/minha-agenda', 'calme', 'Minha agenda', 'clin'],
   ['online', '#/solicitacoes', 'globe', 'Agendamentos online'],
-  ['pacientes', '#/pacientes', 'user', 'Pacientes'], ['emagrecimento', '#/emagrecimento', 'scale', 'Emagrecimento'], ['prescrever', '#/prescrever', 'pill', 'Prescrever', 'clin'],
+  ['pacientes', '#/pacientes', 'user', 'Pacientes'], ['emagrecimento', '#/emagrecimento', 'scale', 'Emagrecimento'], ['prescrever', '#/prescrever', 'pill', 'Prescrever', 'clin'], ['odonto', '#/odontologia', 'tooth', 'Ferramentas do dentista', 'dent'],
   ['sep', 'Gestão'], ['financeiro', '#/financeiro', 'money', 'Financeiro'], ['precificador', '#/precificador', 'tag', 'Precificador'],
   ['convenios', '#/convenios', 'building', 'Convênios'], ['relatorios', '#/relatorios', 'chart', 'Relatórios'], ['estoque', '#/estoque', 'box', 'Estoque'],
   ['sep', 'Relacionamento'], ['marketing', '#/marketing', 'mega', 'Marketing'], ['crm', '#/crm', 'crm', 'CRM'], ['ideias', '#/ideias', 'bulb', 'Central de ideias'],
@@ -34,7 +34,7 @@ function renderShell(active) {
     if (hasLogo) document.getElementById('side').classList.add('withfoot');
     if (!patient) updateNotif();
   }
-  const items = patient ? PNAV : NAV.filter(n => (n[4] !== 'clin' || isClinical()) && (!ADM_NAV.includes(n[0]) || isAdmin())).filter((n, i, a) => !(n[0] === 'sep' && n[1] === 'Gestão' && !isAdmin()));
+  const items = patient ? PNAV : NAV.filter(n => (n[4] !== 'clin' || isClinical()) && (n[4] !== 'dent' || (isClinical() && showDental())) && (!ADM_NAV.includes(n[0]) || isAdmin())).filter((n, i, a) => !(n[0] === 'sep' && n[1] === 'Gestão' && !isAdmin()));
   document.getElementById('side').innerHTML = fv(html`${items.map(n => n[0] === 'sep' ? html`<div class="sep"></div>${n[1] ? html`<div class="label">${n[1]}</div>` : ''}` : html`<a href="${n[1]}" class="${active === n[0] ? 'on' : ''}">${icon(n[2])}<span>${n[3]}</span>${n[0] === 'online' && NOTIF.pending ? html`<span class="pill accent" style="margin-left:auto">${NOTIF.pending}</span>` : ''}</a>`)}
     ${safeLogo(S.clinic.logo_url) ? html`<div class="sidefoot">${brandLogo(S.clinic)}<span class="tiny muted">${[S.clinic.city, S.clinic.state].filter(Boolean).join('/')}${S.clinic.phone ? ' · ' + fPhone(S.clinic.phone) : ''}</span><span class="tiny muted">sistema PEPMH</span></div>` : ''}`);
 }

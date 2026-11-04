@@ -161,7 +161,7 @@ const Demo = {
   async updateWhere(t, eq, patch) { const d = Demo.load(); let last; (d[t] || []).forEach(r => { if (Demo.match(r, { eq })) { Object.assign(r, patch); last = r; } }); Demo.save(d); return last && { ...last }; },
   async removeWhere(t, eq) {
     const d = Demo.load(); const gone = (d[t] || []).filter(r => Demo.match(r, { eq })).map(r => r.id); d[t] = (d[t] || []).filter(r => !Demo.match(r, { eq }));
-    const cascade = { patients: ['appointments', 'anamneses', 'evolutions', 'odontogram', 'treatment_plans', 'documents', 'return_alerts'], treatment_plans: ['treatment_items'], stock_items: ['stock_movements'] };
+    const cascade = { patients: ['appointments', 'anamneses', 'evolutions', 'odontogram', 'treatment_plans', 'documents', 'return_alerts', 'dental_records'], treatment_plans: ['treatment_items'], stock_items: ['stock_movements'] };
     (cascade[t] || []).forEach(ct => { const fk = t === 'patients' ? 'patient_id' : t === 'treatment_plans' ? 'plan_id' : 'item_id'; d[ct] = (d[ct] || []).filter(r => !gone.includes(r[fk])); });
     Demo.save(d); return null;
   },

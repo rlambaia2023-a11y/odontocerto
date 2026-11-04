@@ -44,7 +44,7 @@ route('/prescrever', async (_, q) => {
   const tpls = await db.list('document_templates', { order: 'title' });
   const hist = p ? await db.list('documents', { eq: { patient_id: p.id }, order: 'created_at.desc', limit: 5 }) : [];
   window.__tpls = tpls; await loadAllergy(p);
-  after(() => { const ed = document.getElementById('rxed'); if (ed) ed.innerHTML = repDoc ? sanitize(repDoc.content) : ''; });
+  after(() => { const ed = document.getElementById('rxed'); if (ed) ed.innerHTML = repDoc ? sanitize(repDoc.content) : window.__rxPrefill ? sanitize(window.__rxPrefill) : ''; window.__rxPrefill = null; });
   return html`<div class="pagehead"><div class="row">${p ? html`<a class="btn sm back" href="#/paciente/${p.id}?tab=documentos">${icon('back')}</a>` : ''}<h1>Prescrições e laudos</h1></div></div>
   <form id="rxform" onsubmit="return false" class="stack">
     <div class="card"><h2 style="color:var(--brand);margin-bottom:12px">Informe os dados do paciente</h2>

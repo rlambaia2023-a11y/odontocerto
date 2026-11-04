@@ -1,5 +1,5 @@
 /* ===== Prontuário do paciente ===== */
-const TABS = [['resumo', 'Resumo'], ['anamnese', 'Anamnese'], ['odontograma', 'Odontograma'], ['evolucao', 'Evolução'], ['plano', 'Plano de tratamento'], ['documentos', 'Prescrições e documentos'], ['financeiro', 'Financeiro'], ['retornos', 'Retornos'], ['consultas', 'Consultas']];
+const TABS = [['resumo', 'Resumo'], ['anamnese', 'Anamnese'], ['odontograma', 'Odontograma'], ['periograma', 'Periograma'], ['exame', 'Exame clínico'], ['evolucao', 'Evolução'], ['plano', 'Plano de tratamento'], ['documentos', 'Prescrições e documentos'], ['financeiro', 'Financeiro'], ['retornos', 'Retornos'], ['consultas', 'Consultas']];
 const DOCT = { receituario: ['Receituário', 'pill'], atestado: ['Atestado', 'edit'], declaracao: ['Declaração', 'file'], carta: ['Carta / encaminhamento', 'send'], exames: ['Solicitação de exames', 'clip'], cirurgia: ['Solicitação de cirurgia', 'building'], laudo: ['Laudo', 'file'] };
 const ANAM = [
   ['queixa', 'Queixa principal', 'text'], ['tratamento_medico', 'Está em tratamento médico?', 'bool'], ['medicamentos', 'Medicamentos em uso', 'text'], ['alergias', 'Alergias (medicamentos, látex, alimentos)', 'text'],
@@ -10,7 +10,7 @@ const ANAM = [
   ['gengiva_sangra', 'Gengiva sangra ao escovar', 'bool'], ['sensibilidade', 'Sensibilidade dentária', 'bool'], ['ultima_visita', 'Última visita ao dentista', 'text'], ['observacoes', 'Observações', 'text'],
 ];
 
-const tabsFor = () => isClinical() ? TABS.filter(([k]) => k !== 'odontograma' || hasDentists()).flatMap(t => t[0] === 'evolucao' ? [t, ['sinais', 'Sinais vitais'], ['emagrecimento', 'Emagrecimento']] : [t]) : TABS.filter(([k]) => ['plano', 'financeiro', 'retornos', 'consultas'].includes(k)).concat([['emagrecimento', 'Emagrecimento']]);
+const tabsFor = () => isClinical() ? TABS.filter(([k]) => !['odontograma', 'periograma', 'exame'].includes(k) || showDental()).flatMap(t => t[0] === 'evolucao' ? [t, ['sinais', 'Sinais vitais'], ['emagrecimento', 'Emagrecimento']] : [t]) : TABS.filter(([k]) => ['plano', 'financeiro', 'retornos', 'consultas'].includes(k)).concat([['emagrecimento', 'Emagrecimento']]);
 route('/paciente/:id', async ({ id }, q) => {
   const allowed = tabsFor().map(t => t[0]); let tab = q.get('tab') || allowed[0]; if (!allowed.includes(tab)) tab = allowed[0];
   const p = await db.get('patients', id); if (!p) return html`<div class="card empty">Paciente não encontrado. <a href="#/pacientes">Voltar</a></div>`;
@@ -30,6 +30,9 @@ route('/paciente/:id', async ({ id }, q) => {
       <button class="btn" data-act="newReturn" data-id="${p.id}">${icon('alarm')} Retorno</button>
       <button class="btn" data-act="patientAccess" data-id="${p.id}">${icon(p.user_id ? 'check' : 'globe')} ${p.user_id ? 'Tem acesso' : 'Acesso online'}</button>
       ${isClinical() ? html`<button class="btn" data-act="printRecord" data-id="${p.id}">${icon('print')} Imprimir</button>` : ''}
+      ${isClinical() && showDental() ? html`<button class="btn" data-act="anesPatient" data-id="${p.id}">${icon('tooth')} Anestesia</button>
+      <button class="btn" data-act="consentPatient" data-id="${p.id}">${icon('file')} Consentimento</button>
+      <a class="btn" href="#/odontologia?aba=atb&p=${p.id}">${icon('pill')} Profilaxia ATB</a>` : ''}
     </div></div>
   <nav class="tabs">${tabsFor().map(([k, l]) => html`<a class="${tab === k ? 'on' : ''}" href="#/paciente/${p.id}?tab=${k}">${l}</a>`)}</nav>
   ${content}`;
@@ -44,6 +47,7 @@ const TABRENDER = {
       db.list('appointments', { eq: { patient_id: p.id }, order: 'starts_at' }), db.list('documents', { eq: { patient_id: p.id }, order: 'created_at.desc', limit: 3 }),
     ]);
     const items = plans.length ? await db.list('treatment_items', { in: { plan_id: plans.map(x => x.id) } }) : [];
+    const perio = isClinical() && showDental() ? ((await dentalList(p.id, 'periograma', 1)) || [])[0] : null; const ps = perio ? perioStats(perio.data) : null;
     const a = an[0]?.data || {}; const now = new Date();
     const flags = ANAM.filter(([k, , t]) => t === 'bool' && a[k]).map(([, l]) => l);
     const pend = items.filter(i => i.status === 'pendente'); const done = items.filter(i => i.status === 'realizado');
@@ -58,6 +62,7 @@ const TABRENDER = {
       a.medicamentos ? `Medicamentos em uso: ${a.medicamentos}.` : null, a.alergias ? `Alergias informadas: ${a.alergias}.` : null,
       a.queixa ? `Queixa principal: ${a.queixa}.` : null,
       odo.length ? `No odontograma há ${odo.filter(o => o.status === 'a_realizar').length} achado(s) a tratar e ${odo.filter(o => o.status === 'realizado').length} procedimento(s) já realizados.` : null,
+      ps ? `Último periograma (${fDate(perio.created_at)}): sangramento em ${ps.bopPct}% dos sítios, PS média ${f1(ps.pdMean)} mm. ${ps.dx}` : null,
       items.length ? `Plano de tratamento: ${done.length} de ${items.length} itens concluídos${pend.length ? `; faltam ${pend.slice(0, 4).map(i => i.description + (i.tooth ? ' (' + i.tooth + ')' : '')).join(', ')}${pend.length > 4 ? '…' : ''}` : ''}.` : null,
       lastA ? `Último atendimento em ${fDate(lastA.starts_at)}.` : null, nextA ? `Próxima consulta: ${fDT(nextA.starts_at)}.` : 'Sem consulta futura agendada.',
       faltas ? `Registro de ${faltas} falta(s).` : null, open ? `Valor em aberto: ${BRL(open)}.` : null,
@@ -78,19 +83,7 @@ const TABRENDER = {
     <div class="row between"><span class="tiny muted">Cada salvamento gera uma nova versão; as anteriores ficam no histórico (${list.length}).</span><button class="btn primary" type="submit">Salvar anamnese</button></div></form></div>`;
   },
 
-  /* ---- odontograma ---- */
-  async odontograma(p, q) {
-    const rows = await db.list('odontogram', { eq: { patient_id: p.id }, order: 'created_at' }); const dec = q.get('dec') === '1';
-    const by = groupBy(rows, r => r.tooth);
-    const U = dec ? [55, 54, 53, 52, 51, 61, 62, 63, 64, 65] : [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
-    const L = dec ? [85, 84, 83, 82, 81, 71, 72, 73, 74, 75] : [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
-    const arch = list => html`<div class="arch">${list.map((t, i) => html`${i === list.length / 2 ? raw('<span class="gap"></span>') : ''}${toothSvg(t, by[t] || [])}`)}</div>`;
-    return html`<div class="card"><div class="row between"><h2>Odontograma</h2><div class="seg"><a class="${!dec ? 'on' : ''}" href="#/paciente/${p.id}?tab=odontograma">Permanente</a><a class="${dec ? 'on' : ''}" href="#/paciente/${p.id}?tab=odontograma&dec=1">Decídua</a></div></div>
-      <p class="small muted">Toque em um dente para registrar achados, procedimentos ou incluir no plano de tratamento.</p>
-      <div class="odo">${arch(U)}<div style="height:12px"></div>${arch(L)}</div>
-      <div class="legend" style="margin-top:12px"><span><i style="background:#f2a5a5"></i>A realizar</span><span><i style="background:#9cc2f0"></i>Realizado</span><span><i style="background:#c8d0da"></i>Existente</span><span>A = ausente · X = extração · E = endodontia · C = coroa · I = implante · P = prótese · R = raiz residual</span></div></div>
-    <div class="card"><h3>Registros</h3>${rows.length ? html`<div class="tblwrap" style="margin-top:10px"><table class="tbl"><tr><th>Dente</th><th>Faces</th><th>Condição</th><th>Situação</th><th>Data</th><th></th></tr>${rows.map(r => html`<tr><td><b>${r.tooth}</b></td><td>${(r.faces || []).join(', ') || '—'}</td><td>${r.condition}${r.notes ? html`<div class="tiny muted">${r.notes}</div>` : ''}</td><td>${odoStatusPill(r.status)}</td><td class="small">${fDate(r.created_at)}</td><td class="num"><button class="btn sm" data-act="odoCycle" data-id="${r.id}" title="Alterar situação">${icon('repeat')}</button> <button class="btn sm danger" data-act="odoDel" data-id="${r.id}">${icon('trash')}</button></td></tr>`)}</table></div>` : html`<p class="muted small">Nenhum registro ainda.</p>`}</div>`;
-  },
+  /* odontograma, periograma e exame clínico: ver pages-dental.js */
 
   /* ---- evolução ---- */
   async evolucao(p) {
@@ -195,44 +188,7 @@ onForm('saveReturn', async d => { await db.insert('return_alerts', { patient_id:
 act('retDone', async el => { await db.update('return_alerts', el.dataset.id, { done: true }); updateNotif(); router(); });
 act('retDel', async el => { await db.remove('return_alerts', el.dataset.id); updateNotif(); router(); });
 
-/* odontograma */
-const ODO_FACE = ['Cárie', 'Restauração', 'Restauração insatisfatória', 'Selante', 'Fratura', 'Mancha branca', 'Lesão não cariosa'];
-const ODO_WHOLE = { 'Ausente': 'A', 'Extração indicada': 'X', 'Canal (endodontia)': 'E', 'Coroa': 'C', 'Implante': 'I', 'Prótese': 'P', 'Raiz residual': 'R' };
-const odoStatusPill = s => html`<span class="pill ${s === 'a_realizar' ? 'bad' : s === 'realizado' ? '' : 'gray'}">${{ a_realizar: 'A realizar', realizado: 'Realizado', existente: 'Existente' }[s]}</span>`;
-function faceMap(t) { const q = Math.floor(t / 10), upper = [1, 2, 5, 6].includes(q), right = [1, 4, 5, 8].includes(q); return { top: upper ? 'V' : 'L', bottom: upper ? 'L' : 'V', left: right ? 'D' : 'M', right: right ? 'M' : 'D', center: 'O' }; }
-function toothSvg(t, entries) {
-  const fm = faceMap(t), cls = {}; let whole = null;
-  entries.forEach(e => { if (ODO_WHOLE[e.condition]) whole = e; else (e.faces || []).forEach(f => (cls[f] = 'c-' + e.status)); });
-  const poly = (pos, pts) => `<polygon class="f ${cls[fm[pos]] || ''}" points="${pts}"/>`;
-  const col = whole ? (whole.status === 'a_realizar' ? '#c42b2b' : whole.status === 'realizado' ? '#0b57b3' : '#5f6b7a') : '';
-  const svg = `<svg viewBox="0 0 40 40">${poly('top', '0,0 40,0 28,12 12,12')}${poly('bottom', '0,40 40,40 28,28 12,28')}${poly('left', '0,0 12,12 12,28 0,40')}${poly('right', '40,0 28,12 28,28 40,40')}<rect class="f ${cls.O || ''}" x="12" y="12" width="16" height="16"/>${whole ? `<rect x="1" y="1" width="38" height="38" fill="rgba(255,255,255,.75)"/><text x="20" y="27" text-anchor="middle" font-size="20" font-weight="800" fill="${col}">${ODO_WHOLE[whole.condition]}</text>` : ''}</svg>`;
-  return html`<div class="tooth" data-act="odoTooth" data-t="${t}" title="Dente ${t}"><span class="n">${t}</span>${raw(svg)}</div>`;
-}
-act('odoTooth', el => {
-  const t = +el.dataset.t, fm = faceMap(t), pid = location.hash.match(/paciente\/([^?]+)/)[1];
-  const faces = [['V', 'Vestibular'], ['L', [1, 2, 5, 6].includes(Math.floor(t / 10)) ? 'Palatina' : 'Lingual'], ['M', 'Mesial'], ['D', 'Distal'], ['O', t % 10 <= 3 ? 'Incisal' : 'Oclusal']];
-  modal(`Dente ${t}`, html`<form data-form="saveOdo" class="stack"><input type="hidden" name="patient_id" value="${pid}"><input type="hidden" name="tooth" value="${t}">
-    <label class="f"><span>Condição / procedimento</span><select class="in" name="condition" required><optgroup label="Por face">${ODO_FACE.map(c => html`<option>${c}</option>`)}</optgroup><optgroup label="Dente inteiro">${Object.keys(ODO_WHOLE).map(c => html`<option>${c}</option>`)}</optgroup></select></label>
-    <div><span class="small" style="font-weight:600;color:var(--ink-2)">Faces</span><div class="row" style="margin-top:6px">${faces.map(([k, l]) => html`<label class="check"><input type="checkbox" name="faces" value="${k}" data-multi="1"> ${l} (${k})</label>`)}</div></div>
-    <label class="f"><span>Situação</span><select class="in" name="status"><option value="a_realizar">A realizar</option><option value="realizado">Realizado</option><option value="existente">Existente (pré-existente)</option></select></label>
-    <label class="f"><span>Observação</span><input class="in" name="notes"></label>
-    <label class="f"><span>Incluir no plano de tratamento (opcional)</span><select class="in" name="procedure_id"><option value="">Não incluir</option>${S.procedures.filter(x => x.active).map(x => html`<option value="${x.id}">${x.name} — ${BRL(x.price)}</option>`)}</select></label>
-    <button class="btn primary" type="submit">Registrar</button></form>`);
-});
-onForm('saveOdo', async d => {
-  const t = +d.tooth; const whole = !!ODO_WHOLE[d.condition];
-  if (!whole && !(d.faces || []).length) throw new Error('Marque pelo menos uma face.');
-  await db.insert('odontogram', { patient_id: d.patient_id, tooth: t, faces: whole ? [] : d.faces, condition: d.condition, status: d.status, notes: nz(d.notes) });
-  if (d.procedure_id) {
-    let plan = (await db.list('treatment_plans', { eq: { patient_id: d.patient_id }, in: { status: ['orcamento', 'aprovado', 'em_andamento'] }, order: 'created_at.desc', limit: 1 }))[0];
-    if (!plan) plan = await db.insert('treatment_plans', { patient_id: d.patient_id, title: 'Plano de tratamento' });
-    const pr = S.procedures.find(x => x.id === d.procedure_id);
-    await db.insert('treatment_items', { plan_id: plan.id, procedure_id: pr.id, description: pr.name, tooth: t, faces: whole ? [] : d.faces, price: pr.price });
-  }
-  closeModal(); toast(d.procedure_id ? 'Registrado e incluído no plano.' : 'Registrado.', 'ok'); router();
-});
-act('odoCycle', async el => { const r = await db.get('odontogram', el.dataset.id); const nx = { a_realizar: 'realizado', realizado: 'existente', existente: 'a_realizar' }[r.status]; await db.update('odontogram', r.id, { status: nx }); router(); });
-act('odoDel', async el => { if (await confirmBox('Excluir este registro do odontograma?', 'Excluir')) { await db.remove('odontogram', el.dataset.id); router(); } });
+/* odontograma: ver pages-dental.js */
 
 /* plano */
 act('newPlan', async el => { await db.insert('treatment_plans', { patient_id: el.dataset.id, title: 'Plano de tratamento ' + fDate(new Date()) }); toast('Plano criado. Adicione os procedimentos.', 'ok'); router(); });
@@ -280,7 +236,7 @@ act('printRecord', async el => {
   const p = await db.get('patients', el.dataset.id);
   const [ev, docs, odo] = await Promise.all([db.list('evolutions', { eq: { patient_id: p.id }, order: 'created_at' }), db.list('documents', { eq: { patient_id: p.id }, order: 'created_at' }), db.list('odontogram', { eq: { patient_id: p.id }, order: 'tooth' })]);
   printDoc('Prontuário – ' + p.name, `${docHeader()}<h1>Prontuário odontológico</h1><p><b>Paciente:</b> ${esc(p.name)} · <b>Nº</b> ${esc(p.record_number || '')}<br><b>Nascimento:</b> ${esc(fDate(p.birth_date))} · <b>CPF:</b> ${esc(fCPF(p.cpf))} · <b>Convênio:</b> ${esc(insName(p.insurance_id))}<br><b>Telefone:</b> ${esc(fPhone(p.phone))} · <b>Endereço:</b> ${esc([p.address, p.city, p.state].filter(Boolean).join(', '))}${p.alerts ? `<br><b>Alertas:</b> ${esc(p.alerts)}` : ''}</p>
-  <h3>Odontograma</h3><table><tr><th>Dente</th><th>Faces</th><th>Condição</th><th>Situação</th></tr>${odo.map(o => `<tr><td>${o.tooth}</td><td>${esc((o.faces || []).join(', '))}</td><td>${esc(o.condition)}</td><td>${esc({ a_realizar: 'A realizar', realizado: 'Realizado', existente: 'Existente' }[o.status])}</td></tr>`).join('') || '<tr><td colspan=4>—</td></tr>'}</table>
+  <h3>Odontograma</h3>${odo.length ? odoGraphicHtml(odo, defaultDentition(p)) : ''}<table><tr><th>Dente</th><th>Faces</th><th>Condição</th><th>Situação</th></tr>${odo.map(o => `<tr><td>${o.tooth}</td><td>${esc((o.faces || []).join(', '))}</td><td>${esc(o.condition)}</td><td>${esc({ a_realizar: 'A realizar', realizado: 'Realizado', existente: 'Existente' }[o.status])}</td></tr>`).join('') || '<tr><td colspan=4>—</td></tr>'}</table>
   <h3>Evolução</h3>${ev.map(e => `<p><b>${esc(fDT(e.created_at))}</b> – ${esc(e.professional_name || '')}<br>${e.chief_complaint ? 'Queixa: ' + esc(e.chief_complaint) + '<br>' : ''}${esc(e.content).replace(/\n/g, '<br>')}</p>`).join('') || '<p>—</p>'}
   <h3>Documentos emitidos</h3>${docs.map(d => `<p><b>${esc(fDT(d.created_at))}</b> – ${esc(DOCT[d.doc_type]?.[0] || d.doc_type)}</p>`).join('') || '<p>—</p>'}${signature(S.me.full_name, councilOf(S.me))}`);
 });
