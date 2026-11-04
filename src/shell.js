@@ -2,7 +2,7 @@
 const NAV = [
   ['inicio', '#/', 'home', 'Início'], ['agenda', '#/agenda', 'cal', 'Agenda'], ['minha', '#/minha-agenda', 'calme', 'Minha agenda', 'clin'],
   ['online', '#/solicitacoes', 'globe', 'Agendamentos online'],
-  ['pacientes', '#/pacientes', 'user', 'Pacientes'], ['emagrecimento', '#/emagrecimento', 'scale', 'Emagrecimento'], ['prescrever', '#/prescrever', 'pill', 'Prescrever', 'clin'], ['odonto', '#/odontologia', 'tooth', 'Ferramentas do dentista', 'dent'],
+  ['pacientes', '#/pacientes', 'user', 'Pacientes'], ['emagrecimento', '#/emagrecimento', 'scale', 'Emagrecimento'], ['guia', '#/guia', 'leaf', 'Dietas e exercícios'], ['prescrever', '#/prescrever', 'pill', 'Prescrever', 'clin'], ['odonto', '#/odontologia', 'tooth', 'Ferramentas do dentista', 'dent'],
   ['sep', 'Gestão'], ['financeiro', '#/financeiro', 'money', 'Financeiro'], ['precificador', '#/precificador', 'tag', 'Precificador'],
   ['convenios', '#/convenios', 'building', 'Convênios'], ['relatorios', '#/relatorios', 'chart', 'Relatórios'], ['estoque', '#/estoque', 'box', 'Estoque'],
   ['sep', 'Relacionamento'], ['marketing', '#/marketing', 'mega', 'Marketing'], ['crm', '#/crm', 'crm', 'CRM'], ['ideias', '#/ideias', 'bulb', 'Central de ideias'],
@@ -11,6 +11,7 @@ const NAV = [
 const PNAV = [
   ['inicio', '#/', 'home', 'Início'], ['agendar', '#/agendar', 'plus', 'Marcar consulta'], ['consultas', '#/consultas', 'cal', 'Minhas consultas'],
   ['documentos', '#/documentos', 'file', 'Receitas e documentos'], ['tratamentos', '#/tratamentos', 'clip', 'Tratamentos e pagamentos'], ['tratamento', '#/meu-tratamento', 'scale', 'Meu emagrecimento'],
+  ['guia', '#/guia', 'leaf', 'Dietas e exercícios'],
   ['precons', '#/pre-consulta', 'edit', 'Ficha de saúde'], ['dados', '#/meus-dados', 'user', 'Meus dados'],
 ];
 let NOTIF = { count: 0, items: [] };

@@ -2,3 +2,5 @@ node_modules/
 build/
 dist/index.html
 .DS_Store
+dist/*.png
+dist/icon.svg

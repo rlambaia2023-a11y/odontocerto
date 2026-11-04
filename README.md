@@ -4,6 +4,12 @@ Prontuário eletrônico e gestão de consultório odontológico.
 
 **Módulos:** início com próximo paciente, agenda (dia/semana, conflitos, confirmação por WhatsApp), pacientes, prontuário (resumo automático, anamnese versionada, odontograma permanente/misto/decíduo com CPO-D, periograma, exame clínico extra/intraoral, evolução, plano de tratamento com orçamento e cobrança, documentos, financeiro, retornos), prescrições e laudos (receituário simples e de controle especial, atestado, declaração, carta, exames, cirurgia, laudo, modelos, checagem de alergia), financeiro, precificador, convênios, relatórios, estoque, marketing (aniversariantes, recall, campanhas), CRM, central de ideias e configurações. Inclui modo demonstração com dados fictícios.
 
+## Dietas e exercícios (`#/guia`)
+Guia para a equipe e para o paciente: 8 dietas (prato equilibrado, mediterrânea, MIND, DASH, low carb, cetogênica, cetogênica mediterrânea, jejum intermitente), receitas ricas em proteína, planos semanais de exercício (iniciante, intermediário e avançado) com treino de força em casa, cuidados com tirzepatida e sinais de alerta, suplementos, calculadoras (IMC, água, proteína, gasto calórico e meta) e dica do dia. A equipe envia qualquer conteúdo ao paciente pelo WhatsApp.
+
+## Ícone do sistema
+Gerado por `python scripts/make_icons.py` (requer Pillow) em `src/icons/` (SVG e PNG 32/180/192/512/maskable). O build embute os arquivos no servidor. A logo da tela não muda.
+
 ## Perfis de acesso
 - **Responsável** (dono da clínica): tudo, inclusive convites e página pública.
 - **Profissional de saúde** (dentista, médico ou outra área): prontuário completo; médicos têm sinais vitais, CID-10 e evolução SOAP.

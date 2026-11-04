@@ -251,13 +251,14 @@ onForm('wSavePay', async d => {
 proute('/meu-tratamento', async () => {
   const p = S.patient;
   const [[tr], logs, doses] = await Promise.all([db.list('weight_treatments', { eq: { patient_id: p.id }, limit: 1 }), db.list('weight_logs', { eq: { patient_id: p.id }, order: 'data.desc,created_at.desc' }), db.list('dose_logs', { eq: { patient_id: p.id }, order: 'data_aplicacao.desc', limit: 6 })]);
-  if (!tr) return html`<div class="pagehead"><h1>Meu tratamento</h1></div><div class="card empty">${icon('chart')}<div>Você ainda não tem acompanhamento de emagrecimento com a clínica.</div><a class="btn sm" style="margin-top:10px" href="#/agendar">Marcar uma consulta</a></div>`;
+  if (!tr) return html`<div class="pagehead"><h1>Meu tratamento</h1></div><div class="card empty">${icon('chart')}<div>Você ainda não tem acompanhamento de emagrecimento com a clínica.</div><a class="btn sm" style="margin-top:10px" href="#/agendar">Marcar uma consulta</a></div><div style="margin-top:14px">${tipCard()}</div>`;
   const s = weightStats(tr, logs); const ap = appState(tr);
   return html`<div class="pagehead"><div><h1>Meu tratamento</h1><div class="muted small">${tr.medication || 'Tirzepatida'} · ${S.clinic.name}</div></div></div>
   <div class="grid g3">
     <div class="card kpi"><div class="l">Próxima aplicação</div><div class="v" style="font-size:1.3rem">${tr.proxima_aplicacao ? fDate(tr.proxima_aplicacao) : '—'}</div>${ap && ap[0] !== 'gray' ? html`<span class="pill ${ap[0]}">${ap[1]}</span>` : ''}</div>
     <div class="card kpi"><div class="l">Dose atual</div><div class="v" style="font-size:1.3rem">${tr.dose_atual || '—'}</div><div class="tiny muted">a cada ${tr.frequencia_dias || 7} dias</div></div>
     <div class="card kpi"><div class="l">Você já perdeu</div><div class="v" style="font-size:1.3rem;color:${s.lost > 0 ? 'var(--ok)' : 'inherit'}">${s.lost > 0 ? num1(s.lost) + ' kg' : '—'}</div><div class="tiny muted">${kg(s.ini)} → ${kg(s.cur)}</div></div></div>
+  <div style="margin-top:14px">${tipCard()}</div>
   <div class="card" style="margin-top:14px"><h2 style="margin-top:0">Minha evolução</h2>${weightChart(s.logs, tr.peso_meta)}</div>
   ${await myCheckinSection(tr)}
   <div class="grid g2 collapse" style="margin-top:14px">

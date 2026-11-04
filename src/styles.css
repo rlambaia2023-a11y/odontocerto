@@ -287,3 +287,12 @@ body.branded .pagehead h1{background:linear-gradient(90deg,var(--brand-600),var(
   body.branded .side{top:66px}
   .topbar .brandimg{height:40px;max-width:190px}
 }
+
+/* guia de dietas e exercícios */
+.gtip{background:linear-gradient(135deg,var(--brand-50),#fff);border-color:var(--brand-100)}
+.gtip .pill .icon{width:13px;height:13px}
+.gcard{display:flex;flex-direction:column}.gcard .row:last-child{margin-top:auto}
+.glist{margin:6px 0 10px;padding-left:20px}.glist li{margin:3px 0;font-size:.9rem}
+.glist.yes li::marker{content:'✓  ';color:var(--ok)}.glist.no li::marker{content:'✕  ';color:var(--bad)}
+.gwarn{background:var(--warn-50);color:#6b4300;border-radius:10px;padding:10px 12px;font-size:.88rem;border:1px solid #f3dcae}
+.grid>.card+.card{margin-top:0}
