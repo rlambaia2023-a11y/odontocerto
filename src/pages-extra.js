@@ -68,10 +68,26 @@ pubRoute('/verificar/:code', async ({ code }) => {
 const signUrl = id => `${location.origin}/#/assinar/${id}`;
 const isPhone = () => matchMedia('(pointer:coarse)').matches && innerWidth < 900;
 const ICP_HELP = html`<ol class="small" style="padding-left:18px;margin:6px 0">
-  <li><b>No celular</b>, toque em <b>Abrir no VIDaaS</b> (ou baixe o PDF e, no app VIDaaS, toque em <b>Assinar documento</b> e escolha o arquivo).</li>
-  <li>Aprove no app com a sua senha ou biometria. O VIDaaS grava o PDF assinado no padrão ICP-Brasil (PAdES).</li>
-  <li>Volte aqui e envie o PDF assinado. Na mesma hora o documento aparece na área do paciente, com essa versão assinada para baixar, e a farmácia confere em <a href="https://validar.iti.gov.br" target="_blank" rel="noopener">validar.iti.gov.br</a>.</li></ol>
-  <p class="tiny muted" style="margin:0">Serve também para BirdID, SafeID, NeoID, token A3 ou A1: assine o PDF no assinador da sua certificadora e envie aqui. Depois de enviado, o documento fica travado — para corrigir, use <b>Repetir</b> e emita um novo.</p>`;
+  <li><b>No celular</b>, toque em <b>1. Abrir no VIDaaS</b> e escolha o VIDaaS na lista. Se não aparecer, toque em <b>Baixar PDF</b>, abra o app VIDaaS, vá em <b>Assinar documento</b> e escolha o arquivo baixado.</li>
+  <li>Confira o documento e aprove com a sua senha (PIN) ou biometria. O VIDaaS salva uma cópia do PDF já assinada no padrão ICP-Brasil (PAdES), normalmente com <i>assinado</i> no nome.</li>
+  <li>Volte para esta tela, toque em <b>3. PDF assinado</b>, escolha o arquivo assinado e toque em <b>Enviar PDF assinado</b>.</li>
+  <li>Pronto: na mesma hora o documento aparece na área do paciente, com o PDF assinado para baixar. A farmácia ou o laboratório confere em <a href="https://validar.iti.gov.br" target="_blank" rel="noopener">validar.iti.gov.br</a>.</li></ol>
+  <p class="tiny muted" style="margin:0">Serve também para BirdID, SafeID, NeoID, token A3 ou A1: assine o PDF no assinador da sua certificadora e envie aqui. Depois de enviado, o documento fica travado — para corrigir, use <b>Repetir</b> e emita um novo. <a href="#" data-act="signGuide">Passo a passo completo</a></p>`;
+const SIGN_GUIDE = html`<div class="stack small">
+  <div><b>Antes da primeira vez (uma vez só)</b><ol style="padding-left:18px;margin:6px 0">
+    <li>Tenha um certificado digital ICP-Brasil de pessoa física (e-CPF ou o certificado do CRM/CFO) em nuvem. O VIDaaS, da Valid, é o mais usado e funciona direto no celular.</li>
+    <li>Instale o app <b>VIDaaS</b> (Play Store ou App Store), entre com o seu CPF e crie o PIN. Guarde esse PIN: é ele que assina.</li>
+    <li>Entre no PEPMH pelo mesmo celular, com o seu usuário de profissional. Só quem emitiu o documento consegue anexar a versão assinada.</li></ol></div>
+  <div><b>Para cada documento (receita, atestado, pedido de exame, encaminhamento, laudo)</b><ol style="padding-left:18px;margin:6px 0">
+    <li>Emita o documento normalmente em <b>Prescrever / laudar</b> e salve. Ele fica no prontuário como <i>aguardando assinatura</i> e o paciente ainda não vê.</li>
+    <li>No prontuário do paciente, aba <b>Documentos</b>, abra o documento e toque em <b>Assinar com certificado</b>.</li>
+    <li>Toque em <b>1. Abrir no VIDaaS</b>, escolha o VIDaaS e aprove com o PIN ou a biometria.</li>
+    <li>Volte ao PEPMH, toque em <b>3. PDF assinado</b>, escolha o arquivo que o VIDaaS gerou e toque em <b>Enviar PDF assinado</b>.</li>
+    <li>O documento passa para <i>na área do paciente</i>. O paciente entra na área dele, vai em <b>Receitas e documentos</b> e baixa o PDF assinado.</li></ol></div>
+  <div><b>Está no computador?</b> Na tela de assinatura tem um link para mandar o documento ao seu WhatsApp. Abra no celular, já logada, e siga do passo 3.</div>
+  <div><b>Não vai assinar digitalmente?</b> Use <b>Liberar sem assinatura</b> no documento: o paciente vê, baixa e imprime, mas sem a assinatura ICP-Brasil.</div>
+  <div class="tiny muted">Receita de controle especial ou de antimicrobiano em formato digital precisa da numeração do SNCR da Anvisa, que o PEPMH ainda não emite. Para essas, use a Prescrição Eletrônica do CFM ou imprima e assine à mão.</div></div>`;
+act('signGuide', () => modal('Como assinar digitalmente', SIGN_GUIDE, { wide: true }));
 const CONTROL_NOTE = html`<div class="tip">${icon('bulb')}<span>Receita de <b>controle especial</b> ou de <b>antimicrobiano</b> em formato digital precisa da numeração do SNCR da Anvisa, que o PEPMH ainda não emite. Para essas, use a <a href="https://prescricaoeletronica.cfm.org.br/" target="_blank" rel="noopener">Prescrição Eletrônica do CFM</a> (médicos) ou a <a href="https://prescricao.cfo.org.br/" target="_blank" rel="noopener">do CFO</a> (dentistas), ou imprima e assine à mão.</span></div>`;
 async function signPanel(d) {
   const mine = isDemo() || d.professional_id === Auth.userId();
