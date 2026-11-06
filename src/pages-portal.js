@@ -77,9 +77,6 @@ function patientSignupFields() {
     <label class="f"><span>CEP <i>*</i></span><input class="in" name="zip" required inputmode="numeric" maxlength="9" placeholder="00000-000" autocomplete="postal-code"></label>
     <div class="grid g2" style="gap:8px"><label class="f"><span>Cidade <i>*</i></span><input class="in" name="city" required></label><label class="f"><span>UF <i>*</i></span><input class="in" name="state" required maxlength="2" style="text-transform:uppercase"></label></div>
     <label class="f" style="grid-column:1/-1"><span>Endereço (rua, número, bairro) <i>*</i></span><input class="in" name="address" required autocomplete="street-address"></label>
-    <label class="f"><span>Convênio e nº da carteirinha</span><input class="in" name="insurance" placeholder="Deixe em branco se for particular"></label>
-    <label class="f"><span>Como conheceu a clínica</span><input class="in" name="origin" list="origins-pt"><datalist id="origins-pt"><option>Indicação</option><option>Instagram</option><option>Google</option><option>WhatsApp</option><option>Convênio</option></datalist></label>
-    <label class="f" style="grid-column:1/-1"><span>Responsável (se o paciente for menor de idade)</span><input class="in" name="guardian_name"></label>
     <label class="f" style="grid-column:1/-1"><span>Alergias ou problemas de saúde que a clínica deve saber</span><input class="in" name="alerts" placeholder="Ex.: alergia a dipirona, hipertensão"></label>
     <label class="f"><span>E-mail <i>*</i></span><input class="in" type="email" name="email" required autocomplete="email"></label>
     <label class="f"><span>Crie uma senha (mín. 6) <i>*</i></span><input class="in" type="password" name="password" minlength="6" required autocomplete="new-password"></label>
