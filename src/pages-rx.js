@@ -126,7 +126,7 @@ act('rxSave', async el => {
     const doc = await db.insert('documents', { content_hash: await sha256(content), patient_id: pid, professional_id: prof.user_id, professional_name: prof.full_name, doc_type: d.doc_type, rx_type: d.doc_type === 'receituario' ? d.rx_type : null, content, no_date: !!d.no_date, sent_to: null });
     if (d.save_tpl) { const title = prompt('Nome do modelo:', DOCT[d.doc_type][0] + ' – ' + fDate(new Date())); if (title) await db.insert('document_templates', { doc_type: d.doc_type, title, content }); }
     if (el.dataset.mode === 'print') printDocument(doc, p, prof);
-    toast('Documento salvo com sucesso!', 'ok'); go(`#/paciente/${pid}?tab=documentos`);
+    toast('Documento salvo. Assine com o certificado e ele aparece sozinho na área do paciente.', 'ok'); go(`#/paciente/${pid}?tab=documentos`);
     if (el.dataset.mode === 'pdf') setTimeout(() => shareModal(doc.id), 700);
   } finally { el.disabled = false; }
 });

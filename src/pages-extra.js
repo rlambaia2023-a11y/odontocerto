@@ -70,7 +70,7 @@ const isPhone = () => matchMedia('(pointer:coarse)').matches && innerWidth < 900
 const ICP_HELP = html`<ol class="small" style="padding-left:18px;margin:6px 0">
   <li><b>No celular</b>, toque em <b>Abrir no VIDaaS</b> (ou baixe o PDF e, no app VIDaaS, toque em <b>Assinar documento</b> e escolha o arquivo).</li>
   <li>Aprove no app com a sua senha ou biometria. O VIDaaS grava o PDF assinado no padrão ICP-Brasil (PAdES).</li>
-  <li>Volte aqui e envie o PDF assinado. O paciente passa a baixar essa versão na área dele, e a farmácia confere em <a href="https://validar.iti.gov.br" target="_blank" rel="noopener">validar.iti.gov.br</a>.</li></ol>
+  <li>Volte aqui e envie o PDF assinado. Na mesma hora o documento aparece na área do paciente, com essa versão assinada para baixar, e a farmácia confere em <a href="https://validar.iti.gov.br" target="_blank" rel="noopener">validar.iti.gov.br</a>.</li></ol>
   <p class="tiny muted" style="margin:0">Serve também para BirdID, SafeID, NeoID, token A3 ou A1: assine o PDF no assinador da sua certificadora e envie aqui. Depois de enviado, o documento fica travado — para corrigir, use <b>Repetir</b> e emita um novo.</p>`;
 const CONTROL_NOTE = html`<div class="tip">${icon('bulb')}<span>Receita de <b>controle especial</b> ou de <b>antimicrobiano</b> em formato digital precisa da numeração do SNCR da Anvisa, que o PEPMH ainda não emite. Para essas, use a <a href="https://prescricaoeletronica.cfm.org.br/" target="_blank" rel="noopener">Prescrição Eletrônica do CFM</a> (médicos) ou a <a href="https://prescricao.cfo.org.br/" target="_blank" rel="noopener">do CFO</a> (dentistas), ou imprima e assine à mão.</span></div>`;
 async function signPanel(d) {
@@ -117,10 +117,21 @@ act('uploadSigned', async el => {
   const path = `${d.clinic_id}/${d.id}-${Date.now()}.pdf`; const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', await f.arrayBuffer()))].map(x => x.toString(16).padStart(2, '0')).join('');
   el.disabled = true;
   try {
-    if (isDemo()) { await db.update('documents', d.id, { signed_file_path: 'demo/' + d.id + '.pdf', signed_at: new Date().toISOString(), signed_sha256: hash }); }
-    else { await Remote.upload('signed-docs', path, f, false); await db.update('documents', d.id, { signed_file_path: path, signed_at: new Date().toISOString(), signed_by: Auth.userId(), signed_sha256: hash }); }
-    closeModal(); toast('PDF assinado salvo. O paciente já pode baixar.', 'ok'); router();
+    const now = new Date().toISOString(), rel = d.released_at ? {} : { released_at: now };
+    if (isDemo()) { await db.update('documents', d.id, { signed_file_path: 'demo/' + d.id + '.pdf', signed_at: now, signed_sha256: hash, ...rel }); }
+    else { await Remote.upload('signed-docs', path, f, false); await db.update('documents', d.id, { signed_file_path: path, signed_at: now, signed_by: Auth.userId(), signed_sha256: hash, ...rel, ...(d.released_at ? {} : { released_by: Auth.userId() }) }); }
+    closeModal(); toast('Documento assinado e liberado. Já está na área do paciente, com o PDF assinado para baixar.', 'ok'); router();
   } finally { el.disabled = false; }
+});
+act('releaseDoc', async el => {
+  if (!(await confirmBox('Liberar este documento na área do paciente sem a assinatura digital? Ele vai poder ver, baixar e imprimir. Se assinar depois, o PDF assinado aparece para ele também.', 'Liberar'))) return;
+  await db.update('documents', el.dataset.id, { released_at: new Date().toISOString(), ...(isDemo() ? {} : { released_by: Auth.userId() }) });
+  toast('Documento liberado para o paciente.', 'ok'); router();
+});
+act('hideDoc', async el => {
+  if (!(await confirmBox('Tirar este documento da área do paciente? Ele continua no prontuário e você pode liberar de novo quando quiser.', 'Ocultar'))) return;
+  await db.update('documents', el.dataset.id, { released_at: null, released_by: null });
+  toast('Documento oculto da área do paciente.'); router();
 });
 act('downloadSigned', async el => {
   const d = await db.get('documents', el.dataset.id);
