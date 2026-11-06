@@ -228,7 +228,7 @@ proute('/', async () => {
   <div class="grid g2 collapse"><div class="card"><h2>Próxima consulta</h2>${next ? html`<div class="row" style="margin:12px 0;flex-wrap:nowrap"><span class="avatar lg">${icon(next.modality === 'online' ? 'video' : 'cal')}</span><div><b>${fLong(new Date(next.starts_at))} às ${fTime(next.starts_at)}</b><div class="small muted">${MOD[next.modality || 'presencial']} · ${proById(next.professional_id).full_name || ''}</div>${apPill(next)}</div></div>
       <div class="row">${joinBtn(next)}<a class="btn sm" href="#/consultas">Ver detalhes</a></div>${next.approval === 'pendente' ? html`<p class="tiny muted">Aguardando a confirmação de ${proById(next.professional_id).full_name || 'profissional'}. O link aparece aqui após a aprovação.</p>` : next.modality === 'online' ? html`<p class="tiny muted">O link do Google Meet funciona no horário da consulta.</p>` : ''}`
     : html`<div class="empty">${icon('cal')}<div>Nenhuma consulta marcada.</div><a class="btn primary sm" style="margin-top:10px" href="#/agendar">Marcar consulta</a></div>`}</div>
-    <div class="quick" style="grid-template-columns:repeat(2,1fr)">${[['#/agendar', 'plus', 'Marcar consulta'], ['#/documentos', 'file', 'Receitas e documentos'], ['#/pre-consulta', 'edit', 'Ficha de saúde'], ['#/tratamentos', 'clip', 'Tratamentos']].map(([h, i, l]) => html`<a href="${h}">${icon(i)}<span>${l}</span></a>`)}</div></div>
+    <div class="quick" style="grid-template-columns:repeat(2,1fr)">${[['#/agendar', 'plus', 'Marcar consulta'], ['#/documentos', 'file', 'Receitas e documentos'], ['#/pre-consulta', 'edit', 'Ficha de saúde'], ['#/tratamentos', 'clip', 'Tratamentos'], ['#/tratamentos?anexar=1', 'money', 'Anexar pagamento']].map(([h, i, l]) => html`<a href="${h}">${icon(i)}<span>${l}</span></a>`)}</div></div>
   ${reqs.length ? html`<div class="card"><h3>Pedidos aguardando a clínica</h3>${reqs.map(r => html`<p class="small" style="margin:8px 0 0">${r.preferred_date ? fDate(r.preferred_date) + ' · ' : ''}${PERIOD[r.period]} — ${r.reason || 'Consulta'}</p>`)}</div>` : ''}
   ${rets.length ? html`<div class="card"><h3>Lembretes de retorno</h3>${rets.map(r => html`<p class="small" style="margin:8px 0 0">${icon('alarm')} ${r.reason || 'Retorno'} — a partir de ${fDate(r.due_date)}</p>`)}</div>` : ''}
   ${docs.length ? html`<div class="card"><div class="row between"><h3>Documentos recentes</h3><a class="small" href="#/documentos">Ver todos</a></div>${docs.map(d => html`<p class="small" style="margin:8px 0 0">${DOCT[d.doc_type]?.[0]} · ${fDate(d.created_at)}</p>`)}</div>` : ''}`;
@@ -274,12 +274,15 @@ proute('/documentos', async () => {
 }, 'documentos');
 act('pPrintDoc', async el => { const d = await db.get('documents', el.dataset.id); printDocument(d, S.patient, proById(d.professional_id).full_name ? proById(d.professional_id) : { full_name: d.professional_name }); });
 
-proute('/tratamentos', async () => {
+proute('/tratamentos', async (_, q) => {
+  if (q && q.get && q.get('anexar')) after(() => ACT.pReceipt());
   const [plans, fin] = await Promise.all([db.list('treatment_plans', { eq: { patient_id: S.patient.id }, order: 'created_at.desc' }), db.list('finance_entries', { eq: { patient_id: S.patient.id }, order: 'due_date' })]);
   const items = plans.length ? await db.list('treatment_items', { in: { plan_id: plans.map(p => p.id) } }) : [];
   return html`<div class="pagehead"><h1>Tratamentos e pagamentos</h1></div>
+  ${pixCard()}
   ${plans.length ? plans.map(pl => { const its = items.filter(i => i.plan_id === pl.id); const tot = Math.max(0, sum(its, i => i.price) - (+pl.discount || 0)); return html`<div class="card"><div class="row between"><h3>${pl.title}</h3><span class="pill">${pl.status}</span></div><div class="list" style="margin-top:10px">${its.map(i => html`<div class="li small"><span>${i.status === 'realizado' ? '✅' : '⏳'}</span><span class="grow">${i.description}${i.tooth ? ' · dente ' + i.tooth : ''}</span><b>${BRL(i.price)}</b></div>`)}</div><p class="small" style="text-align:right;margin:8px 0 0">${+pl.discount ? `Desconto ${BRL(pl.discount)} · ` : ''}<b>Total ${BRL(tot)}</b></p></div>`; }) : html`<div class="card empty small">Nenhum plano de tratamento.</div>`}
-  <h3 style="margin-top:16px">Pagamentos</h3>${fin.length ? html`<div class="list">${fin.map(f => html`<div class="li small"><span class="grow">${f.description}<div class="tiny muted">vence ${fDate(f.due_date)}</div></span><b>${BRL(f.amount)}</b>${f.paid_at ? html`<span class="pill ok">pago</span>` : f.due_date < ymd(new Date()) ? html`<span class="pill bad">vencido</span>` : html`<span class="pill gray">em aberto</span>`}</div>`)}</div>` : html`<p class="muted small">Nenhum lançamento.</p>`}`;
+  <h3 style="margin-top:16px">Pagamentos</h3>${fin.length ? html`<div class="list">${fin.map(f => html`<div class="li small"><span class="grow">${f.description}<div class="tiny muted">vence ${fDate(f.due_date)}</div></span><b>${BRL(f.amount)}</b>${f.paid_at ? html`<span class="pill ok">pago</span>` : f.due_date < ymd(new Date()) ? html`<span class="pill bad">vencido</span>` : html`<span class="pill gray">em aberto</span>`}</div>`)}</div>` : html`<p class="muted small">Nenhum lançamento.</p>`}
+  ${await myReceiptsBlock()}`;
 }, 'tratamentos');
 
 proute('/pre-consulta', async () => {
