@@ -126,19 +126,23 @@ function renderAuth(mode = 'login') {
         <option value="clinica" ${t === 'clinica' ? 'selected' : ''}>Abrir meu consultório (dentista ou médico)</option>
         <option value="equipe" ${t === 'equipe' ? 'selected' : ''}>Entrar na equipe de uma clínica (tenho convite)</option>
         <option value="paciente" ${t === 'paciente' ? 'selected' : ''}>Sou paciente</option></select></label>
-      <form data-form="signup" class="stack" style="margin-top:12px"><input type="hidden" name="type" value="${t}">
+      ${t === 'paciente' ? html`<form data-form="ptSignup" class="stack" style="margin-top:12px">
+        ${SU.code ? html`<div class="tip">${icon('bulb')}<span>A clínica liberou seu acesso com o código <b>${SU.code}</b>. Confira e complete seus dados abaixo.</span></div><input type="hidden" name="patient_code" value="${SU.code}">`
+        : SU.clinics === undefined ? html`<div class="loading">Carregando clínicas…</div>`
+        : !SU.clinics.length ? html`<div class="pill warn" style="white-space:normal">Nenhuma clínica está recebendo cadastros online agora. Peça o link de cadastro à sua clínica.</div>`
+        : html`<label class="f"><span>Clínica <i>*</i></span><select class="in" name="clinic_slug" required>${SU.clinics.length > 1 ? html`<option value="">Escolha a clínica</option>` : ''}${SU.clinics.map(c => html`<option value="${c.slug}">${c.name}${c.city ? ' · ' + c.city + (c.state ? '/' + c.state : '') : ''}</option>`)}</select></label>`}
+        ${patientSignupFields()}
+        <button class="btn primary block" type="submit" ${!SU.code && !(SU.clinics || []).length ? 'disabled' : ''}>Criar conta</button>
+      </form>` : html`<form data-form="signup" class="stack" style="margin-top:12px"><input type="hidden" name="type" value="${t}">
         <label class="f"><span>Nome completo <i>*</i></span><input class="in" name="full_name" required autocomplete="name"></label>
         ${t === 'clinica' ? html`<label class="f"><span>Área</span><select class="in" name="profession"><option value="odontologia">Odontologia (CRO)</option><option value="medicina">Medicina (CRM)</option><option value="outra">Outra área da saúde</option></select></label>` : ''}
         ${t !== 'paciente' ? html`<div class="grid g2"><label class="f"><span>Nº do conselho</span><input class="in" name="council_number" inputmode="numeric"></label><label class="f"><span>UF</span><input class="in" name="council_uf" maxlength="2" style="text-transform:uppercase"></label></div>` : ''}
         ${t === 'clinica' ? html`<label class="f"><span>Nome do consultório/clínica <i>*</i></span><input class="in" name="clinic_name" required></label>` : ''}
         ${t === 'equipe' ? html`<label class="f"><span>Código do convite <i>*</i></span><input class="in" name="invite_code" required value="${SU.code}" style="text-transform:uppercase"></label>` : ''}
-        ${t === 'paciente' ? html`<div class="tip">${icon('bulb')}<span>Para <b>marcar consulta</b> (presencial ou online), abra o link de agendamento que a sua clínica divulga. Se a clínica te mandou um <b>código de acesso</b>, informe abaixo.</span></div>
-          <label class="f"><span>Código de acesso enviado pela clínica <i>*</i></span><input class="in" name="patient_code" required value="${SU.code}" style="text-transform:uppercase"></label>
-          <label class="f"><span>Celular (WhatsApp)</span><input class="in" name="phone" inputmode="tel"></label>` : ''}
         <label class="f"><span>E-mail <i>*</i></span><input class="in" type="email" name="email" required autocomplete="email"></label>
         <label class="f"><span>Senha (mín. 6 caracteres) <i>*</i></span><input class="in" type="password" name="password" minlength="6" required autocomplete="new-password"></label>
         <button class="btn primary block" type="submit">Criar conta</button>
-      </form>`}
+      </form>`}`}
     ${SHOW_DEMO() ? html`<div class="sep" style="height:1px;background:var(--line);margin:18px 0"></div>
     <div class="grid g2"><button class="btn" data-act="enterDemo" data-u="demo-user">${icon('sparkle')} Demo clínica</button><button class="btn" data-act="enterDemo" data-u="demo-patient">${icon('user')} Demo paciente</button></div>
     <a class="btn ghost block small" style="margin-top:6px" href="#/agendar/demonstracao" data-act="demoBookPage">${icon('globe')} Ver a página pública de agendamento (demo)</a>
@@ -148,7 +152,20 @@ function renderAuth(mode = 'login') {
 }
 act('authLogin', () => renderAuth('login'));
 act('authSignup', () => renderAuth('signup'));
-onInput('suType', el => { SU.type = el.value; renderAuth('signup'); });
+onInput('suType', el => { SU.type = el.value; renderAuth('signup'); if (SU.type === 'paciente' && SU.clinics === undefined) loadSignupClinics(); });
+async function loadSignupClinics() {
+  try { SU.clinics = isDemo() || !(CFG.url && CFG.key) ? [] : (await db.rpc('public_clinic_list', {})) || []; } catch { SU.clinics = []; }
+  if (SU.type === 'paciente' && document.querySelector('[data-form=ptSignup]')) renderAuth('signup');
+}
+onForm('ptSignup', async d => {
+  const slug = d.clinic_slug || null;
+  if (!d.patient_code && !slug) throw new Error('Escolha a clínica.');
+  const meta = patientSignupMeta(d, slug, 'cadastro');
+  if (d.patient_code) { meta.patient_code = d.patient_code.toUpperCase(); delete meta.book_slug; }
+  const ok = await Auth.signUp(d.email.trim(), d.password, meta);
+  if (ok) { await boot(); return; }
+  renderAuth('login'); toast('Conta criada! Abra o e-mail de confirmação que enviamos e depois entre aqui.', 'ok');
+});
 act('enterDemo', async el => { LS.set('pepmh_mode', 'demo'); LS.set('pepmh_demo_user', el.dataset.u); Demo.load(); location.hash = '#/'; await boot(); });
 act('demoBookPage', () => { LS.set('pepmh_mode', 'demo'); LS.del('pepmh_demo_user'); Demo.load(); location.hash = '#/agendar/demonstracao'; });
 onForm('login', async d => { await Auth.signIn(d.email, d.password); await boot(); });
@@ -156,7 +173,6 @@ onForm('signup', async d => {
   const meta = { full_name: d.full_name };
   if (d.type === 'clinica') Object.assign(meta, { profession: d.profession, clinic_name: d.clinic_name, council_number: d.council_number, council_uf: (d.council_uf || '').toUpperCase() });
   if (d.type === 'equipe') Object.assign(meta, { invite_code: d.invite_code.toUpperCase(), council_number: d.council_number, council_uf: (d.council_uf || '').toUpperCase() });
-  if (d.type === 'paciente') Object.assign(meta, { patient_code: d.patient_code.toUpperCase(), phone: d.phone });
   const ok = await Auth.signUp(d.email, d.password, meta);
   if (ok) { await boot(); return; }
   renderAuth('login'); toast('Conta criada! Abra o e-mail de confirmação que enviamos e depois entre aqui.', 'ok');

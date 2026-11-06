@@ -58,6 +58,67 @@ const DemoRPC = {
   link_patient_account() { throw new Error('Códigos de acesso funcionam só na versão real (fora da demonstração).'); },
 };
 
+/* ---------- ficha de cadastro preenchida pelo próprio paciente ---------- */
+// Mesmos dados da ficha "Novo paciente" da equipe, menos o que é só da clínica (etiquetas, observações, convênio cadastrado).
+const cpfValid = v => {
+  const d = onlyDigits(v); if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+  const dv = n => { let s = 0; for (let i = 0; i < n; i++) s += +d[i] * (n + 1 - i); const r = (s * 10) % 11; return r === 10 ? 0 : r; };
+  return dv(9) === +d[9] && dv(10) === +d[10];
+};
+function patientSignupFields() {
+  return html`<div class="grid g2 collapse">
+    <label class="f" style="grid-column:1/-1"><span>Nome completo <i>*</i></span><input class="in" name="full_name" required autocomplete="name"></label>
+    <label class="f"><span>Data de nascimento <i>*</i></span><input class="in" type="date" name="birth_date" required max="${ymd(new Date())}"></label>
+    <label class="f"><span>Sexo <i>*</i></span><select class="in" name="sex" required><option value="">Escolha</option><option value="F">Feminino</option><option value="M">Masculino</option><option value="O">Outro</option></select></label>
+    <label class="f"><span>CPF <i>*</i></span><input class="in" name="cpf" required inputmode="numeric" maxlength="14" placeholder="000.000.000-00"></label>
+    <label class="f"><span>RG</span><input class="in" name="rg"></label>
+    <label class="f"><span>Celular (WhatsApp) <i>*</i></span><input class="in" name="phone" required inputmode="tel" autocomplete="tel" placeholder="(75) 99999-9999"></label>
+    <label class="f"><span>Profissão</span><input class="in" name="occupation"></label>
+    <label class="f"><span>CEP <i>*</i></span><input class="in" name="zip" required inputmode="numeric" maxlength="9" placeholder="00000-000" autocomplete="postal-code"></label>
+    <div class="grid g2" style="gap:8px"><label class="f"><span>Cidade <i>*</i></span><input class="in" name="city" required></label><label class="f"><span>UF <i>*</i></span><input class="in" name="state" required maxlength="2" style="text-transform:uppercase"></label></div>
+    <label class="f" style="grid-column:1/-1"><span>Endereço (rua, número, bairro) <i>*</i></span><input class="in" name="address" required autocomplete="street-address"></label>
+    <label class="f"><span>Convênio e nº da carteirinha</span><input class="in" name="insurance" placeholder="Deixe em branco se for particular"></label>
+    <label class="f"><span>Como conheceu a clínica</span><input class="in" name="origin" list="origins-pt"><datalist id="origins-pt"><option>Indicação</option><option>Instagram</option><option>Google</option><option>WhatsApp</option><option>Convênio</option></datalist></label>
+    <label class="f" style="grid-column:1/-1"><span>Responsável (se o paciente for menor de idade)</span><input class="in" name="guardian_name"></label>
+    <label class="f" style="grid-column:1/-1"><span>Alergias ou problemas de saúde que a clínica deve saber</span><input class="in" name="alerts" placeholder="Ex.: alergia a dipirona, hipertensão"></label>
+    <label class="f"><span>E-mail <i>*</i></span><input class="in" type="email" name="email" required autocomplete="email"></label>
+    <label class="f"><span>Crie uma senha (mín. 6) <i>*</i></span><input class="in" type="password" name="password" minlength="6" required autocomplete="new-password"></label>
+  </div>
+  <label class="check small"><input type="checkbox" name="lgpd" required> Autorizo o uso dos meus dados pela clínica para cadastro, agendamento e atendimento, conforme a LGPD.</label>`;
+}
+function patientSignupMeta(d, slug, via) {
+  if (!cpfValid(d.cpf)) throw new Error('Confira o CPF: os números não batem.');
+  if (onlyDigits(d.phone).length < 10) throw new Error('Informe o celular com DDD.');
+  if (onlyDigits(d.zip).length !== 8) throw new Error('O CEP precisa ter 8 números.');
+  const t = v => (v || '').trim() || null;
+  return { full_name: t(d.full_name), birth_date: d.birth_date || null, sex: d.sex || null, cpf: onlyDigits(d.cpf), rg: t(d.rg), phone: onlyDigits(d.phone), occupation: t(d.occupation),
+    zip: onlyDigits(d.zip), city: t(d.city), state: (d.state || '').trim().toUpperCase() || null, address: t(d.address), insurance: t(d.insurance), origin: t(d.origin),
+    guardian_name: t(d.guardian_name), alerts: t(d.alerts), book_slug: slug, signup_via: via };
+}
+const checkEmailCard = email => html`<div class="card"><h2>Falta só confirmar seu e-mail</h2><p>Enviamos um link para <b>${email}</b>. Abra o e-mail e toque no link para ativar sua conta. Seu cadastro já chegou à clínica.</p><p class="small muted">Não chegou? Veja a caixa de spam ou promoções.</p></div>`;
+
+/* página de cadastro que a clínica manda para o paciente: /#/cadastro/<endereco-da-clinica> */
+pubRoute('/cadastro/:slug', async ({ slug }) => {
+  const c = await db.rpc('public_clinic', { p_slug: slug });
+  if (!c) return html`<div class="auth"><div class="card"><h2>Cadastro indisponível</h2><p class="muted">Esta clínica não está recebendo cadastros online agora. Fale diretamente com ela.</p><a class="btn" href="#/">Voltar</a></div></div>`;
+  applyTheme(c); BK.slug = slug; BK.clinic = c;
+  if (S.mode === 'patient') return html`<div class="auth"><div class="card stack"><h2>Você já tem cadastro</h2><p class="muted" style="margin:0">Esta conta já é de paciente. Seus dados ficam em "Meus dados".</p><a class="btn primary" href="#/">Ir para minha área</a></div></div>`;
+  return html`<div style="min-height:100vh;background:var(--bg)">
+    <header class="topbar ${safeLogo(c.logo_url) ? 'light' : ''}"><span class="logo">${safeLogo(c.logo_url) ? brandLogo(c) : html`<span class="mark" role="img" aria-label="PEPMH"></span>${c.name}`}</span><span class="sp"></span><a class="btn sm ${safeLogo(c.logo_url) ? 'primary' : ''}" style="${safeLogo(c.logo_url) ? '' : 'background:#fff'}" href="#/" data-act="bkLoginLink">Já tenho conta</a></header>
+    <main style="max-width:760px;margin:0 auto;padding:18px 16px 60px"><div id="cad">
+      <div class="card"><h1>Cadastro de paciente</h1><p class="muted" style="margin:6px 0 0">${c.name}${c.city ? ' · ' + c.city + (c.state ? '/' + c.state : '') : ''}</p>
+        <p class="small" style="margin:8px 0 0">Preencha seus dados uma vez só. Eles vão direto para a ficha da clínica e você ganha acesso à sua área do paciente, onde marca consultas e recebe receitas e documentos.</p></div>
+      <form data-form="cadSignup" class="card stack" style="margin-top:14px">${patientSignupFields()}<button class="btn primary block" type="submit">${icon('check')} Concluir cadastro</button></form>
+    </div></main></div>`;
+});
+onForm('cadSignup', async d => {
+  if (isDemo()) throw new Error('O cadastro por link funciona só na versão real (fora da demonstração).');
+  const meta = patientSignupMeta(d, BK.slug, 'cadastro');
+  const ok = await Auth.call('signup?redirect_to=' + encodeURIComponent(location.origin + '/'), { email: d.email.trim(), password: d.password, data: meta });
+  if (ok.access_token) { Auth.store(ok); LS.set('pepmh_mode', 'remote'); location.hash = '#/'; S.clinic = null; await boot(); toast('Cadastro concluído!', 'ok'); return; }
+  document.getElementById('cad').innerHTML = fv(checkEmailCard(d.email.trim())); window.scrollTo(0, 0);
+});
+
 /* ---------- página pública de agendamento ---------- */
 const BK = {};
 pubRoute('/agendar/:slug', async ({ slug }) => {
@@ -107,10 +168,7 @@ function bookingBody() {
         : logged ? html`<p class="small muted" style="margin:0">Agendando como <b>${S.patient.name}</b>.</p>` : html`
           <div class="seg" style="width:100%"><button type="button" class="${BK.auth !== 'login' ? 'on' : ''}" style="flex:1" data-act="bkAuth" data-a="novo">Primeira vez aqui</button><button type="button" class="${BK.auth === 'login' ? 'on' : ''}" style="flex:1" data-act="bkAuth" data-a="login">Já tenho conta</button></div>
           ${BK.auth === 'login' ? html`<div class="grid g2 collapse"><label class="f"><span>E-mail</span><input class="in" type="email" name="email" required autocomplete="email"></label><label class="f"><span>Senha</span><input class="in" type="password" name="password" required autocomplete="current-password"></label></div>`
-          : html`<div class="grid g2 collapse"><label class="f"><span>Nome completo <i>*</i></span><input class="in" name="full_name" required autocomplete="name"></label><label class="f"><span>Celular (WhatsApp) <i>*</i></span><input class="in" name="phone" required inputmode="tel" autocomplete="tel"></label>
-            <label class="f"><span>Data de nascimento</span><input class="in" type="date" name="birth_date"></label><label class="f"><span>E-mail <i>*</i></span><input class="in" type="email" name="email" required autocomplete="email"></label>
-            <label class="f" style="grid-column:1/-1"><span>Crie uma senha (mín. 6) <i>*</i></span><input class="in" type="password" name="password" minlength="6" required autocomplete="new-password"></label></div>
-            <label class="check small"><input type="checkbox" name="lgpd" required> Autorizo o uso dos meus dados pela clínica para agendamento e atendimento, conforme a LGPD.</label>`}`}
+          : patientSignupFields()}`}
         <button class="btn primary block" type="submit" ${staff ? 'disabled' : ''}>${icon('check')} Confirmar agendamento</button></form></div>`;
   }
   return body;
@@ -131,8 +189,8 @@ onForm('bkConfirm', async d => {
     if (isDemo()) { const u = 'demo-p-' + uid().slice(0, 8); LS.set('pepmh_demo_user', u); LS.set('pepmh_demo_signup', { full_name: d.full_name || 'Paciente demonstração', phone: d.phone, email: d.email, birth_date: d.birth_date || null }); }
     else if (BK.auth === 'login') await Auth.signIn(d.email, d.password);
     else {
-      const ok = await Auth.call('signup?redirect_to=' + encodeURIComponent(location.origin + '/?agendar=' + BK.slug), { email: d.email, password: d.password, data: { full_name: d.full_name, phone: d.phone, birth_date: d.birth_date || null, book_slug: BK.slug } });
-      if (!ok.access_token) { LS.set('pepmh_pending_book', { slug: BK.slug }); document.getElementById('bk').innerHTML = fv(html`<div class="card"><h2>Falta só confirmar seu e-mail</h2><p>Enviamos um link para <b>${d.email}</b>. Abra o e-mail, toque no link e você volta para cá já com a conta ativa para escolher o horário.</p><p class="small muted">Não chegou? Veja a caixa de spam ou promoções.</p></div>`); return; }
+      const ok = await Auth.call('signup?redirect_to=' + encodeURIComponent(location.origin + '/?agendar=' + BK.slug), { email: d.email.trim(), password: d.password, data: patientSignupMeta(d, BK.slug, 'agendamento') });
+      if (!ok.access_token) { LS.set('pepmh_pending_book', { slug: BK.slug }); document.getElementById('bk').innerHTML = fv(html`<div class="card"><h2>Falta só confirmar seu e-mail</h2><p>Enviamos um link para <b>${d.email}</b>. Abra o e-mail, toque no link e você volta para cá já com a conta ativa para escolher o horário.</p><p class="small muted">Seu cadastro já chegou à clínica. Não chegou o e-mail? Veja a caixa de spam ou promoções.</p></div>`); return; }
       Auth.store(ok); LS.set('pepmh_mode', 'remote');
     }
   }
@@ -252,10 +310,12 @@ onForm('pData', async d => { await db.update('patients', S.patient.id, { phone: 
 route('/solicitacoes', async () => {
   const [reqs, booked] = await Promise.all([db.list('appointment_requests', { eq: { status: 'pendente' }, order: 'created_at' }), db.list('appointments', { eq: { booked_by_patient: true }, gte: { starts_at: startOfDay(new Date()).toISOString() }, order: 'starts_at' })]);
   const pm = await patientMap([...reqs.map(r => r.patient_id), ...booked.map(a => a.patient_id)]); const c = S.clinic;
-  const link = c.slug ? `${location.origin}/#/agendar/${c.slug}` : '';
+  const link = c.slug ? `${location.origin}/#/agendar/${c.slug}` : ''; const cadLink = c.slug ? `${location.origin}/#/cadastro/${c.slug}` : '';
   return html`<div class="pagehead"><h1>Agendamentos online</h1></div>
   <div class="card"><div class="row between"><h2>Sua página de agendamento</h2>${c.public_booking && c.slug ? html`<span class="pill ok">no ar</span>` : html`<span class="pill gray">desligada</span>`}</div>
-    ${c.public_booking && c.slug ? html`<p class="small" style="word-break:break-all"><a href="${link}" target="_blank" rel="noopener">${link}</a></p><div class="row"><button class="btn sm" data-act="copyText" data-t="${link}">${icon('clip')} Copiar link</button><a class="btn sm" target="_blank" rel="noopener" href="${waLink('', 'Marque sua consulta online ou presencial com a gente: ' + link)}">${icon('wa')} Divulgar no WhatsApp</a></div><p class="tiny muted">Coloque esse link na bio do Instagram, no Google Meu Negócio e no status do WhatsApp.</p>`
+    ${c.public_booking && c.slug ? html`<p class="small" style="word-break:break-all"><a href="${link}" target="_blank" rel="noopener">${link}</a></p><div class="row"><button class="btn sm" data-act="copyText" data-t="${link}">${icon('clip')} Copiar link</button><a class="btn sm" target="_blank" rel="noopener" href="${waLink('', 'Marque sua consulta online ou presencial com a gente: ' + link)}">${icon('wa')} Divulgar no WhatsApp</a></div><p class="tiny muted">Coloque esse link na bio do Instagram, no Google Meu Negócio e no status do WhatsApp.</p>
+    <h3 style="margin:14px 0 4px">Link de cadastro de paciente</h3><p class="small muted" style="margin:0 0 6px">Mande para o paciente preencher a ficha completa sozinho. O cadastro entra direto na lista de pacientes, sem código.</p>
+    <p class="small" style="word-break:break-all"><a href="${cadLink}" target="_blank" rel="noopener">${cadLink}</a></p><div class="row"><button class="btn sm" data-act="copyText" data-t="${cadLink}">${icon('clip')} Copiar link</button><a class="btn sm" target="_blank" rel="noopener" href="${waLink('', 'Olá! Para agilizar seu atendimento, faça seu cadastro na ' + c.name + ' por este link: ' + cadLink)}">${icon('wa')} Enviar no WhatsApp</a></div>`
     : html`<p class="small muted">Ative para pacientes novos se cadastrarem de graça e marcarem consulta presencial ou online sozinhos.</p><a class="btn primary sm" href="#/configuracoes?sec=online">Configurar agora</a>`}</div>
   ${await approvalsBlock()}
   ${await remindersBlock()}
