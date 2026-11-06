@@ -106,8 +106,8 @@ async function searchPatients(q, limit = 12) {
 }
 
 /* ---------- login / cadastro ---------- */
-const SU = { type: 'clinica', code: '' };
-const SHOW_DEMO = () => /[?&]demo\b/.test(location.search) || ['localhost', '127.0.0.1'].includes(location.hostname) || !(CFG.url && CFG.key);
+const SU = { type: 'paciente', code: '' };
+const SHOW_DEMO = () => /[?&]demo\b/.test(location.search) || !(CFG.url && CFG.key);
 function renderAuth(mode = 'login') {
   const app = document.getElementById('app');
   const remoteOk = !!(CFG.url && CFG.key);
@@ -123,9 +123,9 @@ function renderAuth(mode = 'login') {
         <button class="btn ghost block small" type="button" data-act="forgot">Esqueci minha senha</button>
       </form>` : html`
       <label class="f"><span>Quero…</span><select class="in" data-change="suType">
-        <option value="clinica" ${t === 'clinica' ? 'selected' : ''}>Abrir meu consultório (dentista ou médico)</option>
-        <option value="equipe" ${t === 'equipe' ? 'selected' : ''}>Entrar na equipe de uma clínica (tenho convite)</option>
-        <option value="paciente" ${t === 'paciente' ? 'selected' : ''}>Sou paciente</option></select></label>
+        <option value="paciente" ${t === 'paciente' ? 'selected' : ''}>Sou paciente</option>
+        <option value="clinica" ${t === 'clinica' ? 'selected' : ''}>Sou médico(a) ou dentista</option>
+        ${t === 'equipe' ? html`<option value="equipe" selected>Entrar na equipe da clínica (convite)</option>` : ''}</select></label>
       ${t === 'paciente' ? html`<form data-form="ptSignup" class="stack" style="margin-top:12px">
         ${SU.code ? html`<div class="tip">${icon('bulb')}<span>A clínica liberou seu acesso com o código <b>${SU.code}</b>. Confira e complete seus dados abaixo.</span></div><input type="hidden" name="patient_code" value="${SU.code}">`
         : SU.clinics === undefined ? html`<div class="loading">Carregando clínicas…</div>`
@@ -151,7 +151,7 @@ function renderAuth(mode = 'login') {
   </div></div>`);
 }
 act('authLogin', () => renderAuth('login'));
-act('authSignup', () => renderAuth('signup'));
+act('authSignup', () => { renderAuth('signup'); if (SU.type === 'paciente' && SU.clinics === undefined) loadSignupClinics(); });
 onInput('suType', el => { SU.type = el.value; renderAuth('signup'); if (SU.type === 'paciente' && SU.clinics === undefined) loadSignupClinics(); });
 async function loadSignupClinics() {
   try { SU.clinics = isDemo() || !(CFG.url && CFG.key) ? [] : (await db.rpc('public_clinic_list', {})) || []; } catch { SU.clinics = []; }
