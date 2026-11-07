@@ -125,7 +125,7 @@ async function buildDocPdf({ doc, patient, prof, clinic }) {
     }
     footer();
   };
-  if (doc.rx_type === 'controle_especial') { body('1ª via – Farmácia'); pdf.addPage(); body('2ª via – Paciente'); } else body('');
+  if (doc.rx_type === 'controle_especial' || doc.rx_type === 'duas_vias') { body('1ª via – Farmácia'); pdf.addPage(); body('2ª via – Paciente'); } else body('');
   return new Blob([pdf.output()], { type: 'application/pdf' });
 }
 const pdfName = (doc, patient) => `${(DOCT[doc.doc_type]?.[0] || 'documento')}-${(patient.name || '').split(' ')[0] || 'paciente'}-${fDate(doc.created_at || new Date()).replace(/\//g, '-')}`.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '-').toLowerCase() + '.pdf';

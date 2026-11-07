@@ -1,6 +1,6 @@
 /* ===== Prontuário do paciente ===== */
 const TABS = [['resumo', 'Resumo'], ['anamnese', 'Anamnese'], ['odontograma', 'Odontograma'], ['periograma', 'Periograma'], ['exame', 'Exame clínico'], ['evolucao', 'Evolução'], ['plano', 'Plano de tratamento'], ['documentos', 'Prescrições e documentos'], ['financeiro', 'Financeiro'], ['retornos', 'Retornos'], ['consultas', 'Consultas']];
-const DOCT = { receituario: ['Receituário', 'pill'], atestado: ['Atestado', 'edit'], declaracao: ['Declaração', 'file'], carta: ['Carta / encaminhamento', 'send'], exames: ['Solicitação de exames', 'clip'], cirurgia: ['Solicitação de cirurgia', 'building'], laudo: ['Laudo', 'file'] };
+const DOCT = { receituario: ['Receituário', 'pill'], atestado: ['Atestado', 'edit'], declaracao: ['Declaração', 'file'], carta: ['Carta / encaminhamento', 'send'], exames: ['Solicitação de exames', 'clip'], imagem: ['Pedido de exames de imagem', 'clip'], manipulado: ['Receita de manipulado', 'pill'], medicacao: ['Pedido de medicação (aplicação)', 'pill'], cirurgia: ['Solicitação de cirurgia', 'building'], laudo: ['Laudo', 'file'] };
 const ANAM = [
   ['queixa', 'Queixa principal', 'text'], ['tratamento_medico', 'Está em tratamento médico?', 'bool'], ['medicamentos', 'Medicamentos em uso', 'text'], ['alergias', 'Alergias (medicamentos, látex, alimentos)', 'text'],
   ['hipertensao', 'Hipertensão arterial', 'bool'], ['diabetes', 'Diabetes', 'bool'], ['cardiopatia', 'Cardiopatia / uso de marca-passo', 'bool'], ['sangramento', 'Problemas de coagulação ou sangramento prolongado', 'bool'],

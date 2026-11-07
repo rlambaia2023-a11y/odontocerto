@@ -19,23 +19,107 @@ const MEDS_ODO = [
   ['Aciclovir creme 5%', 'uso tópico', '1 bisnaga', 'Aplicar sobre a lesão 5 vezes ao dia, por 5 a 7 dias.'],
   ['Fluoreto de sódio 0,05% (solução para bochecho)', 'uso tópico', '1 frasco', 'Bochechar 10 mL por 1 minuto, 1 vez ao dia, à noite, após a escovação. Não engolir.'],
 ];
-/* Referências usuais para adultos em clínica médica — revisar dose, intervalo e duração para cada paciente. */
-const MEDS_MED = [
-  ['Dipirona sódica 1 g', 'uso oral', '10 comprimidos', 'Tomar 1 comprimido de 6 em 6 horas, se dor ou febre.'],
-  ['Paracetamol 750 mg', 'uso oral', '12 comprimidos', 'Tomar 1 comprimido de 6 em 6 horas, se dor ou febre. Não ultrapassar 4 comprimidos por dia.'],
-  ['Ibuprofeno 600 mg', 'uso oral', '9 comprimidos', 'Tomar 1 comprimido de 8 em 8 horas, após as refeições, por 3 dias.'],
-  ['Amoxicilina 500 mg', 'uso oral', '21 cápsulas', 'Tomar 1 cápsula de 8 em 8 horas, por 7 dias.'],
-  ['Azitromicina 500 mg', 'uso oral', '3 comprimidos', 'Tomar 1 comprimido ao dia, por 3 dias.'],
-  ['Cefalexina 500 mg', 'uso oral', '28 cápsulas', 'Tomar 1 cápsula de 6 em 6 horas, por 7 dias.'],
-  ['Omeprazol 20 mg', 'uso oral', '30 cápsulas', 'Tomar 1 cápsula em jejum, 30 minutos antes do café da manhã, por 30 dias.'],
-  ['Loratadina 10 mg', 'uso oral', '5 comprimidos', 'Tomar 1 comprimido ao dia, por 5 dias.'],
-  ['Ondansetrona 4 mg (orodispersível)', 'uso oral', '10 comprimidos', 'Dissolver 1 comprimido na boca de 8 em 8 horas, se náusea ou vômito.'],
-  ['Butilbrometo de escopolamina 10 mg', 'uso oral', '10 comprimidos', 'Tomar 1 comprimido de 8 em 8 horas, se cólica.'],
-  ['Prednisona 20 mg', 'uso oral', '5 comprimidos', 'Tomar 1 comprimido pela manhã, após o café, por 5 dias.'],
-  ['Sais para reidratação oral', 'uso oral', '4 envelopes', 'Diluir 1 envelope em 1 litro de água filtrada e tomar aos poucos ao longo do dia, principalmente após cada evacuação líquida.'],
-];
-const curMeds = () => S.me?.profession === 'medicina' ? MEDS_MED : MEDS_ODO;
-const RXTYPES = { simples: 'Simples (uma via)', controle_especial: 'Controle especial (duas vias)' };
+/* Medicina: referências usuais por área — revisar dose, intervalo e duração para cada paciente.
+   5º campo: 'atm' antimicrobiano (receita em 2 vias, retida na farmácia); 'ret' venda com retenção de receita (2 vias);
+   'ce' controle especial (Portaria 344/98, lista C1 – receituário de controle especial em 2 vias). */
+const MEDS_MED_CATS = {
+  'Ginecologia': [
+    ['Fluconazol 150 mg', 'uso oral', '1 cápsula', 'Tomar 1 cápsula em dose única.'],
+    ['Nitrato de miconazol 2% creme vaginal', 'uso vaginal', '1 bisnaga com aplicadores', 'Aplicar 1 aplicador cheio no fundo da vagina, à noite, ao deitar, por 7 noites seguidas.'],
+    ['Metronidazol 400 mg', 'uso oral', '14 comprimidos', 'Tomar 1 comprimido de 12 em 12 horas, por 7 dias. Não ingerir bebida alcoólica durante o uso e até 48 horas após.', 'atm'],
+    ['Metronidazol gel vaginal 100 mg/g', 'uso vaginal', '1 bisnaga com aplicadores', 'Aplicar 1 aplicador cheio na vagina, à noite, ao deitar, por 5 noites. Evitar bebida alcoólica durante o tratamento.', 'atm'],
+    ['Clindamicina creme vaginal 2%', 'uso vaginal', '1 bisnaga com aplicadores', 'Aplicar 1 aplicador cheio na vagina, à noite, ao deitar, por 7 noites.', 'atm'],
+    ['Secnidazol 1 g', 'uso oral', '2 comprimidos', 'Tomar 2 comprimidos juntos (2 g), em dose única, após uma refeição. Não ingerir bebida alcoólica por 48 horas.', 'atm'],
+    ['Azitromicina 500 mg', 'uso oral', '2 comprimidos', 'Tomar 2 comprimidos juntos (1 g), em dose única.', 'atm'],
+    ['Nitrofurantoína 100 mg', 'uso oral', '20 cápsulas', 'Tomar 1 cápsula de 6 em 6 horas, por 5 dias, junto com alimento.', 'atm'],
+    ['Fosfomicina trometamol 3 g', 'uso oral', '1 envelope', 'Dissolver o envelope em meio copo de água e tomar em dose única, à noite, após esvaziar a bexiga.', 'atm'],
+    ['Ácido mefenâmico 500 mg', 'uso oral', '9 comprimidos', 'Tomar 1 comprimido de 8 em 8 horas, após as refeições, durante a menstruação, por até 3 dias.'],
+    ['Ácido tranexâmico 250 mg', 'uso oral', '30 comprimidos', 'Tomar 2 comprimidos (500 mg) de 8 em 8 horas durante o sangramento, por até 5 dias.'],
+    ['Butilbrometo de escopolamina 10 mg + dipirona 250 mg', 'uso oral', '12 comprimidos', 'Tomar 1 comprimido de 6 em 6 horas, se cólica.'],
+    ['Levonorgestrel 0,15 mg + etinilestradiol 0,03 mg', 'uso oral', '3 cartelas', 'Tomar 1 comprimido ao dia, no mesmo horário, por 21 dias. Fazer pausa de 7 dias e iniciar a cartela seguinte.'],
+    ['Desogestrel 0,075 mg', 'uso oral', '3 cartelas', 'Tomar 1 comprimido ao dia, sempre no mesmo horário, de forma contínua, sem pausa entre as cartelas.'],
+    ['Levonorgestrel 1,5 mg (contracepção de emergência)', 'uso oral', '1 comprimido', 'Tomar 1 comprimido em dose única, o quanto antes, até 72 horas após a relação.'],
+    ['Estriol 1 mg/g creme vaginal', 'uso vaginal', '1 bisnaga com aplicador', 'Aplicar 1 aplicador na vagina à noite, todos os dias, por 2 semanas. Depois, 2 vezes por semana, conforme reavaliação.'],
+  ],
+  'Obstetrícia': [
+    ['Ácido fólico 0,4 mg', 'uso oral', '30 comprimidos', 'Tomar 1 comprimido ao dia. Iniciar pelo menos 30 dias antes de engravidar e manter até a 12ª semana de gestação.'],
+    ['Ácido fólico 5 mg', 'uso oral', '30 comprimidos', 'Tomar 1 comprimido ao dia, conforme orientação médica.'],
+    ['Sulfato ferroso 40 mg de ferro elementar', 'uso oral', '30 comprimidos', 'Tomar 1 comprimido ao dia, 30 minutos antes do almoço, de preferência com suco de fruta cítrica. Não tomar junto com leite ou cálcio.'],
+    ['Carbonato de cálcio 1.250 mg (500 mg de cálcio elementar)', 'uso oral', '60 comprimidos', 'Tomar 1 comprimido no almoço e 1 no jantar, a partir da 12ª semana até o parto. Tomar longe do sulfato ferroso.'],
+    ['Ácido acetilsalicílico 100 mg (prevenção de pré-eclâmpsia)', 'uso oral', '30 comprimidos', 'Tomar 1 comprimido ao dia, à noite, da 12ª até a 36ª semana de gestação.'],
+    ['Dimenidrinato 50 mg + piridoxina 10 mg', 'uso oral', '12 comprimidos', 'Tomar 1 comprimido de 6 em 6 horas, se náusea ou vômito. Pode causar sonolência.'],
+    ['Metoclopramida 10 mg', 'uso oral', '10 comprimidos', 'Tomar 1 comprimido de 8 em 8 horas, 30 minutos antes das refeições, se náusea ou vômito.'],
+    ['Paracetamol 750 mg', 'uso oral', '12 comprimidos', 'Tomar 1 comprimido de 6 em 6 horas, se dor ou febre. Não ultrapassar 4 comprimidos por dia.'],
+    ['Butilbrometo de escopolamina 10 mg', 'uso oral', '10 comprimidos', 'Tomar 1 comprimido de 8 em 8 horas, se cólica.'],
+    ['Cefalexina 500 mg', 'uso oral', '28 cápsulas', 'Tomar 1 cápsula de 6 em 6 horas, por 7 dias.', 'atm'],
+    ['Progesterona natural micronizada 200 mg', 'uso vaginal', '30 cápsulas', 'Introduzir 1 cápsula na vagina à noite, ao deitar, pelo período indicado pela médica.'],
+    ['Simeticona 40 mg', 'uso oral', '20 comprimidos', 'Tomar 1 comprimido de 8 em 8 horas, se gases ou desconforto abdominal.'],
+    ['Lactulose 667 mg/mL', 'uso oral', '1 frasco', 'Tomar 15 mL uma vez ao dia, se intestino preso. Ajustar a dose conforme o funcionamento do intestino.'],
+    ['Lanolina pomada', 'uso tópico', '1 bisnaga', 'Aplicar uma pequena quantidade nos mamilos após cada mamada. Não precisa retirar antes de amamentar.'],
+  ],
+  'Emagrecimento e metabolismo': [
+    ['Tirzepatida 2,5 mg (caneta)', 'uso subcutâneo', '1 caixa', 'Aplicar 2,5 mg por via subcutânea, 1 vez por semana, sempre no mesmo dia, por 4 semanas. Depois, reavaliar para subir para 5 mg semanais.', 'ret'],
+    ['Tirzepatida 5 mg (caneta)', 'uso subcutâneo', '1 caixa', 'Aplicar 5 mg por via subcutânea, 1 vez por semana, sempre no mesmo dia.', 'ret'],
+    ['Semaglutida 0,25 mg (caneta)', 'uso subcutâneo', '1 caneta', 'Aplicar 0,25 mg por via subcutânea, 1 vez por semana, por 4 semanas. Depois, subir para 0,5 mg semanais.', 'ret'],
+    ['Liraglutida 6 mg/mL (caneta)', 'uso subcutâneo', '1 caixa', 'Aplicar por via subcutânea, 1 vez ao dia: 0,6 mg na 1ª semana, aumentando 0,6 mg por semana até 3 mg ao dia, conforme tolerância.', 'ret'],
+    ['Orlistate 120 mg', 'uso oral', '84 cápsulas', 'Tomar 1 cápsula junto com cada refeição principal (até 3 por dia). Se pular a refeição ou ela não tiver gordura, não tomar.'],
+    ['Cloridrato de metformina XR 500 mg', 'uso oral', '30 comprimidos', 'Tomar 1 comprimido no jantar. Ajustar a dose no retorno.'],
+    ['Topiramato 25 mg', 'uso oral', '30 comprimidos', 'Tomar 1 comprimido à noite.', 'ce'],
+    ['Cloridrato de bupropiona 150 mg (liberação prolongada)', 'uso oral', '30 comprimidos', 'Tomar 1 comprimido pela manhã.', 'ce'],
+    ['Psyllium 5 g (sachê)', 'uso oral', '30 sachês', 'Diluir 1 sachê em 200 mL de água e tomar 1 vez ao dia, 30 minutos antes da principal refeição. Beber bastante água ao longo do dia.'],
+    ['Colecalciferol (vitamina D3) 50.000 UI', 'uso oral', '8 cápsulas', 'Tomar 1 cápsula por semana, junto com uma refeição, por 8 semanas.'],
+  ],
+  'Fórmulas manipuladas': [
+    ['Colecalciferol (vitamina D3) 50.000 UI', 'uso oral', 'Manipular 8 cápsulas', 'Tomar 1 cápsula por semana, junto com uma refeição, por 8 semanas.'],
+    ['Metilfolato 1 mg + metilcobalamina 1.000 mcg', 'uso oral', 'Manipular 30 cápsulas', 'Tomar 1 cápsula ao dia.'],
+    ['Mio-inositol 2 g + ácido fólico 200 mcg (sachê)', 'uso oral', 'Manipular 60 sachês', 'Dissolver 1 sachê em água e tomar 2 vezes ao dia, antes do café da manhã e antes do jantar.'],
+    ['Picolinato de cromo 200 mcg', 'uso oral', 'Manipular 30 cápsulas', 'Tomar 1 cápsula ao dia, antes do almoço.'],
+    ['Berberina 500 mg', 'uso oral', 'Manipular 60 cápsulas', 'Tomar 1 cápsula antes do almoço e 1 antes do jantar.'],
+    ['Psyllium 5 g (sachê)', 'uso oral', 'Manipular 30 sachês', 'Diluir 1 sachê em 200 mL de água e tomar 30 minutos antes da principal refeição.'],
+    ['Creatina monoidratada 3 g (sachê)', 'uso oral', 'Manipular 30 sachês', 'Diluir 1 sachê em água ou suco e tomar 1 vez ao dia.'],
+    ['Bisglicinato de ferro 30 mg + vitamina C 100 mg', 'uso oral', 'Manipular 30 cápsulas', 'Tomar 1 cápsula ao dia, longe de leite e derivados.'],
+    ['Magnésio quelato 300 mg', 'uso oral', 'Manipular 30 cápsulas', 'Tomar 1 cápsula à noite.'],
+    ['Melatonina 3 mg', 'uso oral', 'Manipular 30 cápsulas', 'Tomar 1 cápsula 30 minutos antes de dormir.'],
+    ['Estriol 1 mg/g – creme vaginal', 'uso vaginal', 'Manipular 30 g com aplicador', 'Aplicar 1 aplicador na vagina à noite, todos os dias, por 2 semanas. Depois, 2 vezes por semana.'],
+    ['Ácido bórico 600 mg – óvulo vaginal', 'uso vaginal', 'Manipular 14 óvulos', 'Introduzir 1 óvulo na vagina à noite, ao deitar, por 14 noites. Não ingerir. Não usar durante a gestação.'],
+  ],
+  'Medicação para aplicação': [
+    ['Benzilpenicilina benzatina 1.200.000 UI', 'uso intramuscular', '2 frascos-ampola', 'Aplicar 2.400.000 UI por via intramuscular (1.200.000 UI em cada glúteo), em dose única.', 'atm'],
+    ['Ceftriaxona 500 mg', 'uso intramuscular', '1 frasco-ampola', 'Aplicar 500 mg por via intramuscular, em dose única.', 'atm'],
+    ['Imunoglobulina anti-D 300 mcg', 'uso intramuscular', '1 seringa/ampola', 'Aplicar 1 dose por via intramuscular (gestante Rh negativo não sensibilizada), na data indicada pela médica.'],
+    ['Sacarato de hidróxido férrico 100 mg/5 mL', 'uso endovenoso', '2 ampolas', 'Diluir 200 mg em 200 mL de soro fisiológico 0,9% e infundir por via endovenosa em, no mínimo, 30 minutos, em ambiente com observação.'],
+    ['Cianocobalamina (vitamina B12) 1.000 mcg/mL', 'uso intramuscular', '4 ampolas', 'Aplicar 1 ampola por via intramuscular, 1 vez por semana, por 4 semanas.'],
+    ['Vacina dTpa (difteria, tétano e coqueluche acelular)', 'uso intramuscular', '1 dose', 'Aplicar 1 dose por via intramuscular, a partir da 20ª semana de gestação.'],
+    ['Vacina influenza', 'uso intramuscular', '1 dose', 'Aplicar 1 dose por via intramuscular.'],
+    ['Dipirona sódica 500 mg/mL', 'uso intramuscular', '1 ampola de 2 mL', 'Aplicar 1 ampola por via intramuscular, dose única, se dor.'],
+  ],
+  'Clínica geral': [
+    ['Dipirona sódica 1 g', 'uso oral', '10 comprimidos', 'Tomar 1 comprimido de 6 em 6 horas, se dor ou febre.'],
+    ['Paracetamol 750 mg', 'uso oral', '12 comprimidos', 'Tomar 1 comprimido de 6 em 6 horas, se dor ou febre. Não ultrapassar 4 comprimidos por dia.'],
+    ['Ibuprofeno 600 mg', 'uso oral', '9 comprimidos', 'Tomar 1 comprimido de 8 em 8 horas, após as refeições, por 3 dias.'],
+    ['Amoxicilina 500 mg', 'uso oral', '21 cápsulas', 'Tomar 1 cápsula de 8 em 8 horas, por 7 dias.', 'atm'],
+    ['Cefalexina 500 mg', 'uso oral', '28 cápsulas', 'Tomar 1 cápsula de 6 em 6 horas, por 7 dias.', 'atm'],
+    ['Omeprazol 20 mg', 'uso oral', '30 cápsulas', 'Tomar 1 cápsula em jejum, 30 minutos antes do café da manhã, por 30 dias.'],
+    ['Loratadina 10 mg', 'uso oral', '5 comprimidos', 'Tomar 1 comprimido ao dia, por 5 dias.'],
+    ['Ondansetrona 4 mg (orodispersível)', 'uso oral', '10 comprimidos', 'Dissolver 1 comprimido na boca de 8 em 8 horas, se náusea ou vômito.'],
+    ['Prednisona 20 mg', 'uso oral', '5 comprimidos', 'Tomar 1 comprimido pela manhã, após o café, por 5 dias.'],
+    ['Sais para reidratação oral', 'uso oral', '4 envelopes', 'Diluir 1 envelope em 1 litro de água filtrada e tomar aos poucos ao longo do dia, principalmente após cada evacuação líquida.'],
+  ],
+};
+const MED_FLAG = { atm: 'antimicrobiano: receita em 2 vias, a farmácia retém uma', ret: 'venda com retenção de receita: emitir em 2 vias', ce: 'controle especial (lista C1): receituário de controle especial em 2 vias' };
+/* qual lista aparece em cada tipo de documento */
+function medCats(type) {
+  if (S.me?.profession !== 'medicina') return { 'Medicamentos': MEDS_ODO };
+  if (type === 'manipulado') return { 'Fórmulas manipuladas': MEDS_MED_CATS['Fórmulas manipuladas'] };
+  if (type === 'medicacao') return { 'Medicação para aplicação': MEDS_MED_CATS['Medicação para aplicação'] };
+  return MEDS_MED_CATS;
+}
+const medById = id => { const [c, i] = String(id || '').split('::'); return (S.me?.profession !== 'medicina' ? (c === 'Medicamentos' ? MEDS_ODO : null) : MEDS_MED_CATS[c])?.[i]; };
+const curMeds = () => S.me?.profession === 'medicina' ? Object.values(MEDS_MED_CATS).flat() : MEDS_ODO;
+const medOptions = type => html`<option value="">Selecione…</option>${Object.entries(medCats(type)).map(([c, list]) => html`<optgroup label="${c}">${list.map((m, i) => html`<option value="${c}::${i}">${m[0]}${m[4] ? ' ⚑' : ''}</option>`)}</optgroup>`)}`;
+const MED_TYPES = ['receituario', 'manipulado', 'medicacao'];
+const DOC_FALLBACK = { imagem: 'exames', manipulado: 'receituario', medicacao: 'receituario' };
+const RXTYPES = { simples: 'Simples (uma via)', duas_vias: 'Simples em duas vias (antimicrobiano ou retenção de receita)', controle_especial: 'Controle especial (duas vias)' };
 
 route('/prescrever', async (_, q) => {
   const pid = q.get('p'); const rep = q.get('repetir'); const tipo = q.get('tipo') || 'receituario';
@@ -57,18 +141,18 @@ route('/prescrever', async (_, q) => {
       <div class="grid g2 collapse" style="align-items:end"><label class="f"><span>Modelo personalizado</span><select class="in" id="rxtpl" data-change="rxTpl"><option value="">Selecione…</option>${tpls.filter(t => t.doc_type === type).map(t => html`<option value="${t.id}">${t.title}</option>`)}</select></label>
         <div class="row"><button type="button" class="btn sm" data-act="manageTpl">${icon('edit')} Editar lista de modelos</button></div></div>
       ${examBox(type)}
-      <div id="medbox" class="${type === 'receituario' ? '' : 'hidden'}"><div class="grid g2 collapse" style="align-items:end"><label class="f"><span>Adicionar medicamento</span><select class="in" id="rxmed" data-change="rxMed"><option value="">Selecione…</option>${curMeds().map((m, i) => html`<option value="${i}">${m[0]}</option>`)}</select></label>
+      <div id="medbox" class="${MED_TYPES.includes(type) ? '' : 'hidden'}"><div class="grid g2 collapse" style="align-items:end"><label class="f"><span>Adicionar medicamento</span><select class="in" id="rxmed" data-change="rxMed">${medOptions(type)}</select></label>
         <label class="f"><span>Quantidade</span><input class="in" id="rxqty"></label></div>
         <label class="f" style="margin-top:10px"><span>Posologia</span><input class="in" id="rxpos"></label>
         <div class="row" style="margin-top:10px"><button type="button" class="btn" data-act="rxClearMed">${icon('x')} Remover</button><button type="button" class="btn ok" data-act="rxAddMed">${icon('plus')} Adicionar</button></div>
-        <p class="tiny muted" style="margin:8px 0 0">Posologias de referência. Confira dose, intervalo e duração para cada paciente (idade, peso, alergias, função renal/hepática).</p></div>
+        <p class="tiny muted" id="rxflag" style="margin:8px 0 0;color:var(--warn,#b26a00)"></p><p class="tiny muted" style="margin:8px 0 0">⚑ = exige receita em 2 vias / retenção. Posologias de referência. Confira dose, intervalo e duração para cada paciente (idade, peso, alergias, função renal/hepática).</p></div>
       <div><span class="small" style="font-weight:600;color:var(--ink-2)">Escreva o documento <i style="color:var(--bad);font-style:normal">*</i></span>
         <div class="editor-bar" style="margin-top:6px">${[['bold', 'B'], ['italic', 'I'], ['underline', 'U'], ['undo', '↶'], ['redo', '↷'], ['insertOrderedList', '1.'], ['insertUnorderedList', '•']].map(([c, l]) => html`<button type="button" data-act="rxCmd" data-c="${c}" title="${c}">${l}</button>`)}</div>
         <div class="editor" id="rxed" contenteditable="true"></div></div>
-      <div class="grid g2 collapse"><label class="f ${type === 'receituario' ? '' : 'hidden'}" id="rxtypebox"><span>Tipo de receituário</span><select class="in" name="rx_type">${Object.entries(RXTYPES).map(([k, v]) => html`<option value="${k}" ${repDoc?.rx_type === k ? 'selected' : ''}>${v}</option>`)}</select></label>
+      <div class="grid g2 collapse"><label class="f ${type === 'receituario' || type === 'manipulado' ? '' : 'hidden'}" id="rxtypebox"><span>Tipo de receituário</span><select class="in" name="rx_type">${Object.entries(RXTYPES).map(([k, v]) => html`<option value="${k}" ${repDoc?.rx_type === k ? 'selected' : ''}>${v}</option>`)}</select></label>
         <div class="stack"><label class="check"><input type="checkbox" name="save_tpl"> Salvar como modelo para uso futuro</label><label class="check"><input type="checkbox" name="no_date"> Emitir sem data</label></div></div>
       <div class="tip">${icon('bulb')}<span>Cabeçalho, endereço e assinatura saem dos dados da clínica e do seu cadastro. <a href="#/configuracoes">Ajustar agora</a>. O PDF sai com a logo, os dados da clínica e os seus, e pode ser enviado por WhatsApp, e-mail ou link. Para receita digital valer na farmácia, assine o PDF com certificado ICP-Brasil.</span></div>
-      <div class="grid g2"><button type="button" class="btn primary" data-act="rxSave" data-mode="pdf">${icon('down')} Salvar e gerar PDF</button><button type="button" class="btn" data-act="rxSave" data-mode="print">${icon('print')} Salvar e imprimir</button></div>
+      <div class="grid g2"><button type="button" class="btn primary" data-act="rxSave" data-mode="pdf">${icon('down')} Salvar, gerar PDF e assinar</button><button type="button" class="btn" data-act="rxSave" data-mode="print">${icon('print')} Salvar e imprimir</button></div>
     </div>
   </form>
   ${hist.length ? html`<div class="card" style="margin-top:14px"><h3>Últimos documentos de ${p.name.split(' ')[0]}</h3><div class="list" style="margin-top:8px">${hist.map(d => html`<div class="li">${icon(DOCT[d.doc_type]?.[1])}<span class="grow small">${DOCT[d.doc_type]?.[0]} · ${fDT(d.created_at)}</span><a class="btn sm" href="#/prescrever?p=${p.id}&repetir=${d.id}">${icon('repeat')} Repetir</a></div>`)}</div></div>` : ''}`;
@@ -92,9 +176,11 @@ function allergyHit(medName) {
 act('rxType', el => {
   const f = document.getElementById('rxform'); f.doc_type.value = el.dataset.t;
   f.querySelectorAll('.doctype button').forEach(b => b.classList.toggle('on', b === el));
-  document.getElementById('medbox').classList.toggle('hidden', el.dataset.t !== 'receituario');
-  document.getElementById('exambox')?.classList.toggle('hidden', el.dataset.t !== 'exames');
-  document.getElementById('rxtypebox').classList.toggle('hidden', el.dataset.t !== 'receituario');
+  const t = el.dataset.t;
+  document.getElementById('medbox').classList.toggle('hidden', !MED_TYPES.includes(t));
+  if (MED_TYPES.includes(t)) { document.getElementById('rxmed').innerHTML = fv(medOptions(t)); ACT.rxClearMed(); }
+  const eb = document.getElementById('exambox'); if (eb) eb.outerHTML = fv(examBox(t));
+  document.getElementById('rxtypebox').classList.toggle('hidden', !['receituario', 'manipulado'].includes(t));
   document.getElementById('rxtpl').innerHTML = fv(html`<option value="">Selecione…</option>${(window.__tpls || []).filter(t => t.doc_type === el.dataset.t).map(t => html`<option value="${t.id}">${t.title}</option>`)}`);
 });
 onInput('rxTpl', el => {
@@ -102,32 +188,38 @@ onInput('rxTpl', el => {
   const name = document.querySelector('#rxform [name=patient_name]').value || '______________';
   const ed = document.getElementById('rxed'); ed.innerHTML = (ed.innerHTML.trim() ? ed.innerHTML : '') + sanitize(t.content).replace(/\{paciente\}/g, esc(name));
 });
-onInput('rxMed', el => { const m = curMeds()[el.value]; document.getElementById('rxqty').value = m ? m[2] : ''; document.getElementById('rxpos').value = m ? m[3] : ''; });
-act('rxClearMed', () => { document.getElementById('rxmed').value = ''; document.getElementById('rxqty').value = ''; document.getElementById('rxpos').value = ''; });
+onInput('rxMed', el => { const m = medById(el.value); document.getElementById('rxqty').value = m ? m[2] : ''; document.getElementById('rxpos').value = m ? m[3] : ''; document.getElementById('rxflag').textContent = m?.[4] ? '⚑ ' + MED_FLAG[m[4]] + '.' : ''; });
+act('rxClearMed', () => { document.getElementById('rxmed').value = ''; document.getElementById('rxqty').value = ''; document.getElementById('rxpos').value = ''; const fl = document.getElementById('rxflag'); if (fl) fl.textContent = ''; });
 act('rxAddMed', async () => {
-  const m = curMeds()[document.getElementById('rxmed').value]; if (!m) return toast('Escolha um medicamento.', 'bad');
+  const m = medById(document.getElementById('rxmed').value); if (!m) return toast('Escolha um medicamento.', 'bad');
   if (allergyHit(m[0]) && !(await confirmBox(`Atenção: o paciente tem registro de "${window.__allergy}". ${m[0]} pode estar relacionado. Incluir mesmo assim?`, 'Incluir mesmo assim'))) return;
   const ed = document.getElementById('rxed'); const n = (ed.querySelectorAll('[data-med]').length || ed.innerHTML.match(/<p>\d+\./g)?.length || 0) + 1;
   const via = m[1]; const hasVia = ed.textContent.toLowerCase().includes(via);
   ed.insertAdjacentHTML('beforeend', `${hasVia ? '' : `<p><b>${esc(via[0].toUpperCase() + via.slice(1))}</b></p>`}<p data-med="1">${n}. ${esc(m[0])} ———— ${esc(document.getElementById('rxqty').value)}<br>${esc(document.getElementById('rxpos').value)}</p>`);
+  if (m[4]) { const sel = document.querySelector('#rxform [name=rx_type]'); const want = m[4] === 'ce' ? 'controle_especial' : 'duas_vias'; if (sel && sel.value !== 'controle_especial' && sel.value !== want) { sel.value = want; toast(`${m[0].split(' ')[0]}: ${MED_FLAG[m[4]]}. Ajustei o tipo de receituário.`); } }
   ACT.rxClearMed();
 });
 act('rxCmd', el => { document.getElementById('rxed').focus(); document.execCommand(el.dataset.c, false, null); });
 act('rxSave', async el => {
   const f = document.getElementById('rxform'); const d = formData(f); const content = sanitize(document.getElementById('rxed').innerHTML);
   if (!htmlToText(content)) throw new Error('Escreva o conteúdo do documento.');
-  if (d.doc_type === 'receituario' && window.__allergy) { const hit = curMeds().find(m => norm(htmlToText(content)).includes(norm(m[0].split(' ')[0])) && allergyHit(m[0])); if (hit && !(await confirmBox(`O texto inclui ${hit[0].split(' ')[0]} e o paciente tem registro de "${window.__allergy}". Salvar mesmo assim?`, 'Salvar mesmo assim'))) return; }
+  if (MED_TYPES.includes(d.doc_type) && window.__allergy) { const hit = curMeds().find(m => norm(htmlToText(content)).includes(norm(m[0].split(' ')[0])) && allergyHit(m[0])); if (hit && !(await confirmBox(`O texto inclui ${hit[0].split(' ')[0]} e o paciente tem registro de "${window.__allergy}". Salvar mesmo assim?`, 'Salvar mesmo assim'))) return; }
   el.disabled = true;
   try {
     const pid = await resolvePatient(d, { phone: onlyDigits(d.phone), email: d.email });
     const p = await db.get('patients', pid);
     if (d.phone && onlyDigits(d.phone) !== (p.phone || '')) { await db.update('patients', pid, { phone: onlyDigits(d.phone) }); p.phone = onlyDigits(d.phone); }
     const prof = S.members.find(m => m.user_id === d.professional_id) || S.me;
-    const doc = await db.insert('documents', { content_hash: await sha256(content), patient_id: pid, professional_id: prof.user_id, professional_name: prof.full_name, doc_type: d.doc_type, rx_type: d.doc_type === 'receituario' ? d.rx_type : null, content, no_date: !!d.no_date, sent_to: null });
+    const row = { content_hash: await sha256(content), patient_id: pid, professional_id: prof.user_id, professional_name: prof.full_name, doc_type: d.doc_type, rx_type: ['receituario', 'manipulado'].includes(d.doc_type) ? d.rx_type : null, content, no_date: !!d.no_date, sent_to: null };
+    let doc; try { doc = await db.insert('documents', row); } catch (e) {
+      /* banco ainda sem os tipos novos: grava no tipo equivalente (exames / receituário) */
+      const fb = DOC_FALLBACK[d.doc_type]; if (!fb || !/doc_type|check/i.test(e.message)) throw e;
+      doc = await db.insert('documents', { ...row, doc_type: fb, rx_type: fb === 'receituario' ? (row.rx_type || 'simples') : null });
+    }
     if (d.save_tpl) { const title = prompt('Nome do modelo:', DOCT[d.doc_type][0] + ' – ' + fDate(new Date())); if (title) await db.insert('document_templates', { doc_type: d.doc_type, title, content }); }
     if (el.dataset.mode === 'print') printDocument(doc, p, prof);
-    toast('Documento salvo. Assine com o certificado e ele aparece sozinho na área do paciente.', 'ok'); go(`#/paciente/${pid}?tab=documentos`);
-    if (el.dataset.mode === 'pdf') setTimeout(() => shareModal(doc.id), 700);
+    toast(el.dataset.mode === 'pdf' && !isPhone() ? 'Documento salvo. Abrindo para assinar com o certificado…' : 'Documento salvo. Assine com o certificado e ele aparece sozinho na área do paciente.', 'ok'); go(`#/paciente/${pid}?tab=documentos`);
+    if (el.dataset.mode === 'pdf') setTimeout(async () => { if (isPhone()) return shareModal(doc.id); for (let i = 0; i < 25 && document.querySelector('#app .loading'); i++) await new Promise(r => setTimeout(r, 200)); const d2 = await db.get('documents', doc.id); modal('Assinatura digital ICP-Brasil', await signPanel(d2), { wide: true }); desktopSign(doc.id).catch(e => toast(e.message, 'bad')); }, 700);
   } finally { el.disabled = false; }
 });
 
@@ -139,7 +231,7 @@ function printDocument(doc, p, prof) {
     <div style="min-height:260px">${sanitize(doc.content).replace(/\{paciente\}/g, esc(p.name))}</div>${dateLine}${signature(prof.full_name, councilOf(prof))}
     ${doc.rx_type === 'controle_especial' ? `<div style="display:flex;gap:12px;margin-top:20px"><div class="box" style="flex:1"><b>Identificação do comprador</b><br>Nome:<br>RG:<br>Endereço:<br>Telefone:</div><div class="box" style="flex:1"><b>Identificação do fornecedor</b><br><br><br>Assinatura do farmacêutico &nbsp; Data: __/__/__</div></div>` : ''}
     <div class="ft">${esc(S.clinic.name)} · ${esc(fPhone(S.clinic.phone))}${doc.verify_code ? ` · Código de verificação <b>${esc(doc.verify_code)}</b> — confira em ${esc(verifyUrl(doc.verify_code))}` : ''}</div></div>`;
-  printDoc(title + ' – ' + p.name, doc.rx_type === 'controle_especial' ? body('1ª via – Farmácia') + body('2ª via – Paciente') : body(''));
+  printDoc(title + ' – ' + p.name, doc.rx_type === 'controle_especial' || doc.rx_type === 'duas_vias' ? body('1ª via – Farmácia') + body('2ª via – Paciente') : body(''));
 }
 function sendDocument(doc, p, prof) {
   if (!p.phone) { toast('Paciente sem telefone. Documento salvo; imprima ou cadastre o celular.', 'bad'); return; }

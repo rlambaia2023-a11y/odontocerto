@@ -36,3 +36,11 @@ Gerado por `python scripts/make_icons.py` (requer Pillow) em `src/icons/` (SVG e
 python3 scripts/build.py
 PORT=4173 bun dist/index.tsx
 ```
+
+## Ginecologia, obstetrícia e emagrecimento
+- Solicitação de exames com grupos de GO (rastreamento, hormônios, fertilidade, pré-natal), emagrecimento/metabolismo e imagem, com pacotes prontos (pré-natal por trimestre, rotina ginecológica, SOP, climatério, infertilidade, DIU, ISTs, emagrecimento, GLP-1, pós-bariátrica).
+- Tipos novos: **Pedido de exames de imagem**, **Receita de manipulado** e **Pedido de medicação (aplicação)** (migração `20261107_doc_types_go.sql`; sem ela, gravam como exames/receituário).
+- Receituário com listas por área; agonistas de GLP-1 e antimicrobianos marcam "duas vias" sozinhos; lista C1 marca controle especial.
+
+## Assinatura no computador (VIDaaS Connect)
+Ao salvar com **Salvar, gerar PDF e assinar** no computador, o PDF é baixado (o Chrome abre direto no Acrobat se configurado), a médica assina com o certificado do VIDaaS Connect e o PEPMH vigia a pasta escolhida (File System Access API, Chrome/Edge) e envia o PDF assinado sozinho. Também aceita arrastar o arquivo. No celular continua o fluxo pelo app VIDaaS.

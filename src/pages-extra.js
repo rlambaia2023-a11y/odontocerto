@@ -2,44 +2,66 @@
 
 /* ---------- catálogo de exames ---------- */
 const EXAMS = {
-  'Hematologia e bioquímica': ['Hemograma completo', 'Glicemia de jejum', 'Hemoglobina glicada (HbA1c)', 'Colesterol total e frações (HDL, LDL, VLDL)', 'Triglicerídeos', 'Ureia', 'Creatinina', 'Ácido úrico', 'Sódio', 'Potássio', 'Cálcio', 'Magnésio', 'TGO (AST)', 'TGP (ALT)', 'Gama-GT', 'Fosfatase alcalina', 'Bilirrubinas total e frações', 'Proteínas totais e frações', 'Amilase', 'Lipase', 'CPK', 'Ferro sérico', 'Ferritina', 'Transferrina / saturação de transferrina', 'Vitamina B12', 'Ácido fólico', '25-OH vitamina D', 'Proteína C reativa (PCR)', 'VHS'],
-  'Hormônios': ['TSH', 'T4 livre', 'T3', 'Insulina de jejum', 'Beta-hCG quantitativo', 'PSA total e livre', 'Cortisol', 'Prolactina', 'FSH', 'LH', 'Estradiol', 'Testosterona total'],
-  'Coagulação': ['Coagulograma completo', 'Tempo de protrombina (TP/INR)', 'TTPa', 'Contagem de plaquetas', 'Tempo de sangramento', 'Fibrinogênio'],
+  'Hematologia e bioquímica': ['Hemograma completo', 'Glicemia de jejum', 'Hemoglobina glicada (HbA1c)', 'Colesterol total e frações (HDL, LDL, VLDL)', 'Triglicerídeos', 'Ureia', 'Creatinina', 'Ácido úrico', 'Sódio', 'Potássio', 'Cálcio', 'Magnésio', 'TGO (AST)', 'TGP (ALT)', 'Gama-GT', 'Fosfatase alcalina', 'Bilirrubinas total e frações', 'Proteínas totais e frações', 'Albumina', 'Amilase', 'Lipase', 'CPK', 'Desidrogenase láctica (DHL)', 'Ferro sérico', 'Ferritina', 'Transferrina / saturação de transferrina', 'Vitamina B12', 'Ácido fólico', '25-OH vitamina D', 'Zinco', 'PTH (paratormônio)', 'Proteína C reativa (PCR)', 'VHS'],
+  'Hormônios': ['TSH', 'T4 livre', 'T3', 'Anti-TPO', 'Insulina de jejum', 'Beta-hCG quantitativo', 'PSA total e livre', 'Cortisol', 'Prolactina', 'FSH', 'LH', 'Estradiol', 'Testosterona total'],
+  'Ginecologia – rastreamento e infecções': ['Colpocitologia oncótica (Papanicolaou)', 'Teste de DNA-HPV oncogênico', 'Colposcopia', 'Biópsia de colo uterino guiada por colposcopia', 'Bacterioscopia de secreção vaginal (Gram)', 'Cultura de secreção vaginal para fungos', 'PCR para Chlamydia trachomatis e Neisseria gonorrhoeae', 'PCR para Mycoplasma genitalium', 'Pesquisa de Trichomonas vaginalis', 'Biópsia de endométrio', 'CA-125'],
+  'Ginecologia – hormônios e fertilidade': ['Progesterona (21º dia do ciclo)', 'Macroprolactina', 'Testosterona livre calculada', 'SHBG', 'DHEA-S', 'Androstenediona', '17-OH progesterona', 'Hormônio antimülleriano (AMH)', 'Espermograma (parceiro)'],
+  'Obstetrícia – pré-natal': ['Tipagem sanguínea ABO e fator Rh', 'Coombs indireto', 'TOTG 75 g (jejum, 1 h e 2 h) – 24 a 28 semanas', 'Teste treponêmico para sífilis', 'VDRL', 'Anti-HIV 1 e 2', 'HBsAg', 'Anti-HCV', 'Toxoplasmose IgG e IgM', 'Avidez de IgG para toxoplasmose', 'Rubéola IgG e IgM', 'Citomegalovírus IgG e IgM', 'HTLV I e II', 'Eletroforese de hemoglobina', 'Cultura para estreptococo do grupo B (swab vaginal e retal) – 35 a 37 semanas', 'Relação proteína/creatinina em amostra de urina', 'Proteinúria de 24 horas', 'Contagem de plaquetas'],
+  'Emagrecimento e metabolismo': ['HOMA-IR (glicemia e insulina de jejum)', 'Peptídeo C', 'TOTG 75 g com dosagem de insulina (curva glicêmica e insulinêmica)', 'Apolipoproteína B', 'Lipoproteína(a)', 'Creatinina com taxa de filtração glomerular estimada', 'Cortisol sérico às 8 h', 'Calcitonina', 'Bioimpedância (composição corporal)', 'Calorimetria indireta (gasto energético de repouso)'],
+  'Coagulação': ['Coagulograma completo', 'Tempo de protrombina (TP/INR)', 'TTPa', 'Tempo de sangramento', 'Fibrinogênio'],
   'Urina e fezes': ['Urina tipo 1 (EAS)', 'Urocultura com antibiograma', 'Microalbuminúria', 'Parasitológico de fezes (3 amostras)', 'Pesquisa de sangue oculto nas fezes'],
-  'Sorologias e infecções': ['Anti-HIV 1 e 2', 'HBsAg', 'Anti-HBs', 'Anti-HCV', 'VDRL', 'Toxoplasmose IgG e IgM', 'Rubéola IgG e IgM', 'Citomegalovírus IgG e IgM', 'Dengue (NS1, IgG e IgM)', 'Teste para COVID-19 (RT-PCR ou antígeno)', 'Cultura de secreção com antibiograma'],
-  'Imagem e cardiologia': ['Radiografia de tórax PA e perfil', 'Eletrocardiograma (ECG)', 'Ecocardiograma transtorácico', 'Teste ergométrico', 'Holter 24 horas', 'MAPA 24 horas', 'Ultrassonografia de abdome total', 'Ultrassonografia de tireoide', 'Ultrassonografia de vias urinárias', 'Ultrassonografia pélvica', 'Mamografia bilateral', 'Densitometria óssea', 'Tomografia computadorizada (especificar região)', 'Ressonância magnética (especificar região)'],
+  'Sorologias e infecções': ['Anti-HBs', 'Dengue (NS1, IgG e IgM)', 'Teste para COVID-19 (RT-PCR ou antígeno)', 'Cultura de secreção com antibiograma'],
+  'Imagem – ginecologia e mamas': ['Ultrassonografia transvaginal', 'Ultrassonografia pélvica (via abdominal)', 'Ultrassonografia transvaginal com Doppler', 'Ultrassonografia transvaginal com preparo intestinal (pesquisa de endometriose)', 'Ultrassonografia de mamas bilateral', 'Mamografia bilateral', 'Ressonância magnética de mamas', 'Ressonância magnética de pelve (protocolo para endometriose)', 'Histerossalpingografia', 'Histeroscopia diagnóstica', 'Densitometria óssea (coluna lombar e fêmur)'],
+  'Imagem – obstetrícia': ['Ultrassonografia obstétrica inicial (transvaginal)', 'Ultrassonografia morfológica de 1º trimestre (11 a 14 semanas) com translucência nucal', 'Ultrassonografia morfológica de 2º trimestre (20 a 24 semanas)', 'Ultrassonografia obstétrica', 'Ultrassonografia obstétrica com Doppler', 'Perfil biofísico fetal', 'Cervicometria por via transvaginal', 'Ecocardiograma fetal', 'Cardiotocografia'],
+  'Imagem – emagrecimento, geral e cardiologia': ['Ultrassonografia de abdome total', 'Ultrassonografia de abdome superior', 'Elastografia hepática', 'Densitometria de corpo inteiro (composição corporal – DEXA)', 'Ultrassonografia de tireoide', 'Ultrassonografia de vias urinárias', 'Radiografia de tórax PA e perfil', 'Eletrocardiograma (ECG)', 'Ecocardiograma transtorácico', 'Teste ergométrico', 'Holter 24 horas', 'MAPA 24 horas', 'Endoscopia digestiva alta', 'Tomografia computadorizada (especificar região)', 'Ressonância magnética (especificar região)'],
   'Odontológicos – imagem': ['Radiografia panorâmica', 'Radiografia periapical (especificar dentes)', 'Radiografia interproximal (bite-wing)', 'Radiografia oclusal', 'Telerradiografia lateral com traçado cefalométrico', 'Telerradiografia frontal (PA)', 'Tomografia computadorizada de feixe cônico (especificar região)', 'Radiografia de ATM (boca aberta e fechada)', 'Ressonância magnética de ATM'],
   'Odontológicos – diagnóstico': ['Documentação ortodôntica completa', 'Fotografias intra e extraorais', 'Modelos de estudo / escaneamento intraoral', 'Biópsia com exame anatomopatológico', 'Citologia esfoliativa', 'Teste de vitalidade pulpar', 'Teste de fluxo salivar', 'Exame microbiológico / cultura de canal'],
 };
+const isImgGroup = g => /imagem/i.test(g);
 const EXAM_PACKS = {
+  'Pré-natal 1º trimestre': ['Hemograma completo', 'Tipagem sanguínea ABO e fator Rh', 'Coombs indireto', 'Glicemia de jejum', 'Urina tipo 1 (EAS)', 'Urocultura com antibiograma', 'Teste treponêmico para sífilis', 'VDRL', 'Anti-HIV 1 e 2', 'HBsAg', 'Anti-HCV', 'Toxoplasmose IgG e IgM', 'Rubéola IgG e IgM', 'Eletroforese de hemoglobina', 'TSH', 'Parasitológico de fezes (3 amostras)', 'Ultrassonografia obstétrica inicial (transvaginal)', 'Ultrassonografia morfológica de 1º trimestre (11 a 14 semanas) com translucência nucal'],
+  'Pré-natal 2º trimestre': ['Hemograma completo', 'TOTG 75 g (jejum, 1 h e 2 h) – 24 a 28 semanas', 'VDRL', 'Anti-HIV 1 e 2', 'Toxoplasmose IgG e IgM', 'Coombs indireto', 'Urina tipo 1 (EAS)', 'Urocultura com antibiograma', 'Ultrassonografia morfológica de 2º trimestre (20 a 24 semanas)'],
+  'Pré-natal 3º trimestre': ['Hemograma completo', 'VDRL', 'Anti-HIV 1 e 2', 'HBsAg', 'Toxoplasmose IgG e IgM', 'Coombs indireto', 'Urina tipo 1 (EAS)', 'Urocultura com antibiograma', 'Cultura para estreptococo do grupo B (swab vaginal e retal) – 35 a 37 semanas', 'Ultrassonografia obstétrica com Doppler'],
+  'Rotina ginecológica': ['Colpocitologia oncótica (Papanicolaou)', 'Hemograma completo', 'Glicemia de jejum', 'Colesterol total e frações (HDL, LDL, VLDL)', 'Triglicerídeos', 'TSH', '25-OH vitamina D', 'Anti-HIV 1 e 2', 'VDRL', 'HBsAg', 'Anti-HCV', 'Ultrassonografia transvaginal', 'Ultrassonografia de mamas bilateral'],
+  'SOP': ['LH', 'FSH', 'Prolactina', 'TSH', 'Testosterona total', 'SHBG', 'DHEA-S', '17-OH progesterona', 'Hormônio antimülleriano (AMH)', 'Glicemia de jejum', 'Insulina de jejum', 'TOTG 75 g com dosagem de insulina (curva glicêmica e insulinêmica)', 'Hemoglobina glicada (HbA1c)', 'Colesterol total e frações (HDL, LDL, VLDL)', 'Triglicerídeos', 'Ultrassonografia transvaginal'],
+  'Climatério': ['FSH', 'Estradiol', 'TSH', 'Glicemia de jejum', 'Hemoglobina glicada (HbA1c)', 'Colesterol total e frações (HDL, LDL, VLDL)', 'Triglicerídeos', '25-OH vitamina D', 'Colpocitologia oncótica (Papanicolaou)', 'Mamografia bilateral', 'Densitometria óssea (coluna lombar e fêmur)', 'Ultrassonografia transvaginal'],
+  'Infertilidade (casal)': ['FSH', 'LH', 'Estradiol', 'Hormônio antimülleriano (AMH)', 'Prolactina', 'TSH', 'Progesterona (21º dia do ciclo)', 'Anti-HIV 1 e 2', 'VDRL', 'HBsAg', 'Anti-HCV', 'Rubéola IgG e IgM', 'Ultrassonografia transvaginal', 'Histerossalpingografia', 'Espermograma (parceiro)'],
+  'Antes do DIU': ['Beta-hCG quantitativo', 'Colpocitologia oncótica (Papanicolaou)', 'PCR para Chlamydia trachomatis e Neisseria gonorrhoeae', 'Ultrassonografia transvaginal'],
+  'ISTs': ['Anti-HIV 1 e 2', 'Teste treponêmico para sífilis', 'VDRL', 'HBsAg', 'Anti-HCV', 'PCR para Chlamydia trachomatis e Neisseria gonorrhoeae', 'Pesquisa de Trichomonas vaginalis'],
+  'Emagrecimento – avaliação inicial': ['Hemograma completo', 'Glicemia de jejum', 'Insulina de jejum', 'HOMA-IR (glicemia e insulina de jejum)', 'Hemoglobina glicada (HbA1c)', 'Colesterol total e frações (HDL, LDL, VLDL)', 'Triglicerídeos', 'TGO (AST)', 'TGP (ALT)', 'Gama-GT', 'Ácido úrico', 'Creatinina com taxa de filtração glomerular estimada', 'TSH', 'T4 livre', 'Vitamina B12', '25-OH vitamina D', 'Ferritina', 'Urina tipo 1 (EAS)', 'Ultrassonografia de abdome superior', 'Bioimpedância (composição corporal)'],
+  'Tirzepatida / semaglutida (antes e acompanhamento)': ['Glicemia de jejum', 'Hemoglobina glicada (HbA1c)', 'Amilase', 'Lipase', 'Creatinina com taxa de filtração glomerular estimada', 'TGO (AST)', 'TGP (ALT)', 'Colesterol total e frações (HDL, LDL, VLDL)', 'Triglicerídeos', 'TSH', 'Ultrassonografia de abdome superior'],
+  'Pós-bariátrica': ['Hemograma completo', 'Ferro sérico', 'Ferritina', 'Vitamina B12', 'Ácido fólico', '25-OH vitamina D', 'PTH (paratormônio)', 'Cálcio', 'Zinco', 'Magnésio', 'Albumina', 'Proteínas totais e frações'],
   'Check-up adulto': ['Hemograma completo', 'Glicemia de jejum', 'Hemoglobina glicada (HbA1c)', 'Colesterol total e frações (HDL, LDL, VLDL)', 'Triglicerídeos', 'Creatinina', 'TGO (AST)', 'TGP (ALT)', 'TSH', 'Urina tipo 1 (EAS)', '25-OH vitamina D'],
   'Pré-operatório': ['Hemograma completo', 'Coagulograma completo', 'Glicemia de jejum', 'Ureia', 'Creatinina', 'Sódio', 'Potássio', 'Eletrocardiograma (ECG)', 'Radiografia de tórax PA e perfil'],
   'Pré-cirurgia oral': ['Hemograma completo', 'Coagulograma completo', 'Glicemia de jejum', 'Radiografia panorâmica', 'Tomografia computadorizada de feixe cônico (especificar região)'],
   'Ortodontia': ['Documentação ortodôntica completa', 'Radiografia panorâmica', 'Telerradiografia lateral com traçado cefalométrico', 'Fotografias intra e extraorais', 'Modelos de estudo / escaneamento intraoral'],
   'Diabetes – acompanhamento': ['Glicemia de jejum', 'Hemoglobina glicada (HbA1c)', 'Creatinina', 'Microalbuminúria', 'Colesterol total e frações (HDL, LDL, VLDL)', 'Triglicerídeos', 'Urina tipo 1 (EAS)'],
-  'Pré-natal (1º trimestre)': ['Hemograma completo', 'Glicemia de jejum', 'Urina tipo 1 (EAS)', 'Urocultura com antibiograma', 'Anti-HIV 1 e 2', 'HBsAg', 'Anti-HCV', 'VDRL', 'Toxoplasmose IgG e IgM', 'Rubéola IgG e IgM', 'Ultrassonografia pélvica'],
 };
+const ODONTO_PACKS = ['Pré-cirurgia oral', 'Ortodontia'];
 function examBox(type) {
   const odonto = S.me?.profession !== 'medicina';
-  const groups = Object.entries(EXAMS).sort(([a], [b]) => (a.startsWith('Odonto') === odonto ? -1 : 0) - (b.startsWith('Odonto') === odonto ? -1 : 0));
-  return html`<div id="exambox" class="${type === 'exames' ? '' : 'hidden'}"><div class="card" style="background:#fafbfc;padding:12px">
+  const img = type === 'imagem';
+  const groups = Object.entries(EXAMS).filter(([g]) => !img || isImgGroup(g)).filter(([g]) => odonto || !g.startsWith('Odonto')).sort(([a], [b]) => (a.startsWith('Odonto') === odonto ? -1 : 0) - (b.startsWith('Odonto') === odonto ? -1 : 0));
+  const inGroups = new Set(groups.flatMap(([, l]) => l));
+  const packs = Object.keys(EXAM_PACKS).filter(k => (odonto || !ODONTO_PACKS.includes(k)) && EXAM_PACKS[k].some(e => inGroups.has(e)));
+  return html`<div id="exambox" class="${type === 'exames' || type === 'imagem' ? '' : 'hidden'}"><div class="card" style="background:#fafbfc;padding:12px">
     <div class="row between"><b class="small">Monte a solicitação</b><div class="search" style="min-width:200px">${icon('search')}<input class="in" style="height:34px" placeholder="Filtrar exames" data-input="exFilter"></div></div>
-    <div class="row" style="gap:6px;margin:10px 0">${Object.keys(EXAM_PACKS).map(k => html`<button type="button" class="btn sm" data-act="exPack" data-k="${k}">+ ${k}</button>`)}</div>
-    <div style="max-height:300px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff">${groups.map(([g, list]) => html`<div class="exgroup"><div class="tiny" style="font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin:8px 0 4px">${g}</div>
+    <div class="row wrap" style="gap:6px;margin:10px 0">${packs.map(k => html`<button type="button" class="btn sm" data-act="exPack" data-k="${k}">+ ${k}</button>`)}</div>
+    <div style="max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff">${groups.map(([g, list]) => html`<div class="exgroup"><div class="tiny" style="font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin:8px 0 4px">${g}</div>
       <div class="grid g2 collapse" style="gap:2px 12px">${list.map(e => html`<label class="check small exitem"><input type="checkbox" value="${e}" data-group="${g}" data-ex="1"> ${e}</label>`)}</div></div>`)}</div>
-    <div class="grid g2 collapse" style="margin-top:10px"><label class="f"><span>Indicação clínica / hipótese diagnóstica</span><input class="in" id="exind" placeholder="Ex.: avaliação pré-operatória"></label><label class="f"><span>CID-10 (opcional)</span><input class="in" id="excid" maxlength="12" style="text-transform:uppercase"></label></div>
-    <label class="f" style="margin-top:8px"><span>Outros exames ou observações</span><input class="in" id="exobs" placeholder="Ex.: jejum de 8 horas; dentes 36 e 46"></label>
+    <div class="grid g2 collapse" style="margin-top:10px"><label class="f"><span>Indicação clínica / hipótese diagnóstica</span><input class="in" id="exind" placeholder="${img ? 'Ex.: gestação de 12 semanas – rastreamento' : 'Ex.: rotina pré-natal'}"></label><label class="f"><span>CID-10 (opcional)</span><input class="in" id="excid" maxlength="12" style="text-transform:uppercase"></label></div>
+    <label class="f" style="margin-top:8px"><span>Outros exames ou observações</span><input class="in" id="exobs" placeholder="Ex.: jejum de 8 horas; DUM 10/09/2026"></label>
     <div class="row between" style="margin-top:10px"><span class="small muted" id="excount">Nenhum exame marcado</span><button type="button" class="btn primary" data-act="exBuild">${icon('check')} Montar solicitação no documento</button></div></div></div>`;
 }
 onInput('exFilter', el => { const q = norm(el.value); document.querySelectorAll('#exambox .exitem').forEach(l => l.classList.toggle('hidden', q && !norm(l.textContent).includes(q))); document.querySelectorAll('#exambox .exgroup').forEach(g => g.classList.toggle('hidden', ![...g.querySelectorAll('.exitem')].some(l => !l.classList.contains('hidden')))); });
 const exCount = () => { const n = document.querySelectorAll('#exambox [data-ex]:checked').length; const el = document.getElementById('excount'); if (el) el.textContent = n ? `${n} exame(s) marcado(s)` : 'Nenhum exame marcado'; };
 document.addEventListener('change', e => { if (e.target.matches?.('#exambox [data-ex]')) exCount(); });
-act('exPack', el => { EXAM_PACKS[el.dataset.k].forEach(n => { const cb = [...document.querySelectorAll('#exambox [data-ex]')].find(c => c.value === n); if (cb) cb.checked = true; }); exCount(); toast(`Pacote "${el.dataset.k}" marcado.`); });
+act('exPack', el => { let n = 0; EXAM_PACKS[el.dataset.k].forEach(x => { const cb = [...document.querySelectorAll('#exambox [data-ex]')].find(c => c.value === x); if (cb) { cb.checked = true; n++; } }); exCount(); toast(`Pacote "${el.dataset.k}" marcado (${n} exames).`); });
 act('exBuild', () => {
   const sel = [...document.querySelectorAll('#exambox [data-ex]:checked')]; const obs = document.getElementById('exobs').value.trim();
   if (!sel.length && !obs) return toast('Marque pelo menos um exame.', 'bad');
   const by = groupBy(sel, c => c.dataset.group); let n = 0;
-  let h = '<p>Solicito os seguintes exames:</p>';
+  let h = document.querySelector('#rxform [name=doc_type]')?.value === 'imagem' ? '<p>Solicito os seguintes exames de imagem:</p>' : '<p>Solicito os seguintes exames:</p>';
   for (const [g, items] of Object.entries(by)) h += `<p><b>${esc(g)}</b><br>${items.map(c => `${++n}. ${esc(c.value)}`).join('<br>')}</p>`;
   if (obs) h += `<p><b>Outros / observações:</b> ${esc(obs)}</p>`;
   const ind = document.getElementById('exind').value.trim(), cid = document.getElementById('excid').value.trim().toUpperCase();
@@ -95,6 +117,17 @@ async function signPanel(d) {
     <div class="row" style="margin-top:12px"><button class="btn ok" data-act="downloadSigned" data-id="${d.id}">${icon('down')} Baixar PDF assinado</button><a class="btn" href="https://validar.iti.gov.br" target="_blank" rel="noopener">Validar no ITI</a></div>`;
   if (!mine) return html`<p class="small">Só <b>${d.professional_name || 'o profissional que emitiu'}</b> pode assinar este documento, com o certificado dele.</p>`;
   const wa = `https://wa.me/?text=${encodeURIComponent('Assinar no PEPMH: ' + signUrl(d.id))}`;
+  if (!isPhone()) {
+    const dir = await SignDir.get();
+    return html`${d.rx_type === 'controle_especial' ? CONTROL_NOTE : ''}
+    <div class="docprev" style="margin:0 0 12px">Código de verificação: <b>${d.verify_code || '—'}</b></div>
+    <ol class="small" style="padding-left:18px;margin:0 0 10px"><li>Clique em <b>Assinar no computador</b>: o PDF abre no Acrobat.</li><li>No Acrobat, <b>Usar um certificado → Assinar digitalmente</b>, escolha o certificado da AC VALID (VIDaaS Connect) e salve.</li><li>O PEPMH encontra o arquivo assinado e libera para a paciente sozinho.</li></ol>
+    <div class="row wrap"><button class="btn primary" data-act="desktopSign" data-id="${d.id}">${icon('check')} Assinar no computador</button><button class="btn" data-act="pickSignDir" data-id="${d.id}">${icon('file')} ${dir ? 'Trocar pasta' : 'Ativar pasta'}</button><button class="btn ghost" data-act="signPcSetup">Configurar (uma vez)</button></div>
+    <p class="tiny muted" style="margin:6px 0 0">Pasta vigiada: <b id="signdirname">${dir ? dir.name : 'nenhuma'}</b>${SignDir.supported() ? '' : ' · este navegador não vigia pastas; use Chrome ou Edge'}</p>
+    <div style="margin-top:10px"><span id="signstatus" class="pill gray" style="white-space:normal">Pronto para assinar.</span></div>
+    <div id="signdrop" data-id="${d.id}" class="signdrop">Ou arraste o PDF assinado para cá<br><label class="btn sm" style="margin-top:8px">${icon('up')} Escolher arquivo<input type="file" accept="application/pdf" id="signedpdf" hidden data-change="signedPicked" data-id="${d.id}"></label></div>
+    <p class="tiny muted" style="margin:8px 0 0">Vai assinar pelo celular? <a href="${wa}" target="_blank" rel="noopener">Mande para o seu WhatsApp</a>.</p>`;
+  }
   return html`${d.rx_type === 'controle_especial' ? CONTROL_NOTE : ''}${ICP_HELP}
     <div class="docprev" style="margin:12px 0">Código de verificação: <b>${d.verify_code || '—'}</b></div>
     <div class="row wrap"><button class="btn primary" data-act="shareToSigner" data-id="${d.id}">${icon('send')} 1. Abrir no VIDaaS</button><button class="btn" data-act="pdfDoc" data-id="${d.id}">${icon('down')} Baixar PDF</button></div>
@@ -120,25 +153,99 @@ act('shareToSigner', async el => {
   }
   saveBlob(file, file.name); toast('PDF baixado. Abra o app VIDaaS → Assinar documento e escolha este arquivo.', 'ok');
 });
-act('uploadSigned', async el => {
-  const f = document.getElementById('signedpdf').files[0]; if (!f) throw new Error('Escolha o arquivo PDF assinado.');
+async function uploadSignedFile(d, f, auto = false) {
+  if (!d) throw new Error('Documento não encontrado.');
   if (f.type !== 'application/pdf' && !/\.pdf$/i.test(f.name)) throw new Error('O arquivo precisa ser PDF.');
   if (f.size > 10 * 1024 * 1024) throw new Error('O PDF passa de 10 MB.');
   const head = new TextDecoder('latin1').decode(await f.arrayBuffer());
   if (!head.startsWith('%PDF')) throw new Error('Esse arquivo não parece ser um PDF válido.');
-  const hasSig = /\/ByteRange\s*\[/.test(head) && /\/(Sig|DocTimeStamp)\b/.test(head);
-  if (!hasSig && !(await confirmBox('Não encontramos uma assinatura digital dentro deste PDF. Ele foi mesmo assinado com o certificado? Enviar assim mesmo?', 'Enviar assim mesmo'))) return;
-  const d = await db.get('documents', el.dataset.id);
+  if (!pdfHasSig(head) && !(await confirmBox('Não encontramos uma assinatura digital dentro deste PDF. Ele foi mesmo assinado com o certificado? Enviar assim mesmo?', 'Enviar assim mesmo'))) return;
   if (d.signed_file_path) throw new Error('Este documento já tem PDF assinado.');
   const path = `${d.clinic_id}/${d.id}-${Date.now()}.pdf`; const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', await f.arrayBuffer()))].map(x => x.toString(16).padStart(2, '0')).join('');
-  el.disabled = true;
-  try {
-    const now = new Date().toISOString(), rel = d.released_at ? {} : { released_at: now };
-    if (isDemo()) { await db.update('documents', d.id, { signed_file_path: 'demo/' + d.id + '.pdf', signed_at: now, signed_sha256: hash, ...rel }); }
-    else { await Remote.upload('signed-docs', path, f, false); await db.update('documents', d.id, { signed_file_path: path, signed_at: now, signed_by: Auth.userId(), signed_sha256: hash, ...rel, ...(d.released_at ? {} : { released_by: Auth.userId() }) }); }
-    closeModal(); toast('Documento assinado e liberado. Já está na área do paciente, com o PDF assinado para baixar.', 'ok'); router();
-  } finally { el.disabled = false; }
+  const now = new Date().toISOString(), rel = d.released_at ? {} : { released_at: now };
+  if (isDemo()) { await db.update('documents', d.id, { signed_file_path: 'demo/' + d.id + '.pdf', signed_at: now, signed_sha256: hash, ...rel }); }
+  else { await Remote.upload('signed-docs', path, f, false); await db.update('documents', d.id, { signed_file_path: path, signed_at: now, signed_by: Auth.userId(), signed_sha256: hash, ...rel, ...(d.released_at ? {} : { released_by: Auth.userId() }) }); }
+  stopSignWatch();
+  modal('Documento assinado', html`<div class="pill ok" style="font-size:.95rem;white-space:normal">✓ Assinado com certificado ICP-Brasil e liberado na área da paciente${auto ? ' (enviado automaticamente)' : ''}.</div>
+    <p class="small">Para conferir a autenticidade, abra o validador oficial do ITI e envie o PDF assinado (<i>${esc(f.name)}</i>). Ele mostra o seu nome, o certificado da AC VALID e se a assinatura é válida.</p>
+    <div class="row wrap"><a class="btn primary" href="https://validar.iti.gov.br" target="_blank" rel="noopener">${icon('check')} Validar no ITI</a><button class="btn ok" data-act="shareDoc" data-id="${d.id}">${icon('send')} Enviar à paciente</button><button class="btn" data-act="closeModal">Fechar</button></div>`, { wide: true });
+  toast('Documento assinado e liberado para a paciente.', 'ok');
+  if (location.hash.includes('/paciente/')) { const iv = setInterval(() => { if (!document.getElementById('modal')) { clearInterval(iv); router(); } }, 400); }
+}
+act('uploadSigned', async el => {
+  const f = document.getElementById('signedpdf').files[0]; if (!f) throw new Error('Escolha o arquivo PDF assinado.');
+  el.disabled = true; try { await uploadSignedFile(await db.get('documents', el.dataset.id), f); } finally { el.disabled = false; }
 });
+onInput('signedPicked', el => { const f = el.files[0]; if (f) db.get('documents', el.dataset.id).then(d => uploadSignedFile(d, f)).catch(e => toast(e.message, 'bad')); });
+/* ---------- assinatura no computador (VIDaaS Connect / certificado instalado no Windows) ----------
+   O navegador não acessa o certificado direto. Fluxo: o PEPMH baixa o PDF, o Chrome abre sozinho no
+   Adobe Acrobat Reader (configuração feita uma vez), a médica assina com o certificado do VIDaaS Connect
+   e salva. O PEPMH vigia a pasta escolhida e envia o PDF assinado sozinho, sem passar pelo celular. */
+const SignDir = {
+  async db() { return new Promise((ok, bad) => { const r = indexedDB.open('pepmh-sign', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => bad(r.error); }); },
+  async get() { try { const d = await this.db(); return await new Promise(ok => { const q = d.transaction('kv').objectStore('kv').get('dir'); q.onsuccess = () => ok(q.result || null); q.onerror = () => ok(null); }); } catch { return null; } },
+  async set(h) { const d = await this.db(); await new Promise(ok => { const t = d.transaction('kv', 'readwrite'); t.objectStore('kv').put(h, 'dir'); t.oncomplete = ok; t.onerror = ok; }); },
+  supported: () => 'showDirectoryPicker' in window,
+  async ready(ask) {
+    const h = await this.get(); if (!h) return null;
+    try { if ((await h.queryPermission({ mode: 'read' })) === 'granted') return h; if (ask && (await h.requestPermission({ mode: 'read' })) === 'granted') return h; } catch { }
+    return null;
+  },
+};
+const pdfHasSig = txt => /\/ByteRange\s*\[/.test(txt) && /\/(Sig|DocTimeStamp)\b/.test(txt);
+let signWatch = null;
+function stopSignWatch() { if (signWatch) { clearInterval(signWatch.t); signWatch = null; } }
+function setSignStatus(msg, kind = '') { const el = document.getElementById('signstatus'); if (el) { el.className = 'pill ' + (kind || 'gray'); el.style.whiteSpace = 'normal'; el.textContent = msg; } }
+async function startSignWatch(d, base, since) {
+  stopSignWatch();
+  const dir = await SignDir.ready(true);
+  if (!dir) { setSignStatus('Assine no Acrobat e arraste o PDF assinado para cá (ou ative a pasta de assinatura para o envio ser automático).'); return; }
+  setSignStatus(`Aguardando o PDF assinado na pasta "${dir.name}"…`, 'warn');
+  const seen = new Map(); const t0 = Date.now();
+  signWatch = { id: d.id, t: setInterval(async () => {
+    if (!document.getElementById('signstatus') || Date.now() - t0 > 20 * 60 * 1000) return stopSignWatch();
+    try {
+      for await (const [name, h] of dir.entries()) {
+        if (h.kind !== 'file' || !/\.pdf$/i.test(name) || !name.toLowerCase().startsWith(base)) continue;
+        const f = await h.getFile(); if (f.lastModified < since - 2000 || seen.get(name) === f.lastModified) continue;
+        seen.set(name, f.lastModified);
+        if (!pdfHasSig(new TextDecoder('latin1').decode(await f.arrayBuffer()))) continue;
+        stopSignWatch(); setSignStatus('PDF assinado encontrado. Enviando…', 'ok');
+        await uploadSignedFile(await db.get('documents', d.id), f, true); return;
+      }
+    } catch (e) { stopSignWatch(); setSignStatus('Não consegui ler a pasta: ' + e.message + '. Arraste o PDF assinado para cá.', 'bad'); }
+  }, 2000) };
+}
+async function desktopSign(docId) {
+  const b = await docBundle(docId); const name = pdfName(b.doc, b.patient);
+  const since = Date.now(); saveBlob(new Blob([await buildDocPdf(b)], { type: 'application/pdf' }), name);
+  toast('PDF gerado. Assine no Acrobat com o certificado do VIDaaS Connect e salve.', 'ok');
+  await startSignWatch(b.doc, name.replace(/\.pdf$/i, '').toLowerCase(), since);
+}
+act('desktopSign', el => desktopSign(el.dataset.id));
+act('pickSignDir', async el => {
+  if (!SignDir.supported()) throw new Error('Este navegador não deixa vigiar pastas. Use o Google Chrome ou o Microsoft Edge no computador.');
+  let h; try { h = await window.showDirectoryPicker({ id: 'pepmh-assinatura', mode: 'read', startIn: 'downloads' }); } catch (e) { if (e.name === 'AbortError') return; throw new Error('O navegador não liberou essa pasta. Crie uma pasta, por exemplo Documentos\\PEPMH Assinados, e escolha ela (e salve os PDFs assinados lá).'); }
+  await SignDir.set(h); toast(`Pasta "${h.name}" ativada. Os PDFs assinados salvos nela sobem sozinhos.`, 'ok');
+  const lbl = document.getElementById('signdirname'); if (lbl) lbl.textContent = h.name;
+  if (el.dataset.id && signWatch?.id !== el.dataset.id) { const d = await db.get('documents', el.dataset.id); const b = await docBundle(d.id); startSignWatch(d, pdfName(b.doc, b.patient).replace(/\.pdf$/i, '').toLowerCase(), Date.now() - 30 * 60 * 1000); }
+});
+act('signPcSetup', () => modal('Assinar no computador – configurar uma vez', SIGN_PC_SETUP, { wide: true }));
+const SIGN_PC_SETUP = html`<div class="stack small">
+  <div><b>1. VIDaaS Connect</b><ol style="padding-left:18px;margin:6px 0"><li>Deixe o VIDaaS Connect aberto e conectado com o seu CPF (ícone perto do relógio do Windows).</li><li>Nas opções dele, aumente o <b>tempo de sessão</b>. Assim você aprova no celular uma vez e assina várias receitas seguidas sem novo pedido.</li></ol></div>
+  <div><b>2. Adobe Acrobat Reader</b> (grátis)<ol style="padding-left:18px;margin:6px 0"><li>Instale e deixe como programa padrão para PDF no Windows.</li><li>Em <b>Editar → Preferências → Assinaturas → Identidades e certificados confiáveis</b>, confira se o seu certificado da AC VALID aparece. Se não aparecer, reinicie o VIDaaS Connect.</li></ol></div>
+  <div><b>3. Chrome abrindo o PDF direto no Acrobat</b><ol style="padding-left:18px;margin:6px 0"><li>No Chrome: <b>Configurações → Privacidade e segurança → Configurações do site → Configurações de conteúdo adicionais → Documentos PDF</b> e marque <b>Fazer o download de PDFs</b>.</li><li>Gere um documento no PEPMH. Quando o download aparecer no canto, clique na setinha (ou nos três pontinhos) e escolha <b>Sempre abrir arquivos deste tipo</b>. A partir daí, todo PDF do PEPMH abre sozinho no Acrobat.</li><li>No Edge é igual: <b>Configurações → Cookies e permissões de site → Documentos PDF → Sempre baixar arquivos PDF</b>.</li></ol></div>
+  <div><b>4. Pasta de assinatura</b><p style="margin:6px 0">Na tela de assinatura, clique em <b>Ativar pasta</b> e escolha a pasta onde o Acrobat salva (normalmente <i>Downloads</i>). O PEPMH fica olhando essa pasta e envia o PDF assinado sozinho. Se o Chrome não aceitar a pasta Downloads, crie <i>Documentos\\PEPMH Assinados</i> e salve os assinados nela.</p></div>
+  <div><b>No dia a dia</b><ol style="padding-left:18px;margin:6px 0"><li>Salve a receita: o PDF abre sozinho no Acrobat.</li><li>No Acrobat: <b>Todas as ferramentas → Usar um certificado → Assinar digitalmente</b>, desenhe o quadro no canto inferior esquerdo, escolha o seu certificado (AC VALID) e clique em <b>Assinar</b>.</li><li>Salve com o nome sugerido (pode acrescentar "assinado" no fim). Em segundos o PEPMH mostra <b>assinado</b> e libera para a paciente.</li></ol></div>
+  <div class="tiny muted">O navegador, por segurança, não consegue abrir o certificado sozinho; por isso a assinatura acontece no Acrobat. Nada é baixado no celular: a aprovação do VIDaaS só aparece no app quando a sessão do Connect expira.</div></div>`;
+document.addEventListener('dragover', e => { if (e.target.closest?.('#signdrop')) { e.preventDefault(); e.target.closest('#signdrop').classList.add('on'); } });
+document.addEventListener('dragleave', e => e.target.closest?.('#signdrop')?.classList.remove('on'));
+document.addEventListener('drop', e => {
+  const z = e.target.closest?.('#signdrop'); if (!z) return; e.preventDefault(); z.classList.remove('on');
+  const f = e.dataTransfer.files[0]; if (!f) return;
+  db.get('documents', z.dataset.id).then(d => uploadSignedFile(d, f)).catch(err => toast(err.message, 'bad'));
+});
+
 act('releaseDoc', async el => {
   if (!(await confirmBox('Liberar este documento na área do paciente sem a assinatura digital? Ele vai poder ver, baixar e imprimir. Se assinar depois, o PDF assinado aparece para ele também.', 'Liberar'))) return;
   await db.update('documents', el.dataset.id, { released_at: new Date().toISOString(), ...(isDemo() ? {} : { released_by: Auth.userId() }) });
