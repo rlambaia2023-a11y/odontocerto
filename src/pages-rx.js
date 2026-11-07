@@ -122,14 +122,17 @@ const DOC_FALLBACK = { imagem: 'exames', manipulado: 'receituario', medicacao: '
 const RXTYPES = { simples: 'Simples (uma via)', duas_vias: 'Simples em duas vias (antimicrobiano ou retenção de receita)', controle_especial: 'Controle especial (duas vias)' };
 
 route('/prescrever', async (_, q) => {
-  const pid = q.get('p'); const rep = q.get('repetir'); const tipo = q.get('tipo') || 'receituario';
+  const pid = q.get('p'); const tipo = q.get('tipo') || 'receituario';
+  const editId = q.get('editar'), subId = q.get('substituir'); const rep = editId || subId || q.get('repetir');
+  window.__rxEdit = editId ? { id: editId, mode: 'editar' } : subId ? { id: subId, mode: 'substituir' } : null;
   const p = pid ? await db.get('patients', pid) : null; const repDoc = rep ? await db.get('documents', rep) : null;
   const type = repDoc?.doc_type || tipo;
   const tpls = await db.list('document_templates', { order: 'title' });
   const hist = p ? await db.list('documents', { eq: { patient_id: p.id }, order: 'created_at.desc', limit: 5 }) : [];
   window.__tpls = tpls; await loadAllergy(p);
   after(() => { const ed = document.getElementById('rxed'); if (ed) ed.innerHTML = repDoc ? sanitize(repDoc.content) : window.__rxPrefill ? sanitize(window.__rxPrefill) : ''; window.__rxPrefill = null; });
-  return html`<div class="pagehead"><div class="row">${p ? html`<a class="btn sm back" href="#/paciente/${p.id}?tab=documentos">${icon('back')}</a>` : ''}<h1>Prescrições e laudos</h1></div></div>
+  return html`<div class="pagehead"><div class="row">${p ? html`<a class="btn sm back" href="#/paciente/${p.id}?tab=documentos">${icon('back')}</a>` : ''}<h1>${editId ? 'Editar documento' : subId ? 'Corrigir documento assinado' : 'Prescrições e laudos'}</h1></div></div>
+  ${editId ? html`<div class="tip">${icon('edit')}<span>Você está editando o documento salvo. Ao salvar, ele é atualizado (ainda não foi assinado).</span></div>` : subId ? html`<div class="tip">${icon('edit')}<span>Documento assinado não muda depois da assinatura. Corrija aqui: ao salvar, sai um documento novo para assinar e o antigo é excluído (anulado e retirado da área do paciente).</span></div>` : ''}
   <form id="rxform" onsubmit="return false" class="stack">
     <div class="card"><h2 style="color:var(--brand);margin-bottom:12px">Informe os dados do paciente</h2>
       <label class="f"><span>Nome completo <i>*</i></span>${patientPicker(p)}</label><div id="rxallergy">${allergyBanner()}</div>
@@ -211,11 +214,15 @@ act('rxSave', async el => {
     if (d.phone && onlyDigits(d.phone) !== (p.phone || '')) { await db.update('patients', pid, { phone: onlyDigits(d.phone) }); p.phone = onlyDigits(d.phone); }
     const prof = S.members.find(m => m.user_id === d.professional_id) || S.me;
     const row = { content_hash: await sha256(content), patient_id: pid, professional_id: prof.user_id, professional_name: prof.full_name, doc_type: d.doc_type, rx_type: ['receituario', 'manipulado'].includes(d.doc_type) ? d.rx_type : null, content, no_date: !!d.no_date, sent_to: null };
-    let doc; try { doc = await db.insert('documents', row); } catch (e) {
+    const ed = window.__rxEdit; let doc;
+    if (ed?.mode === 'editar') { doc = await db.update('documents', ed.id, row) || await db.get('documents', ed.id); }
+    else try { doc = await db.insert('documents', row); } catch (e) {
       /* banco ainda sem os tipos novos: grava no tipo equivalente (exames / receituário) */
       const fb = DOC_FALLBACK[d.doc_type]; if (!fb || !/doc_type|check/i.test(e.message)) throw e;
       doc = await db.insert('documents', { ...row, doc_type: fb, rx_type: fb === 'receituario' ? (row.rx_type || 'simples') : null });
     }
+    if (ed?.mode === 'substituir') await db.update('documents', ed.id, { deleted_at: new Date().toISOString(), delete_reason: 'Substituído por documento corrigido' + (doc.verify_code ? ' (' + doc.verify_code + ')' : ''), released_at: null, released_by: null, share_token: null, share_expires_at: null, share_file_url: null }).catch(e => toast('O novo foi salvo, mas não consegui excluir o antigo: ' + e.message, 'bad'));
+    window.__rxEdit = null;
     if (d.save_tpl) { const title = prompt('Nome do modelo:', DOCT[d.doc_type][0] + ' – ' + fDate(new Date())); if (title) await db.insert('document_templates', { doc_type: d.doc_type, title, content }); }
     if (el.dataset.mode === 'print') printDocument(doc, p, prof);
     toast(el.dataset.mode === 'pdf' && !isPhone() ? 'Documento salvo. Abrindo para assinar com o certificado…' : 'Documento salvo. Assine com o certificado e ele aparece sozinho na área do paciente.', 'ok'); go(`#/paciente/${pid}?tab=documentos`);

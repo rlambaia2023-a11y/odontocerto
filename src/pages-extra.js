@@ -516,3 +516,10 @@ act('restoreDoc', async el => {
   await db.update('documents', d.id, { deleted_at: null, delete_reason: null, ...(d.signed_file_path ? { released_at: new Date().toISOString() } : {}) });
   toast('Documento restaurado.', 'ok'); router();
 });
+
+act('editDoc', async el => {
+  const d = await db.get('documents', el.dataset.id), pid = el.dataset.p || d.patient_id;
+  if (!d.signed_file_path) return go(`#/prescrever?p=${pid}&editar=${d.id}`);
+  if (!isDemo() && d.professional_id !== Auth.userId()) throw new Error(`Só ${d.professional_name || 'quem emitiu'} pode corrigir este documento assinado.`);
+  if (await confirmBox('Este documento já está assinado e não pode ser alterado. Abrir uma cópia para corrigir? Ao salvar, o novo documento vai para assinatura e este é excluído (anulado e retirado da área do paciente).', 'Corrigir')) go(`#/prescrever?p=${pid}&substituir=${d.id}`);
+});
