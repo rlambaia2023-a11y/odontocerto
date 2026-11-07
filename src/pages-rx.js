@@ -68,8 +68,15 @@ const MEDS_MED_CATS = {
     ['Cloridrato de bupropiona 150 mg (liberação prolongada)', 'uso oral', '30 comprimidos', 'Tomar 1 comprimido pela manhã.', 'ce'],
     ['Psyllium 5 g (sachê)', 'uso oral', '30 sachês', 'Diluir 1 sachê em 200 mL de água e tomar 1 vez ao dia, 30 minutos antes da principal refeição. Beber bastante água ao longo do dia.'],
     ['Colecalciferol (vitamina D3) 50.000 UI', 'uso oral', '8 cápsulas', 'Tomar 1 cápsula por semana, junto com uma refeição, por 8 semanas.'],
+    ['Pantogar', 'uso oral', '1 caixa', 'Tomar 1 cápsula por via oral ao dia, por 3 meses.'],
+    ['Buscopan Composto', 'uso oral', '1 caixa', 'Tomar 1 comprimido por via oral de 8 em 8 horas, se dor.'],
+    ['Lactulona', 'uso oral', '1 frasco', 'Tomar 10 mL por via oral à noite, se intestino preso (obstipação).'],
+    ['Ondif 8 mg', 'uso sublingual', '1 caixa', 'Colocar 1 comprimido debaixo da língua, se enjoo.'],
+    ['Whey protein', 'uso oral', 'uso contínuo', 'Tomar 30 g após o café da manhã e 30 g após o treino.'],
+    ['Ômega 3 1 g', 'uso oral', 'uso contínuo', 'Tomar 2 cápsulas de 12 em 12 horas.'],
   ],
   'Fórmulas manipuladas': [
+    ['Creatina 5 g + Peptstrong 2,4 g (sachê)', 'uso oral', 'Manipular 30 sachês', 'Tomar 1 sachê ao dia.'],
     ['Colecalciferol (vitamina D3) 50.000 UI', 'uso oral', 'Manipular 8 cápsulas', 'Tomar 1 cápsula por semana, junto com uma refeição, por 8 semanas.'],
     ['Metilfolato 1 mg + metilcobalamina 1.000 mcg', 'uso oral', 'Manipular 30 cápsulas', 'Tomar 1 cápsula ao dia.'],
     ['Mio-inositol 2 g + ácido fólico 200 mcg (sachê)', 'uso oral', 'Manipular 60 sachês', 'Dissolver 1 sachê em água e tomar 2 vezes ao dia, antes do café da manhã e antes do jantar.'],
@@ -106,6 +113,16 @@ const MEDS_MED_CATS = {
     ['Sais para reidratação oral', 'uso oral', '4 envelopes', 'Diluir 1 envelope em 1 litro de água filtrada e tomar aos poucos ao longo do dia, principalmente após cada evacuação líquida.'],
   ],
 };
+/* Protocolos prontos da clínica (Dra. Mayara – emagrecimento). Aparecem em "Modelo" no receituário e podem ser editados antes de salvar. */
+const RX_PROTOS = {
+  obesidade: ['Receita – protocolo de obesidade',
+    `<p><b>Uso oral</b></p><p data-med="1">1. Pantogar ———— 1 caixa<br>Tomar 1 cápsula por via oral ao dia, por 3 meses.</p><p data-med="1">2. Buscopan Composto ———— 1 caixa<br>Tomar 1 comprimido por via oral de 8 em 8 horas, se dor.</p><p data-med="1">3. Lactulona ———— 1 frasco<br>Tomar 10 mL por via oral à noite, se intestino preso (obstipação).</p><p><b>Uso sublingual</b></p><p data-med="1">4. Ondif 8 mg ———— 1 caixa<br>Colocar 1 comprimido debaixo da língua, se enjoo.</p>`],
+  suplementos: ['Suplementos e dieta – protocolo de obesidade',
+    `<p><b>Dieta</b></p><p>1. Dieta hiperproteica de 900 kcal por dia<br>30% de carboidratos, 40% de proteínas e 30% de gorduras, com predomínio de gorduras boas.</p><p><b>Uso oral</b></p><p data-med="1">2. Whey protein ———— uso contínuo<br>Tomar 30 g após o café da manhã e 30 g após o treino.</p><p data-med="1">3. Creatina 5 g + Peptstrong 2,4 g (sachê) ———— Manipular 30 sachês<br>Tomar 1 sachê ao dia.</p><p data-med="1">4. Ômega 3 1 g ———— uso contínuo<br>Tomar 2 cápsulas de 12 em 12 horas.</p>`],
+  completo: ['Protocolo de obesidade completo (medicações + suplementos e dieta)', null],
+};
+RX_PROTOS.completo[1] = RX_PROTOS.obesidade[1] + '<p><br></p>' + RX_PROTOS.suplementos[1].replace(/<p(?: data-med="1")?>(\d)\./g, (m, n) => m.replace(n + '.', (+n + 4) + '.'));
+const protoOptions = type => type === 'receituario' && S.me?.profession === 'medicina' ? html`<optgroup label="Protocolos da clínica">${Object.entries(RX_PROTOS).map(([k, [t]]) => html`<option value="proto:${k}">${t}</option>`)}</optgroup>` : '';
 const MED_FLAG = { atm: 'antimicrobiano: receita em 2 vias, a farmácia retém uma', ret: 'venda com retenção de receita: emitir em 2 vias', ce: 'controle especial (lista C1): receituário de controle especial em 2 vias' };
 /* qual lista aparece em cada tipo de documento */
 function medCats(type) {
@@ -130,7 +147,7 @@ route('/prescrever', async (_, q) => {
   const tpls = await db.list('document_templates', { order: 'title' });
   const hist = p ? await db.list('documents', { eq: { patient_id: p.id }, order: 'created_at.desc', limit: 5 }) : [];
   window.__tpls = tpls; await loadAllergy(p);
-  after(() => { const ed = document.getElementById('rxed'); if (ed) ed.innerHTML = repDoc ? sanitize(repDoc.content) : window.__rxPrefill ? sanitize(window.__rxPrefill) : ''; window.__rxPrefill = null; });
+  after(() => { const ed = document.getElementById('rxed'); if (ed) ed.innerHTML = repDoc ? sanitize(repDoc.content) : window.__rxPrefill ? sanitize(window.__rxPrefill) : RX_PROTOS[q.get('proto')] ? sanitize(RX_PROTOS[q.get('proto')][1]) : ''; window.__rxPrefill = null; });
   return html`<div class="pagehead"><div class="row">${p ? html`<a class="btn sm back" href="#/paciente/${p.id}?tab=documentos">${icon('back')}</a>` : ''}<h1>${editId ? 'Editar documento' : subId ? 'Corrigir documento assinado' : 'Prescrições e laudos'}</h1></div></div>
   ${editId ? html`<div class="tip">${icon('edit')}<span>Você está editando o documento salvo. Ao salvar, ele é atualizado (ainda não foi assinado).</span></div>` : subId ? html`<div class="tip">${icon('edit')}<span>Documento assinado não muda depois da assinatura. Corrija aqui: ao salvar, sai um documento novo para assinar e o antigo é excluído (anulado e retirado da área do paciente).</span></div>` : ''}
   <form id="rxform" onsubmit="return false" class="stack">
@@ -141,7 +158,7 @@ route('/prescrever', async (_, q) => {
       <label class="f"><span>Profissional</span><select class="in" name="professional_id">${S.members.map(m => html`<option value="${m.user_id}" ${m.user_id === Auth.userId() ? 'selected' : ''}>${m.full_name} ${councilOf(m) ? '· ' + councilOf(m) : ''}</option>`)}</select></label>
       <div><span class="small" style="font-weight:600;color:var(--ink-2)">Escolha um tipo</span><input type="hidden" name="doc_type" value="${type}">
       <div class="doctype" style="margin-top:8px">${Object.entries(DOCT).map(([k, [l, ic]]) => html`<button type="button" class="${k === type ? 'on' : ''}" data-act="rxType" data-t="${k}">${icon(ic)}${l}</button>`)}</div></div>
-      <div class="grid g2 collapse" style="align-items:end"><label class="f"><span>Modelo personalizado</span><select class="in" id="rxtpl" data-change="rxTpl"><option value="">Selecione…</option>${tpls.filter(t => t.doc_type === type).map(t => html`<option value="${t.id}">${t.title}</option>`)}</select></label>
+      <div class="grid g2 collapse" style="align-items:end"><label class="f"><span>Modelo personalizado</span><select class="in" id="rxtpl" data-change="rxTpl"><option value="">Selecione…</option>${protoOptions(type)}${tpls.filter(t => t.doc_type === type).map(t => html`<option value="${t.id}">${t.title}</option>`)}</select></label>
         <div class="row"><button type="button" class="btn sm" data-act="manageTpl">${icon('edit')} Editar lista de modelos</button></div></div>
       ${examBox(type)}
       <div id="medbox" class="${MED_TYPES.includes(type) ? '' : 'hidden'}"><div class="grid g2 collapse" style="align-items:end"><label class="f"><span>Adicionar medicamento</span><select class="in" id="rxmed" data-change="rxMed">${medOptions(type)}</select></label>
@@ -184,9 +201,10 @@ act('rxType', el => {
   if (MED_TYPES.includes(t)) { document.getElementById('rxmed').innerHTML = fv(medOptions(t)); ACT.rxClearMed(); }
   const eb = document.getElementById('exambox'); if (eb) eb.outerHTML = fv(examBox(t));
   document.getElementById('rxtypebox').classList.toggle('hidden', !['receituario', 'manipulado'].includes(t));
-  document.getElementById('rxtpl').innerHTML = fv(html`<option value="">Selecione…</option>${(window.__tpls || []).filter(t => t.doc_type === el.dataset.t).map(t => html`<option value="${t.id}">${t.title}</option>`)}`);
+  document.getElementById('rxtpl').innerHTML = fv(html`<option value="">Selecione…</option>${protoOptions(el.dataset.t)}${(window.__tpls || []).filter(t => t.doc_type === el.dataset.t).map(t => html`<option value="${t.id}">${t.title}</option>`)}`);
 });
 onInput('rxTpl', el => {
+  if (el.value.startsWith('proto:')) { const pr = RX_PROTOS[el.value.slice(6)]; if (!pr) return; const ed = document.getElementById('rxed'); ed.innerHTML = (ed.innerHTML.trim() ? ed.innerHTML + '<p><br></p>' : '') + sanitize(pr[1]); toast('Protocolo inserido. Confira e ajuste antes de salvar.', 'ok'); return; }
   const t = (window.__tpls || []).find(x => x.id === el.value); if (!t) return;
   const name = document.querySelector('#rxform [name=patient_name]').value || '______________';
   const ed = document.getElementById('rxed'); ed.innerHTML = (ed.innerHTML.trim() ? ed.innerHTML : '') + sanitize(t.content).replace(/\{paciente\}/g, esc(name));

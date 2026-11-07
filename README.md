@@ -44,3 +44,12 @@ PORT=4173 bun dist/index.tsx
 
 ## Assinatura no computador (VIDaaS Connect)
 Ao salvar com **Salvar, gerar PDF e assinar** no computador, o PDF é baixado (o Chrome abre direto no Acrobat se configurado), a médica assina com o certificado do VIDaaS Connect e o PEPMH vigia a pasta escolhida (File System Access API, Chrome/Edge) e envia o PDF assinado sozinho. Também aceita arrastar o arquivo. No celular continua o fluxo pelo app VIDaaS.
+
+## Protocolo de obesidade (receituário)
+Em **Prescrições → Modelo** (médicos) aparecem os protocolos da clínica: receita do protocolo de obesidade (Pantogar, Buscopan Composto, Lactulona, Ondif 8 mg), suplementos e dieta (dieta hiperproteica de 900 kcal, whey, creatina + Peptstrong, ômega 3) e os dois juntos. A ficha do paciente em Emagrecimento tem atalhos que abrem a receita já preenchida (`#/prescrever?p=<id>&proto=obesidade|suplementos|completo`).
+
+## Mala direta para pacientes ausentes
+Marketing → **Pacientes ausentes · mala direta**: escolhe o período sem consulta, edita a mensagem ({nome} vira o primeiro nome), seleciona todos de uma vez e o sistema abre um envio por paciente, com o nome de cada um, o WhatsApp e o e-mail da clínica. Sem celular, vai por e-mail.
+
+## Precificador
+Cada procedimento tem botão **Excluir** (na tabela e na edição). Planos que já usaram o procedimento mantêm a descrição e o valor.

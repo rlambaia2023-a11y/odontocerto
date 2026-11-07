@@ -69,7 +69,8 @@ route('/precificador', async () => {
     <form data-form="hourCost" class="grid g4" style="align-items:end"><label class="f"><span>Custos fixos mensais (R$)</span><input class="in" name="fixed" inputmode="decimal" placeholder="Ex.: 9000" data-input="hcCalc"></label><label class="f"><span>Horas clínicas por mês</span><input class="in" name="hours" inputmode="decimal" placeholder="Ex.: 120" data-input="hcCalc"></label>
     <div><div class="small muted">Custo por hora</div><div class="kpi"><div class="v" id="hcout">—</div></div></div><button class="btn" type="submit">Aplicar a todos</button></form></div>
   <div class="tblwrap" style="margin-top:14px"><table class="tbl"><tr><th>Procedimento</th><th class="hide-m">Tempo</th><th class="num">Custo</th><th class="num">Sugerido</th><th class="num">Preço</th><th class="num">Margem real</th><th></th></tr>
-  ${procs.map(p => { const c = calcProc(p); return html`<tr style="${p.active ? '' : 'opacity:.5'}"><td><b>${p.name}</b><div class="tiny muted">${p.category || ''}</div></td><td class="hide-m small">${p.duration_min} min</td><td class="num">${BRL(c.cost)}</td><td class="num">${isFinite(c.sug) ? BRL(c.sug) : '—'}</td><td class="num"><b>${BRL(p.price)}</b></td><td class="num"><span class="pill ${c.real < 0 ? 'bad' : c.real < 15 ? 'warn' : 'ok'}">${c.real.toFixed(0)}%</span></td><td class="num"><button class="btn sm" data-act="editProc" data-id="${p.id}">${icon('edit')}</button></td></tr>`; })}</table></div>`;
+  ${procs.map(p => { const c = calcProc(p); return html`<tr style="${p.active ? '' : 'opacity:.5'}"><td><b>${p.name}</b><div class="tiny muted">${p.category || ''}</div></td><td class="hide-m small">${p.duration_min} min</td><td class="num">${BRL(c.cost)}</td><td class="num">${isFinite(c.sug) ? BRL(c.sug) : '—'}</td><td class="num"><b>${BRL(p.price)}</b></td><td class="num"><span class="pill ${c.real < 0 ? 'bad' : c.real < 15 ? 'warn' : 'ok'}">${c.real.toFixed(0)}%</span></td><td class="num"><div class="row" style="gap:6px;justify-content:flex-end;flex-wrap:nowrap"><button class="btn sm" data-act="editProc" data-id="${p.id}" title="Editar">${icon('edit')}</button><button class="btn sm danger" data-act="delProc" data-id="${p.id}" title="Excluir">${icon('trash')}</button></div></td></tr>`; })}</table></div>
+  ${procs.length ? '' : html`<div class="card empty" style="margin-top:10px">Nenhum procedimento cadastrado.</div>`}`;
 }, 'precificador');
 onInput('hcCalc', el => { const f = el.form; const v = parseMoney(f.fixed.value) / parseMoney(f.hours.value); document.getElementById('hcout').textContent = isFinite(v) && v > 0 ? BRL(v) : '—'; });
 onForm('hourCost', async d => { const v = Math.round(parseMoney(d.fixed) / parseMoney(d.hours) * 100) / 100; if (!(v > 0)) throw new Error('Preencha os dois campos.'); if (!(await confirmBox(`Aplicar custo de ${BRL(v)}/hora a todos os procedimentos?`, 'Aplicar'))) return; for (const p of S.procedures) await db.update('procedures', p.id, { hour_cost: v }); toast('Custo da hora atualizado.', 'ok'); router(); });
@@ -79,7 +80,7 @@ act('editProc', el => {
   <div class="grid g2"><label class="f"><span>Nome <i>*</i></span><input class="in" name="name" required value="${p.name || ''}"></label><label class="f"><span>Especialidade</span><input class="in" name="category" list="pcats" value="${p.category || ''}"><datalist id="pcats">${['Clínica geral', 'Dentística', 'Periodontia', 'Endodontia', 'Cirurgia', 'Prótese', 'Implantodontia', 'Ortodontia', 'Odontopediatria', 'Estética', 'Prevenção'].map(c => html`<option>${c}</option>`)}</datalist></label></div>
   <div class="grid g3">${[['duration_min', 'Tempo (min)'], ['material_cost', 'Material (R$)'], ['hour_cost', 'Custo hora (R$)'], ['tax_pct', 'Impostos/taxas (%)'], ['margin_pct', 'Margem desejada (%)'], ['price', 'Preço de venda (R$)']].map(([k, l]) => html`<label class="f"><span>${l}</span><input class="in" name="${k}" inputmode="decimal" value="${p[k] ?? ''}" data-input="procCalc"></label>`)}</div>
   <div class="tip" id="proccalc"></div><label class="f"><span>Código (TUSS/interno)</span><input class="in" name="code" value="${p.code || ''}"></label>
-  <label class="check"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}> Ativo</label><div class="row between"><button type="button" class="btn" data-act="useSug">Usar preço sugerido</button><button class="btn primary" type="submit">Salvar</button></div></form>`);
+  <label class="check"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}> Ativo</label><div class="row between"><div class="row" style="gap:8px">${p.id ? html`<button type="button" class="btn danger" data-act="delProc" data-id="${p.id}">${icon('trash')} Excluir</button>` : ''}<button type="button" class="btn" data-act="useSug">Usar preço sugerido</button></div><button class="btn primary" type="submit">Salvar</button></div></form>`);
   INPUTS.procCalc(document.querySelector('#procf [name=price]'));
 });
 onInput('procCalc', el => { const f = formData(el.form); const n = {}; Object.keys(f).forEach(k => (n[k] = parseMoney(f[k]))); const c = calcProc(n); el.form.dataset.sug = isFinite(c.sug) ? c.sug.toFixed(2) : ''; document.getElementById('proccalc').innerHTML = fv(html`<span>Custo ${BRL(c.cost)} · Sugerido <b>${isFinite(c.sug) ? BRL(c.sug) : 'margem + impostos ≥ 100%'}</b> · Margem real com o preço atual <b>${c.real.toFixed(1)}%</b></span>`); });
@@ -87,6 +88,19 @@ act('useSug', el => { const f = el.closest('form'); if (f.dataset.sug) { f.price
 onForm('saveProc', async d => {
   const row = { name: d.name, category: nz(d.category), code: nz(d.code), active: !!d.active }; for (const k of ['duration_min', 'material_cost', 'hour_cost', 'tax_pct', 'margin_pct', 'price']) { const v = parseMoney(d[k]); if (!(v >= 0)) throw new Error('Confira os valores numéricos.'); row[k] = k === 'duration_min' ? Math.max(1, Math.round(v)) : v; }
   if (d.id) await db.update('procedures', d.id, row); else await db.insert('procedures', row); await refreshRefs(); closeModal(); toast('Procedimento salvo.', 'ok'); router();
+});
+
+act('delProc', async el => {
+  const p = S.procedures.find(x => x.id === el.dataset.id); if (!p) return;
+  if (!(await confirmBox(`Excluir "${p.name}" do precificador?`, 'Excluir'))) return;
+  try { await db.remove('procedures', p.id); toast('Procedimento excluído.', 'ok'); }
+  catch (err) {
+    /* já usado em plano de tratamento: o banco não deixa apagar, então sai da lista de ativos */
+    if (!/foreign|referenc|viola|23503|constraint/i.test(err.message)) throw err;
+    await db.update('procedures', p.id, { active: false });
+    toast('Esse procedimento já está em planos de pacientes, então não dá para apagar. Ele foi desativado e não aparece mais para novos planos.');
+  }
+  await refreshRefs(); closeModal(); router();
 });
 
 /* ---------- CONVÊNIOS ---------- */
@@ -166,9 +180,18 @@ route('/marketing', async (_, q) => {
     const list = pats.filter(p => p.birth_date && p.birth_date.slice(5, 7) === mm).sort((a, b) => a.birth_date.slice(8) - b.birth_date.slice(8)); const td = ymd(now).slice(5);
     body = html`<p class="small muted">Aniversariantes de ${now.toLocaleDateString('pt-BR', { month: 'long' })}. Cada botão abre o WhatsApp com a mensagem pronta.</p>${list.length ? html`<div class="list">${list.map(p => html`<div class="li">${icon('cake')}<span class="grow"><span class="t">${p.name}</span><span class="tiny muted">${fDate(p.birth_date).slice(0, 5)} · faz ${age(p.birth_date) + (p.birth_date.slice(5) > td ? 1 : 0)} anos</span></span>${p.birth_date.slice(5) === td ? html`<span class="pill accent">hoje</span>` : ''}${p.phone ? html`<a class="btn sm" target="_blank" rel="noopener" href="${waLink(p.phone, `Feliz aniversário, ${p.name.split(' ')[0]}! 🎉 Toda a equipe do ${S.clinic.name} deseja um ano cheio de saúde e muitos sorrisos.`)}">${icon('wa')} Parabenizar</a>` : ''}</div>`)}</div>` : html`<div class="card empty">Nenhum aniversariante este mês.</div>`}`;
   } else if (tab === 'recall') {
-    const since = addDays(now, -180).toISOString(); const recent = new Set((await db.list('appointments', { gte: { starts_at: since }, select: 'patient_id' })).map(a => a.patient_id));
-    const list = pats.filter(p => !recent.has(p.id));
-    body = html`<p class="small muted">Pacientes ativos sem consulta nos últimos 6 meses — bons candidatos para um convite de revisão.</p>${list.length ? html`<div class="list">${list.map(p => html`<div class="li"><span class="avatar">${initials(p.name)}</span><a class="grow" href="#/paciente/${p.id}"><span class="t">${p.name}</span></a>${p.phone ? html`<a class="btn sm" target="_blank" rel="noopener" href="${waLink(p.phone, `Olá, ${p.name.split(' ')[0]}! Faz um tempinho que não te vemos no ${S.clinic.name}. Que tal agendar sua revisão? É rápido e ajuda a evitar problemas maiores.`)}">${icon('wa')} Convidar</a>` : ''}</div>`)}</div>` : html`<div class="card empty">Todos os pacientes ativos estiveram aqui nos últimos 6 meses. 👏</div>`}`;
+    const dias = [30, 60, 90, 180, 365].includes(+q.get('dias')) ? +q.get('dias') : 90;
+    const since = addDays(now, -dias).toISOString(); const recent = new Set((await db.list('appointments', { gte: { starts_at: since }, select: 'patient_id' })).map(a => a.patient_id));
+    const list = pats.filter(p => !recent.has(p.id) && (p.phone || p.email)); window.__mala = list;
+    body = html`<div class="card"><h3 style="margin:0">Mala direta para pacientes ausentes</h3>
+      <p class="small muted" style="margin:6px 0 12px">Marque quem vai receber (ou selecione todos de uma vez). Cada paciente recebe a mensagem com o próprio nome no lugar de {nome}.</p>
+      <div class="grid g2 collapse" style="align-items:end"><label class="f"><span>Sem consulta há mais de</span><select class="in" data-change="malaDias">${[30, 60, 90, 180, 365].map(d => html`<option value="${d}" ${d === dias ? 'selected' : ''}>${d === 365 ? '1 ano' : d + ' dias'}</option>`)}</select></label>
+        <label class="f"><span>Enviar por</span><select class="in" id="malach"><option value="wa">WhatsApp (e-mail se não tiver celular)</option><option value="email">E-mail (WhatsApp se não tiver e-mail)</option></select></label></div>
+      <label class="f" style="margin-top:10px"><span>Mensagem</span><textarea class="in" id="malamsg" rows="6">${malaMsg()}</textarea></label>
+      <div class="row" style="gap:8px;margin-top:6px"><button type="button" class="btn sm" data-act="malaReset">Voltar ao texto padrão</button><span class="tiny muted">{nome} vira o primeiro nome de cada paciente.</span></div></div>
+    ${list.length ? html`<div class="card" style="margin-top:14px"><div class="row between" style="gap:10px;flex-wrap:wrap"><label class="check"><input type="checkbox" id="malaall" data-change="malaAll"> <b>Selecionar todos (${list.length})</b></label><button type="button" class="btn primary" data-act="malaStart">${icon('wa')} Enviar para selecionados (<span id="malan">0</span>)</button></div>
+      <div class="list" style="margin-top:10px">${list.map(p => html`<label class="li" style="cursor:pointer"><input type="checkbox" class="malacb" value="${p.id}" data-change="malaOne"><span class="avatar">${initials(p.name)}</span><span class="grow"><span class="t">${p.name}</span><span class="tiny muted">${[p.phone ? fPhone(p.phone) : '', p.email || ''].filter(Boolean).join(' · ')}</span></span></label>`)}</div></div>`
+      : html`<div class="card empty" style="margin-top:14px">Nenhum paciente ativo ausente nesse período. 👏</div>`}`;
   } else {
     const camps = await db.list('campaigns', { order: 'created_at.desc' }); const cid = q.get('c'); const c = camps.find(x => x.id === cid);
     const tags = [...new Set(pats.flatMap(p => p.tags || []))];
@@ -181,8 +204,47 @@ route('/marketing', async (_, q) => {
       <div class="card">${c ? html`<div class="row between"><h3>${c.title}</h3><button class="btn sm danger" data-act="delCamp" data-id="${c.id}">${icon('trash')}</button></div><p class="small prose muted">${c.message}</p><p class="small"><b>${aud.length}</b> paciente(s) com celular. Envie um por um — o WhatsApp bloqueia números que disparam mensagens em massa.</p>
         <div class="list">${aud.map(p => html`<div class="li"><span class="grow small">${p.name}</span><a class="btn sm" target="_blank" rel="noopener" href="${waLink(p.phone, c.message.replace(/\{nome\}/g, p.name.split(' ')[0]))}" data-act="markSent">${icon('wa')} Enviar</a></div>`)}</div>` : html`<div class="empty">${icon('mega')}<div>Crie ou selecione uma campanha para ver a lista de envio.</div></div>`}</div></div>`;
   }
-  return html`<div class="pagehead"><h1>Marketing</h1></div><nav class="tabs">${[['aniversarios', 'Aniversariantes'], ['recall', 'Pacientes sumidos'], ['campanhas', 'Campanhas']].map(([k, l]) => html`<a class="${tab === k ? 'on' : ''}" href="#/marketing?tab=${k}">${l}</a>`)}</nav>${body}`;
+  return html`<div class="pagehead"><h1>Marketing</h1></div><nav class="tabs">${[['aniversarios', 'Aniversariantes'], ['recall', 'Pacientes ausentes · mala direta'], ['campanhas', 'Campanhas']].map(([k, l]) => html`<a class="${tab === k ? 'on' : ''}" href="#/marketing?tab=${k}">${l}</a>`)}</nav>${body}`;
 }, 'marketing');
+/* mala direta: texto padrão com o contato da clínica */
+const MALA_KEY = 'pepmh_mala_msg';
+function malaDefault() {
+  const tel = fPhone(S.clinic.phone || ''); const mail = S.clinic.email || 'mh.cuidarsaude@gmail.com'; const nome = (S.clinic.name || 'MH.Cuidar').split(' / ')[0];
+  return `Olá, {nome}! Tudo bem? Aqui é da ${nome}.\n\nSentimos sua falta por aqui e queremos saber como você está. Que tal retomar seu acompanhamento? A gente encontra o melhor horário para você.\n\n${tel ? `📱 WhatsApp: ${tel}\n` : ''}✉️ E-mail: ${mail}\n\nUm abraço da equipe ${nome}!`;
+}
+const malaMsg = () => LS.get(MALA_KEY) || malaDefault();
+onInput('malaDias', el => go('#/marketing?tab=recall&dias=' + el.value));
+act('malaReset', () => { LS.del(MALA_KEY); document.getElementById('malamsg').value = malaDefault(); });
+const malaCount = () => { const cbs = [...document.querySelectorAll('.malacb')]; const n = cbs.filter(c => c.checked).length; document.getElementById('malan').textContent = n; const all = document.getElementById('malaall'); if (all) { all.checked = n === cbs.length && n > 0; all.indeterminate = n > 0 && n < cbs.length; } };
+onInput('malaAll', el => { document.querySelectorAll('.malacb').forEach(c => (c.checked = el.checked)); malaCount(); });
+onInput('malaOne', malaCount);
+const malaLink = (p, msg, ch) => {
+  const text = msg.replace(/\{nome\}/g, (p.name || '').trim().split(/\s+/)[0]);
+  const mail = () => `mailto:${encodeURIComponent(p.email)}?subject=${encodeURIComponent(`${S.clinic.name || 'MH.Cuidar'} – sentimos sua falta`)}&body=${encodeURIComponent(text)}`;
+  if (ch === 'email') return p.email ? { href: mail(), via: 'e-mail' } : { href: waLink(p.phone, text), via: 'WhatsApp' };
+  return p.phone ? { href: waLink(p.phone, text), via: 'WhatsApp' } : { href: mail(), via: 'e-mail' };
+};
+act('malaStart', () => {
+  const msg = document.getElementById('malamsg').value.trim(); if (!msg) throw new Error('Escreva a mensagem.');
+  if (!msg.includes('{nome}') && !confirm('A mensagem não tem {nome}. Enviar sem o nome do paciente?')) return;
+  const ids = new Set([...document.querySelectorAll('.malacb:checked')].map(c => c.value)); const queue = (window.__mala || []).filter(p => ids.has(p.id));
+  if (!queue.length) throw new Error('Selecione pelo menos um paciente.');
+  if (msg !== malaDefault()) LS.set(MALA_KEY, msg);
+  window.__malaQ = { queue, msg, ch: document.getElementById('malach').value, i: 0 }; malaStep();
+});
+function malaStep() {
+  const Q = window.__malaQ; if (!Q) return;
+  if (Q.i >= Q.queue.length) { modal('Mala direta concluída', html`<p>Mensagens abertas para os ${Q.queue.length} paciente(s) selecionados. ✅</p><button class="btn primary" data-act="malaClose">Fechar</button>`); return; }
+  const p = Q.queue[Q.i]; const l = malaLink(p, Q.msg, Q.ch);
+  modal(`Mala direta · ${Q.i + 1} de ${Q.queue.length}`, html`<div class="stack"><div class="li" style="padding:0"><span class="avatar">${initials(p.name)}</span><span class="grow"><span class="t">${p.name}</span><span class="tiny muted">por ${l.via}</span></span></div>
+    <div class="prose small" style="white-space:pre-wrap;background:var(--bg,#f4f6f9);border-radius:10px;padding:10px">${Q.msg.replace(/\{nome\}/g, p.name.trim().split(/\s+/)[0])}</div>
+    <a class="btn primary" href="${l.href}" target="_blank" rel="noopener" data-act="malaSend">${icon(l.via === 'WhatsApp' ? 'wa' : 'send')} Enviar para ${p.name.split(' ')[0]} e ir para o próximo</a>
+    <div class="row between"><button type="button" class="btn sm" data-act="malaSkip">Pular este</button><button type="button" class="btn sm" data-act="malaClose">Parar</button></div>
+    <p class="tiny muted" style="margin:0">O WhatsApp e o e-mail abrem com a mensagem pronta e o nome já preenchido; é só tocar em enviar. O WhatsApp bloqueia números que disparam mensagens automáticas em massa, por isso cada envio passa por você.</p></div>`);
+}
+act('malaSend', el => { window.open(el.href, '_blank', 'noopener'); window.__malaQ.i++; malaStep(); });
+act('malaSkip', () => { window.__malaQ.i++; malaStep(); });
+act('malaClose', () => { window.__malaQ = null; closeModal(); });
 act('markSent', el => { window.open(el.href, '_blank', 'noopener'); el.classList.add('ok'); el.innerHTML = fv(html`${icon('check')} Aberto`); });
 onForm('saveCamp', async d => { const c = await db.insert('campaigns', d); go(`#/marketing?tab=campanhas&c=${c.id}`); });
 act('delCamp', async el => { await db.remove('campaigns', el.dataset.id); go('#/marketing?tab=campanhas'); });
