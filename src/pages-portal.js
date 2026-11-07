@@ -52,7 +52,7 @@ const DemoRPC = {
   verify_document({ p_code }) {
     const d = Demo.load(); const doc = d.documents.find(x => x.verify_code === String(p_code).toUpperCase()); if (!doc) return null;
     const m = d.clinic_members.find(x => x.user_id === doc.professional_id) || {}; const p = d.patients.find(x => x.id === doc.patient_id) || {};
-    return { tipo: doc.doc_type, emitido_em: doc.created_at, profissional: doc.professional_name, conselho: councilOf(m), clinica: d.clinics[0].name, paciente_iniciais: initials(p.name), hash: doc.content_hash, assinado_icp: !!doc.signed_file_path, assinado_em: doc.signed_at, hash_pdf_assinado: doc.signed_sha256 || null };
+    return { tipo: doc.doc_type, emitido_em: doc.created_at, profissional: doc.professional_name, conselho: councilOf(m), clinica: d.clinics[0].name, paciente_iniciais: initials(p.name), hash: doc.content_hash, assinado_icp: !!doc.signed_file_path, assinado_em: doc.signed_at, hash_pdf_assinado: doc.signed_sha256 || null, anulado_em: doc.deleted_at || null };
   },
   accept_invite() { throw new Error('Convites funcionam só na versão real (fora da demonstração).'); },
   link_patient_account() { throw new Error('Códigos de acesso funcionam só na versão real (fora da demonstração).'); },
@@ -222,7 +222,7 @@ act('pTeleAccept', async el => {
 const proById = id => S.members.find(m => m.user_id === id) || {};
 proute('/', async () => {
   const p = S.patient, now = new Date();
-  const [ap, docs, reqs, rets] = await Promise.all([db.list('appointments', { eq: { patient_id: p.id }, gte: { ends_at: new Date(+now - 3600000).toISOString() }, order: 'starts_at' }), db.list('documents', { eq: { patient_id: p.id }, order: 'created_at.desc', limit: 20 }).then(r => r.filter(d => d.released_at).slice(0, 3)), db.list('appointment_requests', { eq: { patient_id: p.id, status: 'pendente' } }), db.list('return_alerts', { eq: { patient_id: p.id, done: false }, order: 'due_date', limit: 3 })]);
+  const [ap, docs, reqs, rets] = await Promise.all([db.list('appointments', { eq: { patient_id: p.id }, gte: { ends_at: new Date(+now - 3600000).toISOString() }, order: 'starts_at' }), db.list('documents', { eq: { patient_id: p.id }, order: 'created_at.desc', limit: 20 }).then(r => r.filter(d => d.released_at && d.signed_file_path && !d.deleted_at).slice(0, 3)), db.list('appointment_requests', { eq: { patient_id: p.id, status: 'pendente' } }), db.list('return_alerts', { eq: { patient_id: p.id, done: false }, order: 'due_date', limit: 3 })]);
   const next = ap.find(a => !['cancelado', 'faltou'].includes(a.status));
   return html`<div class="pagehead"><div><h1>Olá, ${p.name.split(' ')[0]}!</h1><div class="muted small">${S.clinic.name}</div></div></div>
   <div class="grid g2 collapse"><div class="card"><h2>Próxima consulta</h2>${next ? html`<div class="row" style="margin:12px 0;flex-wrap:nowrap"><span class="avatar lg">${icon(next.modality === 'online' ? 'video' : 'cal')}</span><div><b>${fLong(new Date(next.starts_at))} às ${fTime(next.starts_at)}</b><div class="small muted">${MOD[next.modality || 'presencial']} · ${proById(next.professional_id).full_name || ''}</div>${apPill(next)}</div></div>
@@ -231,7 +231,7 @@ proute('/', async () => {
     <div class="quick" style="grid-template-columns:repeat(2,1fr)">${[['#/agendar', 'plus', 'Marcar consulta'], ['#/documentos', 'file', 'Receitas e documentos'], ['#/pre-consulta', 'edit', 'Ficha de saúde'], ['#/tratamentos', 'clip', 'Tratamentos'], ['#/tratamentos?anexar=1', 'money', 'Anexar pagamento']].map(([h, i, l]) => html`<a href="${h}">${icon(i)}<span>${l}</span></a>`)}</div></div>
   ${reqs.length ? html`<div class="card"><h3>Pedidos aguardando a clínica</h3>${reqs.map(r => html`<p class="small" style="margin:8px 0 0">${r.preferred_date ? fDate(r.preferred_date) + ' · ' : ''}${PERIOD[r.period]} — ${r.reason || 'Consulta'}</p>`)}</div>` : ''}
   ${rets.length ? html`<div class="card"><h3>Lembretes de retorno</h3>${rets.map(r => html`<p class="small" style="margin:8px 0 0">${icon('alarm')} ${r.reason || 'Retorno'} — a partir de ${fDate(r.due_date)}</p>`)}</div>` : ''}
-  ${docs.length ? html`<div class="card"><div class="row between"><h3>Documentos recentes</h3><a class="small" href="#/documentos">Ver todos</a></div>${docs.map(d => html`<p class="small" style="margin:8px 0 0">${DOCT[d.doc_type]?.[0]} · ${fDate(d.created_at)}${d.signed_file_path ? ' · assinado digitalmente' : ''}</p>`)}</div>` : ''}`;
+  ${docs.length ? html`<div class="card"><div class="row between"><h3>Documentos recentes</h3><a class="small" href="#/documentos">Ver todos</a></div>${docs.map(d => html`<p class="small" style="margin:8px 0 0">${DOCT[d.doc_type]?.[0]} · ${fDate(d.created_at)} · assinado digitalmente</p>`)}</div>` : ''}`;
 }, 'inicio');
 
 proute('/agendar', async () => {
@@ -266,11 +266,11 @@ act('pCancel', async el => { if (await confirmBox('Cancelar esta consulta? O hor
 act('pReqCancel', async el => { await db.update('appointment_requests', el.dataset.id, { status: 'cancelado' }); router(); });
 
 proute('/documentos', async () => {
-  const docs = (await db.list('documents', { eq: { patient_id: S.patient.id }, order: 'created_at.desc' })).filter(d => d.released_at);
-  return html`<div class="pagehead"><h1>Receitas e documentos</h1></div>${docs.length ? html`<div class="stack">${docs.map(d => html`<details class="card"><summary class="row between" style="cursor:pointer;list-style:none"><span class="row">${icon(DOCT[d.doc_type]?.[1] || 'file')}<b>${DOCT[d.doc_type]?.[0] || d.doc_type}</b>${d.signed_file_path ? html`<span class="pill ok">assinado digitalmente</span>` : ''}</span><span class="small muted">${fDate(d.created_at)}</span></summary>
+  const docs = (await db.list('documents', { eq: { patient_id: S.patient.id }, order: 'created_at.desc' })).filter(d => d.released_at && d.signed_file_path && !d.deleted_at);
+  return html`<div class="pagehead"><h1>Receitas e documentos</h1></div>${docs.length ? html`<div class="stack">${docs.map(d => html`<details class="card"><summary class="row between" style="cursor:pointer;list-style:none"><span class="row">${icon(DOCT[d.doc_type]?.[1] || 'file')}<b>${DOCT[d.doc_type]?.[0] || d.doc_type}</b><span class="pill ok">assinado digitalmente</span></span><span class="small muted">${fDate(d.created_at)}</span></summary>
     <div class="docprev" style="margin-top:12px">${raw(sanitize(d.content).replace(/\{paciente\}/g, esc(S.patient.name)))}</div><div class="tiny muted" style="margin-top:6px">${d.professional_name || ''}</div>
-    <div class="row" style="margin-top:10px">${d.signed_file_path ? html`<button class="btn sm ok" data-act="downloadSigned" data-id="${d.id}">${icon('down')} Baixar PDF assinado (ICP-Brasil)</button><a class="btn sm" target="_blank" rel="noopener" href="https://validar.iti.gov.br">Validar no ITI</a>` : ''}<button class="btn sm primary" data-act="pdfDoc" data-id="${d.id}">${icon('down')} Baixar PDF</button><button class="btn sm" data-act="pPrintDoc" data-id="${d.id}">${icon('print')} Imprimir</button></div>${d.verify_code ? html`<div class="tiny muted" style="margin-top:6px">Código de verificação: ${d.verify_code}</div>` : ''}</details>`)}</div>` : html`<div class="card empty">${icon('file')}<div>Nenhum documento ainda.</div></div>`}
-    <p class="tiny muted">Receitas de medicamentos controlados precisam da via original assinada; peça à clínica se necessário.</p>`;
+    <div class="row wrap" style="margin-top:10px"><button class="btn sm primary" data-act="downloadSigned" data-id="${d.id}">${icon('down')} Baixar PDF assinado</button><a class="btn sm" target="_blank" rel="noopener" href="https://validar.iti.gov.br">Validar no ITI</a></div>${d.verify_code ? html`<div class="tiny muted" style="margin-top:6px">Código de verificação: ${d.verify_code}</div>` : ''}</details>`)}</div>` : html`<div class="card empty">${icon('file')}<div>Nenhum documento ainda.</div></div>`}
+    <p class="tiny muted">Todos os documentos daqui são assinados digitalmente com certificado ICP-Brasil e valem em farmácias e laboratórios. Para imprimir, baixe o PDF assinado. Receitas de medicamentos controlados podem precisar da via original; peça à clínica se necessário.</p>`;
 }, 'documentos');
 act('pPrintDoc', async el => { const d = await db.get('documents', el.dataset.id); printDocument(d, S.patient, proById(d.professional_id).full_name ? proById(d.professional_id) : { full_name: d.professional_name }); });
 

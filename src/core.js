@@ -128,6 +128,7 @@ const Remote = {
   },
   upload(bucket, path, file, upsert = true) { return Remote.storageFetch(`object/${bucket}/${path}`, { method: 'POST', body: file, headers: { 'Content-Type': file.type || 'application/pdf', 'x-upsert': String(upsert) } }); },
   async download(bucket, path) { return (await Remote.storageFetch(`object/authenticated/${bucket}/${path}`)).blob(); },
+  async signedUrl(bucket, path, seconds) { const r = await (await Remote.storageFetch(`object/sign/${bucket}/${path}`, { method: 'POST', body: JSON.stringify({ expiresIn: seconds }), headers: { 'Content-Type': 'application/json' } })).json(); const u = r.signedURL || r.signedUrl; return u.startsWith('http') ? u : CFG.url + '/storage/v1' + u; },
   rpc(fn, args = {}) { return Remote.req(`/rest/v1/rpc/${fn}`, { method: 'POST', body: args }); },
 };
 

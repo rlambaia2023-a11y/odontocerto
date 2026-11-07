@@ -76,7 +76,7 @@ const verifyUrl = code => `${location.origin}/#/verificar/${code}`;
 pubRoute('/verificar/:code', async ({ code }) => {
   let v = null; try { v = await db.rpc('verify_document', { p_code: code }); } catch { }
   return html`<div class="auth"><div class="card stack"><div class="brand"><span class="mark" role="img" aria-label="PEPMH"></span><div><h1>Verificação de documento</h1><div class="small muted">Código ${code.toUpperCase()}</div></div></div>
-    ${v ? html`<div class="pill ok" style="font-size:.9rem">✓ Documento emitido pelo PEPMH</div>
+    ${v ? html`${v.anulado_em ? html`<div class="pill bad" style="font-size:.9rem;white-space:normal">✗ Documento ANULADO pelo profissional em ${fDT(v.anulado_em)}. Não deve ser aceito.</div>` : html`<div class="pill ok" style="font-size:.9rem">✓ Documento emitido pelo PEPMH</div>`}
       <table class="tbl"><tr><td class="muted">Tipo</td><td><b>${DOCT[v.tipo]?.[0] || v.tipo}</b></td></tr><tr><td class="muted">Emitido em</td><td>${fDT(v.emitido_em)}</td></tr><tr><td class="muted">Profissional</td><td>${v.profissional || ''} ${v.conselho && !/^-\s*$/.test(v.conselho.trim()) ? '· ' + v.conselho : ''}</td></tr><tr><td class="muted">Clínica</td><td>${v.clinica}</td></tr><tr><td class="muted">Paciente</td><td>${v.paciente_iniciais} (iniciais)</td></tr>
       <tr><td class="muted">Assinatura ICP-Brasil</td><td>${v.assinado_icp ? html`<span class="pill ok">PDF assinado enviado em ${fDT(v.assinado_em)}</span>` : html`<span class="pill gray">não enviada — vale a via assinada à mão</span>`}</td></tr></table>
       ${v.hash ? html`<p class="tiny muted" style="word-break:break-all">Impressão digital (SHA-256): ${v.hash}</p>` : ''}
@@ -94,7 +94,7 @@ const ICP_HELP = html`<ol class="small" style="padding-left:18px;margin:6px 0">
   <li>Confira o documento e aprove com a sua senha (PIN) ou biometria. O VIDaaS salva uma cópia do PDF já assinada no padrão ICP-Brasil (PAdES), normalmente com <i>assinado</i> no nome.</li>
   <li>Volte para esta tela, toque em <b>3. PDF assinado</b>, escolha o arquivo assinado e toque em <b>Enviar PDF assinado</b>.</li>
   <li>Pronto: na mesma hora o documento aparece na área do paciente, com o PDF assinado para baixar. A farmácia ou o laboratório confere em <a href="https://validar.iti.gov.br" target="_blank" rel="noopener">validar.iti.gov.br</a>.</li></ol>
-  <p class="tiny muted" style="margin:0">Serve também para BirdID, SafeID, NeoID, token A3 ou A1: assine o PDF no assinador da sua certificadora e envie aqui. Depois de enviado, o documento fica travado — para corrigir, use <b>Repetir</b> e emita um novo. <a href="#" data-act="signGuide">Passo a passo completo</a></p>`;
+  <p class="tiny muted" style="margin:0">Serve também para BirdID, SafeID, NeoID, token A3 ou A1: assine o PDF no assinador da sua certificadora e envie aqui. Depois de enviado, o documento fica travado — se estiver errado, use <b>Excluir</b> e emita um novo com <b>Repetir</b>. <a href="#" data-act="signGuide">Passo a passo completo</a></p>`;
 const SIGN_GUIDE = html`<div class="stack small">
   <div><b>Antes da primeira vez (uma vez só)</b><ol style="padding-left:18px;margin:6px 0">
     <li>Tenha um certificado digital ICP-Brasil de pessoa física (e-CPF ou o certificado do CRM/CFO) em nuvem. O VIDaaS, da Valid, é o mais usado e funciona direto no celular.</li>
@@ -107,7 +107,7 @@ const SIGN_GUIDE = html`<div class="stack small">
     <li>Volte ao PEPMH, toque em <b>3. PDF assinado</b>, escolha o arquivo que o VIDaaS gerou e toque em <b>Enviar PDF assinado</b>.</li>
     <li>O documento passa para <i>na área do paciente</i>. O paciente entra na área dele, vai em <b>Receitas e documentos</b> e baixa o PDF assinado.</li></ol></div>
   <div><b>Está no computador?</b> Na tela de assinatura tem um link para mandar o documento ao seu WhatsApp. Abra no celular, já logada, e siga do passo 3.</div>
-  <div><b>Não vai assinar digitalmente?</b> Use <b>Liberar sem assinatura</b> no documento: o paciente vê, baixa e imprime, mas sem a assinatura ICP-Brasil.</div>
+  <div><b>Só vai para o paciente o que está assinado.</b> Documento sem assinatura digital fica apenas no prontuário (pode imprimir e assinar à mão). Assinou errado? Use <b>Excluir</b>: o documento é anulado, sai da área do paciente e a verificação pública passa a mostrar "anulado".</div>
   <div class="tiny muted">Receita de controle especial ou de antimicrobiano em formato digital precisa da numeração do SNCR da Anvisa, que o PEPMH ainda não emite. Para essas, use a Prescrição Eletrônica do CFM ou imprima e assine à mão.</div></div>`;
 act('signGuide', () => modal('Como assinar digitalmente', SIGN_GUIDE, { wide: true }));
 const CONTROL_NOTE = html`<div class="tip">${icon('bulb')}<span>Receita de <b>controle especial</b> ou de <b>antimicrobiano</b> em formato digital precisa da numeração do SNCR da Anvisa, que o PEPMH ainda não emite. Para essas, use a <a href="https://prescricaoeletronica.cfm.org.br/" target="_blank" rel="noopener">Prescrição Eletrônica do CFM</a> (médicos) ou a <a href="https://prescricao.cfo.org.br/" target="_blank" rel="noopener">do CFO</a> (dentistas), ou imprima e assine à mão.</span></div>`;
@@ -153,21 +153,64 @@ act('shareToSigner', async el => {
   }
   saveBlob(file, file.name); toast('PDF baixado. Abra o app VIDaaS → Assinar documento e escolha este arquivo.', 'ok');
 });
+/* ---------- validação do PDF assinado ----------
+   Confere, antes de aceitar: (1) existe assinatura PAdES/CMS cobrindo o arquivo inteiro; (2) o conteúdo
+   não mudou depois de assinado (o hash dos trechos assinados bate com o messageDigest da assinatura);
+   (3) o certificado é da cadeia ICP-Brasil; (4) o nome no certificado é o do profissional que emitiu.
+   A conferência criptográfica completa da cadeia continua sendo a do validador do ITI. */
+const _hexBytes = h => { h = h.replace(/[^0-9a-f]/gi, ''); const o = new Uint8Array(h.length >> 1); for (let i = 0; i < o.length; i++) o[i] = parseInt(h.substr(i * 2, 2), 16); return o; };
+function _derLen(b, i) { let l = b[i]; if (l < 0x80) return [l, i + 1]; const n = l & 0x7f; l = 0; for (let k = 0; k < n; k++) l = l * 256 + b[i + 1 + k]; return [l, i + 1 + n]; }
+function _findSeq(b, seq, from = 0) { outer: for (let i = from; i <= b.length - seq.length; i++) { for (let k = 0; k < seq.length; k++) if (b[i + k] !== seq[k]) continue outer; return i; } return -1; }
+const _normName = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z ]+/g, ' ').replace(/\s+/g, ' ').trim();
+function _cmsNames(cms) {
+  const oid = [0x06, 0x03, 0x55, 0x04, 0x03], out = []; let i = 0;
+  while ((i = _findSeq(cms, oid, i)) >= 0) {
+    const t = cms[i + 5]; const [l, st] = _derLen(cms, i + 6); i = st + l;
+    if (![0x0c, 0x13, 0x14, 0x16, 0x1e].includes(t) || l > 200) continue;
+    const raw = cms.slice(st, st + l); out.push(t === 0x1e ? new TextDecoder('utf-16be').decode(raw) : new TextDecoder(t === 0x0c ? 'utf-8' : 'latin1').decode(raw));
+  }
+  return out;
+}
+async function verifySignedPdf(f, d) {
+  const buf = new Uint8Array(await f.arrayBuffer()); const txt = new TextDecoder('latin1').decode(buf);
+  if (!txt.startsWith('%PDF')) throw new Error('Esse arquivo não é um PDF válido.');
+  const ranges = [...txt.matchAll(/\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/g)].map(m => m.slice(1, 5).map(Number));
+  if (!ranges.length) throw new Error('Este PDF não tem assinatura digital. Assine com o certificado (VIDaaS) e envie o arquivo assinado.');
+  if (!ranges.some(([a, , c, e]) => a === 0 && c + e === buf.length)) throw new Error('A assinatura deste PDF não cobre o arquivo inteiro: ele foi alterado depois de assinado. Assine de novo o PDF original.');
+  const mdOid = [0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x04], icp = [...new TextEncoder().encode('ICP-Brasil')];
+  const want = _normName(d.professional_name).split(' ').filter(w => w.length > 2 && !['DRA', 'DR', 'DOS', 'DAS'].includes(w));
+  let lastErr = 'Não encontrei uma assinatura válida dentro do PDF. Assine de novo com o certificado.';
+  for (const [a, b, c, e] of ranges) {
+    if (a !== 0 || c + e > buf.length || c <= b) continue;
+    const cms = _hexBytes(txt.slice(b, c)); const mi = _findSeq(cms, mdOid); if (mi < 0) continue;
+    const [, j] = _derLen(cms, mi + mdOid.length + 1); const [dl, ds] = _derLen(cms, j + 1);
+    const md = cms.slice(ds, ds + dl); const alg = { 32: 'SHA-256', 48: 'SHA-384', 64: 'SHA-512' }[dl]; if (!alg) continue;
+    const signed = new Uint8Array(b + e); signed.set(buf.subarray(0, b), 0); signed.set(buf.subarray(c, c + e), b);
+    const h = new Uint8Array(await crypto.subtle.digest(alg, signed));
+    if (h.length !== md.length || h.some((x, k) => x !== md[k])) { lastErr = 'O conteúdo do PDF não confere com a assinatura (arquivo alterado ou corrompido). Assine de novo.'; continue; }
+    if (_findSeq(cms, icp) < 0) { lastErr = 'O certificado usado não é ICP-Brasil. Use o certificado do VIDaaS (AC VALID) ou outro ICP-Brasil.'; continue; }
+    const raw = _cmsNames(cms), names = raw.map(_normName);
+    const signer = (raw.find(n => /:\d{11}$/.test(n)) || raw[0] || '').replace(/:\d+$/, '');
+    if (want.length && !names.some(n => want.every(w => n.split(' ').includes(w)))) { lastErr = `Este PDF foi assinado por ${signer || 'outra pessoa'}, mas o documento é de ${d.professional_name}. Só quem emitiu pode assinar. Se o nome no PEPMH estiver diferente do certificado, ajuste o nome do profissional na equipe.`; continue; }
+    return { signer, alg };
+  }
+  throw new Error(lastErr);
+}
+
 async function uploadSignedFile(d, f, auto = false) {
   if (!d) throw new Error('Documento não encontrado.');
+  if (d.deleted_at) throw new Error('Este documento foi excluído.');
   if (f.type !== 'application/pdf' && !/\.pdf$/i.test(f.name)) throw new Error('O arquivo precisa ser PDF.');
   if (f.size > 10 * 1024 * 1024) throw new Error('O PDF passa de 10 MB.');
-  const head = new TextDecoder('latin1').decode(await f.arrayBuffer());
-  if (!head.startsWith('%PDF')) throw new Error('Esse arquivo não parece ser um PDF válido.');
-  if (!pdfHasSig(head) && !(await confirmBox('Não encontramos uma assinatura digital dentro deste PDF. Ele foi mesmo assinado com o certificado? Enviar assim mesmo?', 'Enviar assim mesmo'))) return;
   if (d.signed_file_path) throw new Error('Este documento já tem PDF assinado.');
+  const v = await verifySignedPdf(f, d);
   const path = `${d.clinic_id}/${d.id}-${Date.now()}.pdf`; const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', await f.arrayBuffer()))].map(x => x.toString(16).padStart(2, '0')).join('');
   const now = new Date().toISOString(), rel = d.released_at ? {} : { released_at: now };
   if (isDemo()) { await db.update('documents', d.id, { signed_file_path: 'demo/' + d.id + '.pdf', signed_at: now, signed_sha256: hash, ...rel }); }
   else { await Remote.upload('signed-docs', path, f, false); await db.update('documents', d.id, { signed_file_path: path, signed_at: now, signed_by: Auth.userId(), signed_sha256: hash, ...rel, ...(d.released_at ? {} : { released_by: Auth.userId() }) }); }
   stopSignWatch();
-  modal('Documento assinado', html`<div class="pill ok" style="font-size:.95rem;white-space:normal">✓ Assinado com certificado ICP-Brasil e liberado na área da paciente${auto ? ' (enviado automaticamente)' : ''}.</div>
-    <p class="small">Para conferir a autenticidade, abra o validador oficial do ITI e envie o PDF assinado (<i>${esc(f.name)}</i>). Ele mostra o seu nome, o certificado da AC VALID e se a assinatura é válida.</p>
+  modal('Documento assinado', html`<div class="pill ok" style="font-size:.95rem;white-space:normal">✓ Assinatura conferida e documento liberado na área da paciente${auto ? ' (enviado automaticamente)' : ''}.</div>
+    <p class="small">Assinado por <b>${v.signer || d.professional_name}</b> com certificado ICP-Brasil. O PEPMH conferiu que o arquivo não foi alterado depois da assinatura. A validação oficial completa é no ITI (envie o arquivo <i>${esc(f.name)}</i>).</p>
     <div class="row wrap"><a class="btn primary" href="https://validar.iti.gov.br" target="_blank" rel="noopener">${icon('check')} Validar no ITI</a><button class="btn ok" data-act="shareDoc" data-id="${d.id}">${icon('send')} Enviar à paciente</button><button class="btn" data-act="closeModal">Fechar</button></div>`, { wide: true });
   toast('Documento assinado e liberado para a paciente.', 'ok');
   if (location.hash.includes('/paciente/')) { const iv = setInterval(() => { if (!document.getElementById('modal')) { clearInterval(iv); router(); } }, 400); }
@@ -247,9 +290,10 @@ document.addEventListener('drop', e => {
 });
 
 act('releaseDoc', async el => {
-  if (!(await confirmBox('Liberar este documento na área do paciente sem a assinatura digital? Ele vai poder ver, baixar e imprimir. Se assinar depois, o PDF assinado aparece para ele também.', 'Liberar'))) return;
-  await db.update('documents', el.dataset.id, { released_at: new Date().toISOString(), ...(isDemo() ? {} : { released_by: Auth.userId() }) });
-  toast('Documento liberado para o paciente.', 'ok'); router();
+  const d = await db.get('documents', el.dataset.id);
+  if (!d.signed_file_path) throw new Error('Só documento assinado com certificado digital vai para a área do paciente. Assine primeiro.');
+  await db.update('documents', d.id, { released_at: new Date().toISOString(), ...(isDemo() ? {} : { released_by: Auth.userId() }) });
+  toast('Documento de volta à área do paciente.', 'ok'); router();
 });
 act('hideDoc', async el => {
   if (!(await confirmBox('Tirar este documento da área do paciente? Ele continua no prontuário e você pode liberar de novo quando quiser.', 'Ocultar'))) return;
@@ -428,4 +472,47 @@ act('declineAppt', async el => {
   const a = await db.update('appointments', el.dataset.id, { approval: 'recusado', status: 'cancelado', notes: 'Recusada: ' + why }); const full = a || await db.get('appointments', el.dataset.id); const p = await db.get('patients', full.patient_id); gpush('pushAppt', { id: el.dataset.id });
   updateNotif(); await router();
   if (p.phone) modal('Consulta recusada', html`<p style="margin-top:0">O horário foi liberado.</p><a class="btn" target="_blank" rel="noopener" href="${waLink(p.phone, `Olá, ${p.name.split(' ')[0]}! Sobre sua consulta de ${fDate(full.starts_at)} às ${fTime(full.starts_at)}: ${why}`)}" data-act="closeAfterOpen">${icon('wa')} Avisar no WhatsApp</a>`);
+});
+
+/* ---------- prontuário: anexar documento já assinado, excluir e restaurar ---------- */
+act('attachSigned', async el => {
+  const pid = el.dataset.p;
+  modal('Anexar documento assinado', html`<form data-form="attachSigned" class="stack">
+    <input type="hidden" name="patient_id" value="${pid}">
+    <label class="f"><span>Tipo de documento</span><select class="in" name="doc_type" required>${Object.entries(DOCT).map(([k, v]) => html`<option value="${k}">${v[0]}</option>`)}</select></label>
+    <label class="f"><span>Descrição (opcional)</span><input class="in" name="desc" maxlength="200" placeholder="Ex.: atestado de 2 dias, receita de tirzepatida"></label>
+    <label class="f"><span>PDF assinado com certificado ICP-Brasil</span><input class="in" type="file" name="file" accept="application/pdf" required style="padding-top:8px"></label>
+    <p class="tiny muted" style="margin:0">O PEPMH confere a assinatura antes de aceitar: precisa ser ICP-Brasil, no nome de ${S.me?.full_name || 'quem está logado'}, e o arquivo não pode ter sido alterado depois de assinado. Aceito, vai direto para a área do paciente.</p>
+    <button class="btn primary" type="submit">${icon('up')} Conferir e anexar</button></form>`, { wide: true });
+});
+onForm('attachSigned', async (d, f) => {
+  const file = f.querySelector('[name=file]').files[0]; if (!file) throw new Error('Escolha o PDF assinado.');
+  if (file.size > 10 * 1024 * 1024) throw new Error('O PDF passa de 10 MB.');
+  await verifySignedPdf(file, { professional_name: S.me.full_name });
+  const content = sanitize(`<p><b>Documento anexado</b> (PDF assinado digitalmente).</p>${d.desc ? `<p>${esc(d.desc)}</p>` : ''}`);
+  const row = { patient_id: d.patient_id, professional_id: Auth.userId(), professional_name: S.me.full_name, doc_type: d.doc_type, rx_type: ['receituario', 'manipulado'].includes(d.doc_type) ? 'simples' : null, content, content_hash: await sha256(content), no_date: false, sent_to: null };
+  let doc; try { doc = await db.insert('documents', row); } catch (e) {
+    const fb = DOC_FALLBACK[d.doc_type]; if (!fb || !/doc_type|check/i.test(e.message)) throw e;
+    doc = await db.insert('documents', { ...row, doc_type: fb, rx_type: fb === 'receituario' ? 'simples' : null });
+  }
+  try { await uploadSignedFile(doc, file); }
+  catch (e) { await db.remove('documents', doc.id).catch(() => { }); throw e; }
+});
+act('trashDoc', async el => {
+  const d = await db.get('documents', el.dataset.id);
+  if (!d.signed_file_path) { if (await confirmBox('Excluir este documento? Ele ainda não foi assinado, então sai do prontuário de vez.', 'Excluir')) { await db.remove('documents', d.id); toast('Documento excluído.'); router(); } return; }
+  modal('Excluir documento assinado', html`<form data-form="trashDoc" class="stack"><input type="hidden" name="id" value="${d.id}">
+    <p class="small" style="margin:0">O documento sai do prontuário e da área do paciente, o link enviado deixa de funcionar e quem conferir o código <b>${d.verify_code || ''}</b> vai ver que ele foi <b>anulado</b>. O registro fica guardado em "Documentos excluídos", como manda a guarda do prontuário, e pode ser restaurado.</p>
+    <label class="f"><span>Motivo</span><input class="in" name="reason" required maxlength="200" placeholder="Ex.: dose errada, emitido para a paciente errada"></label>
+    <div class="row"><button class="btn danger" type="submit">${icon('trash')} Excluir</button><button class="btn" type="button" data-act="closeModal">Cancelar</button></div></form>`);
+});
+onForm('trashDoc', async d => {
+  await db.update('documents', d.id, { deleted_at: new Date().toISOString(), delete_reason: d.reason.trim(), released_at: null, released_by: null, share_token: null, share_expires_at: null, share_file_url: null });
+  closeModal(); toast('Documento excluído e retirado da área do paciente.', 'ok'); router();
+});
+act('restoreDoc', async el => {
+  if (!(await confirmBox('Restaurar este documento? Se ele for assinado, volta para a área do paciente.', 'Restaurar'))) return;
+  const d = await db.get('documents', el.dataset.id);
+  await db.update('documents', d.id, { deleted_at: null, delete_reason: null, ...(d.signed_file_path ? { released_at: new Date().toISOString() } : {}) });
+  toast('Documento restaurado.', 'ok'); router();
 });

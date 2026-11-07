@@ -141,27 +141,33 @@ act('pdfDoc', async el => { const b = await docBundle(el.dataset.id); saveBlob(a
 const shareLink = token => `${location.origin}/#/d/${token}`;
 async function ensureShare(docId) {
   const d = await db.get('documents', docId);
-  if (d.share_token && (!d.share_expires_at || new Date(d.share_expires_at) > new Date())) return d;
-  const token = Array.from(crypto.getRandomValues(new Uint8Array(24)), b => b.toString(36).padStart(2, '0')).join('').slice(0, 32);
-  return await db.update('documents', docId, { share_token: token, share_expires_at: addDays(new Date(), 30).toISOString() }) || { ...d, share_token: token };
+  if (d.share_token && d.share_file_url && (!d.share_expires_at || new Date(d.share_expires_at) > new Date())) return d;
+  const token = d.share_token && (!d.share_expires_at || new Date(d.share_expires_at) > new Date()) ? d.share_token : Array.from(crypto.getRandomValues(new Uint8Array(24)), b => b.toString(36).padStart(2, '0')).join('').slice(0, 32);
+  const exp = addDays(new Date(), 30);
+  const url = isDemo() ? '#' : await Remote.signedUrl('signed-docs', d.signed_file_path, 30 * 86400);
+  return await db.update('documents', docId, { share_token: token, share_expires_at: exp.toISOString(), share_file_url: url }) || { ...d, share_token: token, share_expires_at: exp.toISOString(), share_file_url: url };
 }
 async function shareModal(docId) {
+  const d0 = await db.get('documents', docId);
+  if (d0.deleted_at) throw new Error('Este documento foi excluído.');
+  if (!d0.signed_file_path) {
+    return modal('Assine antes de enviar', html`<p style="margin-top:0">Só documento assinado com certificado ICP-Brasil vai para o paciente. Assine este ${(DOCT[d0.doc_type]?.[0] || 'documento').toLowerCase()} e depois envie.</p>
+      <div class="row wrap">${S.mode === 'staff' && isClinical() ? html`<button class="btn primary" data-act="signDoc" data-id="${docId}">${icon('check')} Assinar com certificado</button>` : ''}<button class="btn" data-act="printDocId" data-id="${docId}">${icon('print')} Imprimir para assinar à mão</button><button class="btn ghost" data-act="closeModal">Fechar</button></div>`);
+  }
   const b = await docBundle(docId); const d = await ensureShare(docId); const link = shareLink(d.share_token); const p = b.patient, t = (DOCT[b.doc.doc_type]?.[0] || 'documento').toLowerCase();
-  const msg = `Olá, ${(p.name || '').split(' ')[0]}! Aqui está seu ${t} emitido por ${b.prof.full_name || 'seu profissional'} (${S.clinic.name}). Baixe o PDF neste link (válido por 30 dias): ${link}`;
-  const mail = `mailto:${encodeURIComponent(p.email || '')}?subject=${encodeURIComponent(`${DOCT[b.doc.doc_type]?.[0] || 'Documento'} – ${S.clinic.name}`)}&body=${encodeURIComponent(msg + `\n\nCódigo de verificação: ${b.doc.verify_code || ''}\n${S.clinic.name}${S.clinic.phone ? ' · ' + fPhone(S.clinic.phone) : ''}`)}`;
-  modal('Documento pronto', html`<p style="margin-top:0"><b>${DOCT[b.doc.doc_type]?.[0]}</b> de <b>${p.name}</b>${b.doc.verify_code ? html` · código ${b.doc.verify_code}` : ''}</p>
-    <div class="grid g2"><button class="btn primary" data-act="pdfDoc" data-id="${docId}">${icon('down')} Baixar PDF</button>
+  const msg = `Olá, ${(p.name || '').split(' ')[0]}! Aqui está seu ${t} emitido por ${b.prof.full_name || 'seu profissional'} (${S.clinic.name}), assinado digitalmente com certificado ICP-Brasil. Baixe o PDF neste link (válido por 30 dias): ${link}`;
+  const mail = `mailto:${encodeURIComponent(p.email || '')}?subject=${encodeURIComponent(`${DOCT[b.doc.doc_type]?.[0] || 'Documento'} – ${S.clinic.name}`)}&body=${encodeURIComponent(msg + `\n\nCódigo de verificação: ${b.doc.verify_code || ''}\nConfira a assinatura em https://validar.iti.gov.br\n${S.clinic.name}${S.clinic.phone ? ' · ' + fPhone(S.clinic.phone) : ''}`)}`;
+  modal('Documento assinado pronto', html`<p style="margin-top:0"><b>${DOCT[b.doc.doc_type]?.[0]}</b> de <b>${p.name}</b>${b.doc.verify_code ? html` · código ${b.doc.verify_code}` : ''} <span class="pill ok">assinado ICP-Brasil</span></p>
+    <div class="grid g2"><button class="btn primary" data-act="downloadSigned" data-id="${docId}">${icon('down')} Baixar PDF assinado</button>
       ${p.phone ? html`<a class="btn ok" target="_blank" rel="noopener" href="${waLink(p.phone, msg)}" data-act="shareSent" data-id="${docId}" data-to="whatsapp">${icon('wa')} Enviar pelo WhatsApp</a>` : html`<button class="btn" disabled title="Paciente sem celular">${icon('wa')} WhatsApp (sem celular)</button>`}
       <a class="btn" href="${mail}" data-act="shareSent" data-id="${docId}" data-to="email">${icon('send')} Enviar por e-mail${p.email ? '' : ' (digite o endereço)'}</a>
-      <button class="btn" data-act="copyText" data-t="${link}">${icon('clip')} Copiar link do paciente</button>
-      <button class="btn" data-act="printDocId" data-id="${docId}">${icon('print')} Imprimir</button>
-      ${S.mode === 'staff' && isClinical() ? html`<button class="btn" data-act="signDoc" data-id="${docId}">${icon('check')} Assinar com certificado</button>` : ''}</div>
+      <button class="btn" data-act="copyText" data-t="${link}">${icon('clip')} Copiar link do paciente</button></div>
     <div class="docprev" style="margin-top:12px;word-break:break-all">${link}</div>
-    <p class="tiny muted">O link abre o PDF sem login e vale até ${fDate(d.share_expires_at)}. ${S.mode === 'staff' ? html`<a href="#" data-act="revokeShare" data-id="${docId}">Cancelar este link</a>.` : ''} Receitas de controle especial e de antimicrobianos em formato digital só valem na farmácia depois de assinadas com certificado ICP-Brasil.</p>`, { wide: true });
+    <p class="tiny muted">O link entrega o PDF assinado, sem login, até ${fDate(d.share_expires_at)}. ${S.mode === 'staff' ? html`<a href="#" data-act="revokeShare" data-id="${docId}">Cancelar este link</a>.` : ''} O documento também está na área do paciente.</p>`, { wide: true });
 }
 act('shareDoc', el => shareModal(el.dataset.id));
 act('shareSent', async el => { window.open(el.href, el.dataset.to === 'email' ? '_self' : '_blank', 'noopener'); await db.update('documents', el.dataset.id, { sent_to: el.dataset.to }).catch(() => { }); });
-act('revokeShare', async el => { if (!(await confirmBox('Cancelar o link? Quem tiver o endereço não consegue mais abrir o documento. Você pode gerar outro depois.', 'Cancelar link'))) return; await db.update('documents', el.dataset.id, { share_token: null, share_expires_at: null }); closeModal(); toast('Link cancelado.'); });
+act('revokeShare', async el => { if (!(await confirmBox('Cancelar o link? Quem tiver o endereço não consegue mais abrir o documento. Você pode gerar outro depois.', 'Cancelar link'))) return; await db.update('documents', el.dataset.id, { share_token: null, share_expires_at: null, share_file_url: null }); closeModal(); toast('Link cancelado.'); });
 
 /* ---------- página pública do documento (link do paciente) ---------- */
 pubRoute('/d/:token', async ({ token }) => {
@@ -171,14 +177,14 @@ pubRoute('/d/:token', async ({ token }) => {
   return html`<div class="auth" style="background:linear-gradient(160deg,#f6eef3,#efe6f0)"><div class="card stack" style="max-width:460px">
     ${safeLogo(c.logo_url) ? html`<img src="${c.logo_url}" alt="${c.name}" style="height:54px;align-self:flex-start">` : html`<h2>${c.name}</h2>`}
     <div><h1 style="font-size:1.25rem">${DOCT[d.doc_type]?.[0] || 'Documento'}</h1><p class="small muted" style="margin:4px 0 0">Para ${v.patient.name} · ${fDT(d.created_at)}<br>${v.prof?.full_name || d.professional_name || ''}${v.prof ? ' · ' + councilOf(v.prof) : ''}</p></div>
-    <button class="btn primary block" data-act="pdfShared">${icon('down')} Baixar PDF</button>
-    ${d.signed ? html`<p class="small" style="margin:0">Este documento tem versão assinada com certificado ICP-Brasil. Para baixar a versão assinada, <a href="#/">entre na sua área do paciente</a>.</p>` : ''}
+    ${d.file_url ? html`<a class="btn primary block" href="${d.file_url}" target="_blank" rel="noopener">${icon('down')} Baixar PDF assinado</a>` : html`<p class="small" style="margin:0">O arquivo ainda não está disponível por este link. <a href="#/">Entre na sua área do paciente</a> para baixar.</p>`}
+    <p class="small" style="margin:0"><span class="pill ok">assinado com certificado ICP-Brasil</span> Confira a assinatura em <a href="https://validar.iti.gov.br" target="_blank" rel="noopener">validar.iti.gov.br</a>.</p>
     <p class="tiny muted" style="margin:0">Código de verificação: <b>${d.verify_code || ''}</b> · <a href="#/verificar/${d.verify_code}">conferir</a><br>${[c.address, c.city && c.city + (c.state ? '/' + c.state : ''), fPhone(c.phone)].filter(Boolean).join(' · ')}</p></div></div>`;
 });
-act('pdfShared', async () => { const v = window.__shared; if (!v) return; const blob = await buildDocPdf({ doc: v.doc, patient: v.patient, prof: v.prof || { full_name: v.doc.professional_name }, clinic: v.clinic }); saveBlob(blob, pdfName(v.doc, v.patient)); });
 /* demonstração: link do paciente */
 DemoRPC.shared_document = ({ p_token }) => {
   const d = Demo.load(); const doc = d.documents.find(x => x.share_token === p_token && (!x.share_expires_at || new Date(x.share_expires_at) > new Date())); if (!doc) return null;
   const p = d.patients.find(x => x.id === doc.patient_id) || {}; const m = d.clinic_members.find(x => x.user_id === doc.professional_id); const c = d.clinics[0];
-  return { doc: { ...doc, signed: !!doc.signed_file_path }, patient: { name: p.name, address: p.address, city: p.city, state: p.state }, prof: m ? { full_name: m.full_name, council: m.council, council_number: m.council_number, council_uf: m.council_uf, specialty: m.specialty, profession: m.profession } : null, clinic: { name: c.name, address: c.address, city: c.city, state: c.state, phone: c.phone, email: c.email, logo_url: c.logo_url } };
+  if (!doc.signed_file_path || doc.deleted_at) return null;
+  return { doc: { ...doc, signed: true, file_url: doc.share_file_url || null }, patient: { name: p.name, address: p.address, city: p.city, state: p.state }, prof: m ? { full_name: m.full_name, council: m.council, council_number: m.council_number, council_uf: m.council_uf, specialty: m.specialty, profession: m.profession } : null, clinic: { name: c.name, address: c.address, city: c.city, state: c.state, phone: c.phone, email: c.email, logo_url: c.logo_url } };
 };
