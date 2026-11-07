@@ -3,7 +3,7 @@ root = pathlib.Path(__file__).resolve().parent.parent
 src = root / 'src'
 html = (src / 'index.html').read_text()
 css = (src / 'styles.css').read_text()
-js = '\n'.join((src / f).read_text() for f in ['core.js', 'shell.js', 'pages-main.js', 'pages-record.js', 'pages-rx.js', 'pages-dental.js', 'pages-admin.js', 'pages-portal.js', 'pages-extra.js', 'pages-pdf.js', 'pages-auth.js', 'pages-weight.js', 'pages-guide.js', 'pages-places.js', 'pages-checkin.js', 'pages-receipts.js'])
+js = '\n'.join((src / f).read_text() for f in ['core.js', 'shell.js', 'pages-main.js', 'pages-record.js', 'pages-rx.js', 'pages-dental.js', 'pages-admin.js', 'pages-portal.js', 'pages-extra.js', 'pages-pdf.js', 'pages-auth.js', 'pages-weight.js', 'pages-guide.js', 'pages-places.js', 'pages-checkin.js', 'pages-receipts.js', 'pages-contabil.js'])
 js = js + '\nconst GAS_CODE = ' + json.dumps((root / 'google' / 'Codigo.gs').read_text()).replace('</', '<\\/') + ';\n'
 out = html.replace('/*CSS*/', css).replace('/*JS*/', js)
 dist = root / 'dist'; dist.mkdir(exist_ok=True)

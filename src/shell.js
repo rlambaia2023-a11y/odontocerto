@@ -3,7 +3,7 @@ const NAV = [
   ['inicio', '#/', 'home', 'Início'], ['agenda', '#/agenda', 'cal', 'Agenda'], ['minha', '#/minha-agenda', 'calme', 'Minha agenda', 'clin'],
   ['online', '#/solicitacoes', 'globe', 'Agendamentos online'],
   ['pacientes', '#/pacientes', 'user', 'Pacientes'], ['emagrecimento', '#/emagrecimento', 'scale', 'Emagrecimento'], ['guia', '#/guia', 'leaf', 'Dietas e exercícios'], ['prescrever', '#/prescrever', 'pill', 'Prescrever', 'clin'], ['odonto', '#/odontologia', 'tooth', 'Ferramentas do dentista', 'dent'],
-  ['sep', 'Gestão'], ['financeiro', '#/financeiro', 'money', 'Financeiro'], ['precificador', '#/precificador', 'tag', 'Precificador'],
+  ['sep', 'Gestão'], ['financeiro', '#/financeiro', 'money', 'Financeiro'], ['contabil', '#/contabil', 'calc', 'Contábil', 'clin'], ['precificador', '#/precificador', 'tag', 'Precificador'],
   ['convenios', '#/convenios', 'building', 'Convênios'], ['relatorios', '#/relatorios', 'chart', 'Relatórios'], ['estoque', '#/estoque', 'box', 'Estoque'],
   ['sep', 'Relacionamento'], ['marketing', '#/marketing', 'mega', 'Marketing'], ['crm', '#/crm', 'crm', 'CRM'], ['ideias', '#/ideias', 'bulb', 'Central de ideias'],
   ['sep', ''], ['config', '#/configuracoes', 'gear', 'Configurações'],
