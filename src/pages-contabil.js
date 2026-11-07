@@ -30,7 +30,9 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const fCpf = v => { const d = onlyDigits(v); return d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : d.length === 14 ? `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}` : (v || ''); };
 const meU = () => Auth.userId();
 const own = () => ({ user_id: meU(), clinic_id: S.clinic.id });
-const monthName = (y, m) => new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+const monthName = (y, m) => { const t = new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }); return t.charAt(0).toUpperCase() + t.slice(1); };
+/* Só cobra guia vencida a partir do mês em que a médica começou a usar o módulo */
+async function accStart() { const r = await db.list('acc_entries', { eq: own(), order: 'paid_on', limit: 1 }); return r[0] ? String(r[0].paid_on).slice(0, 7) + '-01' : ymd(new Date()).slice(0, 7) + '-01'; }
 
 /* ---------- cálculos ---------- */
 function irTabela(base) { if (!(base > 0)) return 0; const f = TX.ir.find(([lim]) => base <= lim); return Math.max(0, base * f[1] - f[2]); }
@@ -139,7 +141,7 @@ route('/contabil', async (_, q) => {
   return html`<div class="pagehead"><div><h1>Contábil</h1><div class="small muted">${REGIME[prof.regime]} · só você vê estes dados</div></div><div class="row"><button class="btn" data-act="accProfile">${icon('gear')} Meu perfil fiscal</button><button class="btn" data-act="accNew" data-kind="despesa">${icon('receipt')} Despesa</button><button class="btn primary" data-act="accNew" data-kind="receita">${icon('money')} Receita</button></div></div>
   ${prof._novo ? html`<div class="tip" style="margin-bottom:12px">${icon('bulb')}<span>Comece pelo <a href="#" data-act="accProfile"><b>perfil fiscal</b></a>: se você atende como pessoa física ou empresa, como paga o INSS e o ISS. Os cálculos se ajustam a isso.</span></div>` : ''}
   <div class="seg" style="margin-bottom:12px;flex-wrap:wrap">${ACC_TABS.map(([k, l]) => html`<a class="${tab === k ? 'on' : ''}" href="${link(k)}">${l}</a>`)}</div>
-  ${['painel', 'livro', 'recibos', 'impostos'].includes(tab) ? html`<div class="row" style="margin-bottom:12px"><a class="btn sm" href="${link(tab, -1)}">${icon('chevl')}</a><b style="min-width:150px;text-align:center;text-transform:capitalize">${monthName(y, m)}</b><a class="btn sm" href="${link(tab, 1)}">${icon('chev')}</a></div>` : ['agenda', 'anual'].includes(tab) ? html`<div class="row" style="margin-bottom:12px"><a class="btn sm" href="${link(tab, -12)}">${icon('chevl')}</a><b style="min-width:80px;text-align:center">${y}</b><a class="btn sm" href="${link(tab, 12)}">${icon('chev')}</a></div>` : ''}
+  ${['painel', 'livro', 'recibos', 'impostos'].includes(tab) ? html`<div class="row" style="margin-bottom:12px"><a class="btn sm" href="${link(tab, -1)}">${icon('chevl')}</a><b style="min-width:150px;text-align:center">${monthName(y, m)}</b><a class="btn sm" href="${link(tab, 1)}">${icon('chev')}</a></div>` : ['agenda', 'anual'].includes(tab) ? html`<div class="row" style="margin-bottom:12px"><a class="btn sm" href="${link(tab, -12)}">${icon('chevl')}</a><b style="min-width:80px;text-align:center">${y}</b><a class="btn sm" href="${link(tab, 12)}">${icon('chev')}</a></div>` : ''}
   ${body}`;
 }, 'contabil');
 
@@ -148,7 +150,7 @@ async function accPainel(c) {
   const pjr = pj ? apuraPJ(c.all, prof, y, m) : null;
   const ag = agendaAno(prof, y); const pays = await db.list('acc_payments', { eq: own() });
   const T = ymd(new Date()); const proximos = ag.mensal.filter(i => i.due && ymd(i.due) >= T && !pays.some(p => p.kind === i.kind && p.competence === i.comp)).sort((a, b) => a.due - b.due).slice(0, 4);
-  const atrasados = ag.mensal.filter(i => i.due && ymd(i.due) < T && !pays.some(p => p.kind === i.kind && p.competence === i.comp) && i.comp >= `${y}-01-01`);
+  const ini = await accStart(); const atrasados = ag.mensal.filter(i => i.due && ymd(i.due) < T && !pays.some(p => p.kind === i.kind && p.competence === i.comp) && i.comp >= ini);
   const imposto = pj ? (prof.regime === 'pj_simples' ? pjr.das + pjr.pl.inss + pjr.pl.ir : pjr.presTotal + pjr.pl.inss + pjr.pl.ir) : cur.ir.devido + cur.inss + cur.iss;
   const receita = cur.recPF + cur.recPJ;
   return html`<div class="grid g4"><div class="card kpi"><div class="l">Recebido no mês</div><div class="v" style="color:var(--ok)">${BRL(receita)}</div><div class="tiny muted">pacientes ${BRL(cur.recPF)} · empresas ${BRL(cur.recPJ)}</div></div>
@@ -233,14 +235,14 @@ async function accImpostos(c) {
 }
 
 async function accAgenda(c) {
-  const ag = agendaAno(c.prof, c.y); const pays = await db.list('acc_payments', { eq: own() }); const T = ymd(new Date());
-  const row = i => { const p = pays.find(x => x.kind === i.kind && x.competence === i.comp); const venc = i.due && ymd(i.due) < T && !p;
+  const ag = agendaAno(c.prof, c.y); const pays = await db.list('acc_payments', { eq: own() }); const T = ymd(new Date()); const ini = await accStart();
+  const row = i => { const p = pays.find(x => x.kind === i.kind && x.competence === i.comp); const venc = i.due && ymd(i.due) < T && !p && i.comp >= ini;
     return html`<div class="li small"><b style="width:92px">${i.due ? fDate(ymd(i.due)) : 'ver prazo'}</b><span class="grow"><b>${i.label || ACC_PAY[i.kind]}</b>${i.kind !== 'crm' && i.comp.slice(5) !== '12-31' ? html` <span class="muted">· competência ${monthName(...i.comp.split('-').map(Number).slice(0, 2))}</span>` : ''}<div class="tiny muted">${i.how}</div></span>
       ${p ? html`<span class="pill ok">pago ${fDate(p.paid_on).slice(0, 5)}${p.amount ? ' · ' + BRL(p.amount) : ''}</span><button class="btn sm ghost" data-act="accUnpay" data-id="${p.id}">${icon('repeat')}</button>` : html`${venc ? html`<span class="pill bad">vencido</span>` : ''}<button class="btn sm ok" data-act="accPay" data-kind="${i.kind}" data-comp="${i.comp}">${icon('check')} Paguei</button>`}</div>`; };
   const byM = groupBy(ag.mensal, i => i.comp.slice(0, 7));
   return html`<p class="small muted">Datas calculadas pelos fins de semana; feriados podem antecipar ou adiar um dia. Marque o que for pagando para ter o histórico do ano.</p>
     <div class="card"><h3>Anuais</h3><div class="list">${ag.anual.map(row)}</div></div>
-    ${Object.entries(byM).map(([k, its]) => html`<div class="card" style="margin-top:12px"><h3 style="text-transform:capitalize">${monthName(...k.split('-').map(Number))}</h3><div class="list">${its.map(row)}</div></div>`)}`;
+    ${Object.entries(byM).map(([k, its]) => html`<div class="card" style="margin-top:12px"><h3>${monthName(...k.split('-').map(Number))}</h3><div class="list">${its.map(row)}</div></div>`)}`;
 }
 
 async function accSimulador(c) {
@@ -319,7 +321,7 @@ async function accForm(e) {
     <label class="f"><span>Observação</span><input class="in" name="notes" value="${e.notes || ''}"></label>
     <div class="row between">${e.id ? html`<button type="button" class="btn danger" data-act="accDel" data-id="${e.id}">${icon('trash')} Excluir</button>` : html`<span></span>`}<button class="btn primary" type="submit">Salvar</button></div></form>`;
 }
-onInput('accPayer', el => { const pj = el.value === 'pj'; document.getElementById('acc_pf').style.display = pj ? 'none' : ''; document.getElementById('acc_pj').style.display = pj ? '' : 'none'; });
+onInput('accPayer', el => { const pj = el.value === 'pj'; const cat = el.form.querySelector('[name=category]'); if (pj && /^(Consulta particular|Retorno)/.test(cat.value)) cat.value = 'Plantão'; else if (!pj && /^(Plantão|Convênio)$/.test(cat.value)) cat.value = 'Consulta particular'; document.getElementById('acc_pf').style.display = pj ? 'none' : ''; document.getElementById('acc_pj').style.display = pj ? '' : 'none'; });
 onInput('accCat', el => { const d = document.getElementById('acc_ded'); const c = ACC_DES.find(x => x[0] === el.value); if (d && c) d.value = c[1]; });
 act('accNew', async el => modal({ receita: 'Nova receita', despesa: 'Nova despesa', bem: 'Compra de equipamento ou móvel' }[el.dataset.kind], await accForm({ kind: el.dataset.kind }), { wide: true }));
 act('accEdit', async el => { const e = await db.get('acc_entries', el.dataset.id); modal('Editar lançamento', await accForm(e), { wide: true }); });
