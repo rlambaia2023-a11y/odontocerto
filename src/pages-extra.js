@@ -213,7 +213,15 @@ async function uploadSignedFile(d, f, auto = false) {
     <p class="small">Assinado por <b>${v.signer || d.professional_name}</b> com certificado ICP-Brasil. O PEPMH conferiu que o arquivo não foi alterado depois da assinatura. A validação oficial completa é no ITI (envie o arquivo <i>${esc(f.name)}</i>).</p>
     <div class="row wrap"><a class="btn primary" href="https://validar.iti.gov.br" target="_blank" rel="noopener">${icon('check')} Validar no ITI</a><button class="btn ok" data-act="shareDoc" data-id="${d.id}">${icon('send')} Enviar à paciente</button><button class="btn" data-act="closeModal">Fechar</button></div>`, { wide: true });
   toast('Documento assinado e liberado para a paciente.', 'ok');
+  saveSignedCopy(d, f).catch(() => { });
   if (location.hash.includes('/paciente/')) { const iv = setInterval(() => { if (!document.getElementById('modal')) { clearInterval(iv); router(); } }, 400); }
+}
+async function saveSignedCopy(d, f) {
+  if (S.mode !== 'staff' || !PdfDirs.supported() || !(await PdfDirs.opts()).assinadosAuto) return;
+  const p = await db.get('patients', d.patient_id).catch(() => null) || {};
+  const r = await saveOut(f, pdfName(d, p).replace(/\.pdf$/i, '-assinado.pdf'), { kind: 'assinados', alt: DOC_KIND[d.doc_type], patient: p.name, ask: false, fallback: false, quiet: true });
+  if (r.where === 'folder') toast(`Cópia assinada guardada em ${r.path}`, 'ok');
+  else if (r.reason === 'perm') toast('O PDF assinado não foi guardado na sua pasta porque o navegador pediu permissão de novo. Libere em Configurações → Pastas dos PDFs.', 'bad');
 }
 act('uploadSigned', async el => {
   const f = document.getElementById('signedpdf').files[0]; if (!f) throw new Error('Escolha o arquivo PDF assinado.');
@@ -261,7 +269,8 @@ async function startSignWatch(d, base, since) {
 }
 async function desktopSign(docId) {
   const b = await docBundle(docId); const name = pdfName(b.doc, b.patient);
-  const since = Date.now(); saveBlob(new Blob([await buildDocPdf(b)], { type: 'application/pdf' }), name);
+  const since = Date.now(); const pdfB = new Blob([await buildDocPdf(b)], { type: 'application/pdf' }); saveBlob(pdfB, name);
+  if ((await PdfDirs.opts()).naoAssinado) saveOut(pdfB, name, { kind: DOC_KIND[b.doc.doc_type] || 'padrao', patient: b.patient.name, ask: false, fallback: false, quiet: true }).catch(() => { });
   toast('PDF gerado. Assine no Acrobat com o certificado do VIDaaS Connect e salve.', 'ok');
   await startSignWatch(b.doc, name.replace(/\.pdf$/i, '').toLowerCase(), since);
 }
@@ -304,7 +313,9 @@ act('downloadSigned', async el => {
   const d = await db.get('documents', el.dataset.id);
   if (isDemo()) return toast('Na demonstração não há arquivo real para baixar.', 'bad');
   const blob = await Remote.download('signed-docs', d.signed_file_path);
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${(DOCT[d.doc_type]?.[0] || 'documento').replace(/\W+/g, '-').toLowerCase()}-${d.verify_code || d.id.slice(0, 8)}-assinado.pdf`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  const nome = `${(DOCT[d.doc_type]?.[0] || 'documento').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\W+/g, '-').toLowerCase()}-${d.verify_code || d.id.slice(0, 8)}-assinado.pdf`;
+  const p = S.mode === 'staff' ? await db.get('patients', d.patient_id).catch(() => null) : null;
+  await saveOut(blob, nome, { kind: 'assinados', alt: DOC_KIND[d.doc_type], patient: p?.name, quiet: S.mode !== 'staff' });
 });
 
 /* ---------- teleconsulta: iniciar com registro no prontuário ---------- */

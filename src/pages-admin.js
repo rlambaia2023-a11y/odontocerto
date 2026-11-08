@@ -145,7 +145,7 @@ onForm('repPeriod', d => go(`#/relatorios?de=${d.de}&ate=${d.ate}`));
 act('exportFin', async el => {
   const rows = await db.list('finance_entries', { gte: { due_date: el.dataset.de }, lte: { due_date: el.dataset.ate }, order: 'due_date' });
   const csv = ['Tipo;Descrição;Categoria;Valor;Vencimento;Pago em;Forma', ...rows.map(r => [r.kind, `"${(r.description || '').replace(/"/g, '""')}"`, r.category || '', String(r.amount).replace('.', ','), r.due_date, r.paid_at || '', METHODS[r.method] || ''].join(';'))].join('\n');
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); a.download = `financeiro-${el.dataset.de}-a-${el.dataset.ate}.csv`; a.click();
+  await saveOut(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `financeiro-${el.dataset.de}-a-${el.dataset.ate}.csv`, { kind: 'relatorios' });
 });
 
 /* ---------- ESTOQUE ---------- */
@@ -304,7 +304,7 @@ route('/configuracoes', async (_, q) => {
     <div class="grid g2"><label class="f"><span>Especialidade</span><input class="in" name="specialty" value="${m.specialty || ''}"></label><label class="f"><span>CPF</span><input class="in" name="cpf" value="${fCPF(m.cpf)}"></label></div><button class="btn primary" type="submit">Salvar meus dados</button></form></div>
   ${!isDemo() ? html`<div class="card" id="senha"><h2>Senha</h2><form data-form="savePass" class="row" style="margin-top:10px;align-items:end"><label class="f" style="flex:1"><span>Nova senha</span><input class="in" type="password" name="password" minlength="6" required autocomplete="new-password" ${q.get('senha') ? 'autofocus' : ''}></label><button class="btn" type="submit">Alterar</button></form></div>` : html`<div class="card"><h2>Modo demonstração</h2><p class="small muted">Tudo o que você fizer aqui fica só neste navegador. Para usar com pacientes reais, saia e crie uma conta.</p><button class="btn" data-act="resetDemo">${icon('repeat')} Reiniciar dados de exemplo</button></div>`}
 </div></div>
-  <div class="grid g2 collapse" style="align-items:start;margin-top:14px">${await configExtra()}${isOwner() ? await googleCard() : ''}</div>`;
+  <div class="grid g2 collapse" style="align-items:start;margin-top:14px">${await configExtra()}${isOwner() ? await googleCard() : ''}${await pastasCard()}</div>`;
 }, 'config');
 onForm('saveClinic', async d => { const row = { ...d, zip: nz(onlyDigits(d.zip)), phone: nz(onlyDigits(d.phone)), state: nz((d.state || '').toUpperCase()) }; S.clinic = { ...S.clinic, ...(await B().updateWhere('clinics', { id: S.clinic.id }, row)) }; toast('Dados do consultório salvos.', 'ok'); });
 onForm('saveMe', async d => { const row = { ...d, cpf: nz(onlyDigits(d.cpf)), council_uf: nz((d.council_uf || '').toUpperCase()) }; await B().updateWhere('clinic_members', { clinic_id: S.clinic.id, user_id: S.me.user_id }, row); Object.assign(S.me, row); S.members = await db.list('clinic_members', { eq: { clinic_id: S.clinic.id } }); toast('Seus dados foram salvos.', 'ok'); });

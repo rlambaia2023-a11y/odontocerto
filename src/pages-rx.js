@@ -257,6 +257,15 @@ function printDocument(doc, p, prof) {
     ${doc.rx_type === 'controle_especial' ? `<div style="display:flex;gap:12px;margin-top:20px"><div class="box" style="flex:1"><b>Identificação do comprador</b><br>Nome:<br>RG:<br>Endereço:<br>Telefone:</div><div class="box" style="flex:1"><b>Identificação do fornecedor</b><br><br><br>Assinatura do farmacêutico &nbsp; Data: __/__/__</div></div>` : ''}
     <div class="ft">${esc(S.clinic.name)} · ${esc(fPhone(S.clinic.phone))}${doc.verify_code ? ` · Código de verificação <b>${esc(doc.verify_code)}</b> — confira em ${esc(verifyUrl(doc.verify_code))}` : ''}</div></div>`;
   printDoc(title + ' – ' + p.name, doc.rx_type === 'controle_especial' || doc.rx_type === 'duas_vias' ? body('1ª via – Farmácia') + body('2ª via – Paciente') : body(''));
+  printCopy(doc, p, prof).catch(() => { });
+}
+/* cópia em PDF do que foi impresso, na pasta configurada (só se houver pasta e a opção estiver ligada) */
+async function printCopy(doc, p, prof) {
+  if (S.mode !== 'staff' || !PdfDirs.supported() || !(await PdfDirs.opts()).copiaImpressao) return;
+  const b = { doc: { ...doc, signed: !!doc.signed_file_path }, patient: p, prof, clinic: S.clinic };
+  const r = await saveOut(await buildDocPdf(b), pdfName(b.doc, p), { kind: DOC_KIND[doc.doc_type] || 'padrao', patient: p.name, ask: false, fallback: false, quiet: true });
+  if (r.where === 'folder') toast(`Cópia em PDF guardada em ${r.path}`, 'ok');
+  else if (r.reason === 'perm') toast('A cópia em PDF não foi guardada: o navegador pediu permissão da pasta de novo. Libere em Configurações → Pastas dos PDFs.', 'bad');
 }
 function sendDocument(doc, p, prof) {
   if (!p.phone) { toast('Paciente sem telefone. Documento salvo; imprima ou cadastre o celular.', 'bad'); return; }

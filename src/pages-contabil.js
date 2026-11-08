@@ -399,5 +399,5 @@ act('accCsv', async el => {
   const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = [['Data', 'Tipo', 'Categoria', 'Descrição', 'Valor', 'Quem pagou', 'CPF/CNPJ', 'Beneficiária', 'CPF beneficiária', 'IR retido', 'INSS retido', 'Livro-caixa', 'Receita Saúde', 'Nº recibo', 'Nota/recibo'].map(q).join(';'),
     ...rows.map(e => [fDate(e.paid_on), e.kind === 'receita' ? (e.payer_type === 'pj' ? 'Receita de empresa' : e.payer_type === 'exterior' ? 'Receita do exterior' : 'Receita de pessoa física') : e.kind === 'bem' ? 'Bem' : 'Despesa', e.category, e.description, String(e.amount).replace('.', ','), e.payer_name, fCpf(e.payer_doc), e.beneficiary_name, fCpf(e.beneficiary_cpf), String(e.irrf_retido || 0).replace('.', ','), String(e.inss_retido || 0).replace('.', ','), e.kind === 'despesa' ? DED[e.deductible][0] : '', { pendente: 'Pendente', emitido: 'Emitido', nao_se_aplica: '' }[e.receita_saude], e.receita_saude_code, e.doc_ref].map(q).join(';'))];
-  saveBlob(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }), `livro-caixa-${el.dataset.de}-a-${el.dataset.ate}.csv`);
+  await saveOut(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }), `livro-caixa-${el.dataset.de}-a-${el.dataset.ate}.csv`, { kind: 'relatorios' });
 });

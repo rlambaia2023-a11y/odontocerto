@@ -137,7 +137,7 @@ async function docBundle(docId) {
 }
 
 /* ---------- ações: baixar, compartilhar ---------- */
-act('pdfDoc', async el => { const b = await docBundle(el.dataset.id); saveBlob(await buildDocPdf(b), pdfName(b.doc, b.patient)); toast('PDF gerado.', 'ok'); });
+act('pdfDoc', async el => { const b = await docBundle(el.dataset.id); await saveOut(await buildDocPdf(b), pdfName(b.doc, b.patient), { kind: DOC_KIND[b.doc.doc_type] || 'padrao', patient: b.patient.name }); });
 const shareLink = token => `${location.origin}/#/d/${token}`;
 async function ensureShare(docId) {
   const d = await db.get('documents', docId);

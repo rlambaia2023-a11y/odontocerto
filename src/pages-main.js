@@ -199,7 +199,7 @@ act('exportPatients', async () => {
   const rows = await db.list('patients', { order: 'name', limit: 5000 });
   const cols = ['record_number', 'name', 'cpf', 'birth_date', 'sex', 'phone', 'email', 'city', 'state', 'origin'];
   const csv = [['Nº', 'Nome', 'CPF', 'Nascimento', 'Sexo', 'Telefone', 'E-mail', 'Cidade', 'UF', 'Origem', 'Convênio'].join(';'), ...rows.map(r => [...cols.map(c => `"${String(r[c] ?? '').replace(/"/g, '""')}"`), `"${insName(r.insurance_id)}"`].join(';'))].join('\n');
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); a.download = 'pacientes-pepmh.csv'; a.click();
+  await saveOut(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), 'pacientes-pepmh.csv', { kind: 'relatorios' });
 });
 
 function patientForm(p = {}) {
