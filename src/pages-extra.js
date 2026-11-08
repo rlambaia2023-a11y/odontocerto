@@ -135,9 +135,27 @@ async function signPanel(d) {
     <label class="f" style="margin-top:14px"><span>3. PDF assinado</span><input type="file" class="in" accept="application/pdf" id="signedpdf" style="padding-top:8px"></label>
     <button class="btn primary" style="margin-top:12px" data-act="uploadSigned" data-id="${d.id}">${icon('up')} Enviar PDF assinado</button>`;
 }
-act('signDoc', async el => {
-  const d = await db.get('documents', el.dataset.id);
+act('signDoc', el => signPreview(el.dataset.id));
+/* Conferência antes de assinar: o profissional lê o documento e, no OK, a assinatura com o certificado já começa */
+async function signPreview(docId) {
+  const d = await db.get('documents', docId); if (!d) throw new Error('Documento não encontrado.');
+  const mine = isDemo() || d.professional_id === Auth.userId();
+  if (d.signed_file_path || !mine || d.deleted_at) return modal('Assinatura digital ICP-Brasil', await signPanel(d), { wide: true });
+  const p = await db.get('patients', d.patient_id) || {}; const prof = S.members.find(m => m.user_id === d.professional_id) || { full_name: d.professional_name };
+  const { title, body } = docPrintParts(d, p, prof);
+  const src = docPageHtml(title, body, 'body{padding:20px 26px}.ft{position:static;margin-top:28px}.page{min-height:0;margin-bottom:30px;padding-bottom:20px;border-bottom:2px dashed #bbb}.page:last-child{border-bottom:0}');
+  const anexado = /Documento anexado/.test(d.content || '');
+  modal('Confira antes de assinar', html`<p class="small muted" style="margin-top:0"><b>${title}</b> de <b>${p.name || ''}</b>. Leia com calma. Estando tudo certo, clique em <b>Está certo, assinar</b> e a assinatura com o seu certificado (VIDaaS) já começa.</p>
+    <iframe sandbox="" title="Pré-visualização do documento" srcdoc="${src}" style="width:100%;height:62vh;border:1px solid var(--line);border-radius:10px;background:#fff"></iframe>
+    <div class="row wrap between" style="margin-top:12px;gap:8px"><span class="row wrap" style="gap:6px"><button class="btn ghost" data-act="closeModal">Agora não</button>${anexado ? '' : html`<button class="btn" data-act="previewEdit" data-id="${d.id}" data-p="${d.patient_id}">${icon('edit')} Corrigir</button>`}</span>
+      <button class="btn primary" data-act="signOk" data-id="${d.id}">${icon('check')} Está certo, assinar</button></div>`, { wide: true });
+}
+act('previewEdit', el => { closeModal(); go(`#/prescrever?p=${el.dataset.p}&editar=${el.dataset.id}`); });
+act('signOk', async el => {
+  el.disabled = true; const id = el.dataset.id; const d = await db.get('documents', id);
   modal('Assinatura digital ICP-Brasil', await signPanel(d), { wide: true });
+  if (isPhone()) { const b = document.createElement('button'); b.dataset.id = id; try { await ACT.shareToSigner(b); } catch { toast('Toque em "Abrir no VIDaaS" para assinar.', 'ok'); } return; }
+  await desktopSign(id);
 });
 route('/assinar/:id', async ({ id }) => {
   const d = await db.get('documents', id); if (!d) return html`<div class="card empty">${icon('file')}<div>Documento não encontrado.</div></div>`;

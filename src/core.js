@@ -328,8 +328,11 @@ act('popmenu', (el) => {
 function printDoc(title, bodyHtml, extraCss = '') {
   const w = window.open('', '_blank');
   if (!w) { toast('Permita pop-ups para imprimir.', 'bad'); return; }
-  const c = S.clinic || {};
-  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
+  w.document.write(docPageHtml(title, bodyHtml, extraCss, true));
+  w.document.close();
+}
+function docPageHtml(title, bodyHtml, extraCss = '', autoPrint = false) {
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
   body{font-family:Georgia,'Times New Roman',serif;color:#111;margin:0;padding:28px 36px;font-size:14px;line-height:1.55}
   .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #0b57b3;padding-bottom:10px;margin-bottom:22px}
   .hd b{font-size:18px;color:#0b57b3}.hd small{color:#555;display:block}
@@ -339,8 +342,7 @@ function printDoc(title, bodyHtml, extraCss = '') {
   table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #ddd;padding:6px;text-align:left}.r{text-align:right}
   .page{page-break-after:always;min-height:90vh;position:relative}.page:last-child{page-break-after:auto}
   .box{border:1px solid #111;padding:8px;font-size:12px;min-height:90px}
-  @media print{body{padding:0 10mm}} ${extraCss}</style></head><body>${bodyHtml}<script>setTimeout(()=>print(),300)<\/script></body></html>`);
-  w.document.close();
+  @media print{body{padding:0 10mm}} ${extraCss}</style></head><body>${bodyHtml}${autoPrint ? '<script>setTimeout(()=>print(),300)<\/script>' : ''}</body></html>`;
 }
 /* Cores e logo da clínica aplicadas no sistema inteiro */
 const hexOk = v => /^#[0-9a-f]{6}$/i.test(v || '');

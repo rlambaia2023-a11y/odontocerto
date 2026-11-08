@@ -243,12 +243,17 @@ act('rxSave', async el => {
     window.__rxEdit = null;
     if (d.save_tpl) { const title = prompt('Nome do modelo:', DOCT[d.doc_type][0] + ' – ' + fDate(new Date())); if (title) await db.insert('document_templates', { doc_type: d.doc_type, title, content }); }
     if (el.dataset.mode === 'print') printDocument(doc, p, prof);
-    toast(el.dataset.mode === 'pdf' && !isPhone() ? 'Documento salvo. Abrindo para assinar com o certificado…' : 'Documento salvo. Assine com o certificado e ele aparece sozinho na área do paciente.', 'ok'); go(`#/paciente/${pid}?tab=documentos`);
-    if (el.dataset.mode === 'pdf') setTimeout(async () => { if (isPhone()) return shareModal(doc.id); for (let i = 0; i < 25 && document.querySelector('#app .loading'); i++) await new Promise(r => setTimeout(r, 200)); const d2 = await db.get('documents', doc.id); modal('Assinatura digital ICP-Brasil', await signPanel(d2), { wide: true }); desktopSign(doc.id).catch(e => toast(e.message, 'bad')); }, 700);
+    toast(el.dataset.mode === 'pdf' && !isPhone() ? 'Documento salvo. Confira e assine com o certificado…' : 'Documento salvo. Assine com o certificado e ele aparece sozinho na área do paciente.', 'ok'); go(`#/paciente/${pid}?tab=documentos`);
+    if (el.dataset.mode === 'pdf') setTimeout(async () => { for (let i = 0; i < 25 && document.querySelector('#app .loading'); i++) await new Promise(r => setTimeout(r, 200)); signPreview(doc.id).catch(e => toast(e.message, 'bad')); }, 700);
   } finally { el.disabled = false; }
 });
 
 function printDocument(doc, p, prof) {
+  const { title, body } = docPrintParts(doc, p, prof);
+  printDoc(title + ' – ' + p.name, body);
+  printCopy(doc, p, prof).catch(() => { });
+}
+function docPrintParts(doc, p, prof) {
   const title = DOCT[doc.doc_type]?.[0] || 'Documento'; const city = S.clinic.city || '';
   const dateLine = doc.no_date ? `<p style="text-align:right;margin-top:26px">${esc(city)}, ____/____/________</p>` : `<p style="text-align:right;margin-top:26px">${esc(city)}${city ? ', ' : ''}${esc(new Date(doc.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }))}</p>`;
   const body = (via) => `<div class="page">${docHeader()}<h1>${doc.rx_type === 'controle_especial' ? 'Receituário de controle especial' : esc(title)}</h1>${via ? `<p style="text-align:right;font-size:12px"><b>${via}</b></p>` : ''}
@@ -256,8 +261,7 @@ function printDocument(doc, p, prof) {
     <div style="min-height:260px">${sanitize(doc.content).replace(/\{paciente\}/g, esc(p.name))}</div>${dateLine}${signature(prof.full_name, councilOf(prof))}
     ${doc.rx_type === 'controle_especial' ? `<div style="display:flex;gap:12px;margin-top:20px"><div class="box" style="flex:1"><b>Identificação do comprador</b><br>Nome:<br>RG:<br>Endereço:<br>Telefone:</div><div class="box" style="flex:1"><b>Identificação do fornecedor</b><br><br><br>Assinatura do farmacêutico &nbsp; Data: __/__/__</div></div>` : ''}
     <div class="ft">${esc(S.clinic.name)} · ${esc(fPhone(S.clinic.phone))}${doc.verify_code ? ` · Código de verificação <b>${esc(doc.verify_code)}</b> — confira em ${esc(verifyUrl(doc.verify_code))}` : ''}</div></div>`;
-  printDoc(title + ' – ' + p.name, doc.rx_type === 'controle_especial' || doc.rx_type === 'duas_vias' ? body('1ª via – Farmácia') + body('2ª via – Paciente') : body(''));
-  printCopy(doc, p, prof).catch(() => { });
+  return { title, body: doc.rx_type === 'controle_especial' || doc.rx_type === 'duas_vias' ? body('1ª via – Farmácia') + body('2ª via – Paciente') : body('') };
 }
 /* cópia em PDF do que foi impresso, na pasta configurada (só se houver pasta e a opção estiver ligada) */
 async function printCopy(doc, p, prof) {
