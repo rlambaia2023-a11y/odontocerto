@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
     if (patientId) {
       // Conta da equipe (dono, profissional, recepção) nunca pode ser mexida pela ficha de um paciente.
       const staff = await rest(`clinic_members?select=clinic_id&user_id=eq.${targetUser}&limit=1`);
-      if (staff.length) return fail(409, 'Esta ficha está ligada à conta de um profissional da equipe, não à do paciente. Desfaça a ligação em "Acesso do paciente" e crie o acesso de novo com o e-mail do paciente.');
+      if (staff.length) return fail(409, 'Esta ficha está ligada à conta de um profissional da equipe, e não à do paciente. Por segurança, nada foi alterado.');
       const [pf] = await rest(`patients?select=email&id=eq.${patientId}`);
       const fichaEmail = String(pf?.email || '').trim().toLowerCase();
       if (!fichaEmail) return fail(400, 'Cadastre o e-mail do paciente na ficha e salve antes de continuar.');
