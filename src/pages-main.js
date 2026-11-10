@@ -205,7 +205,8 @@ act('exportPatients', async () => {
 function patientForm(p = {}) {
   return html`<form data-form="savePatient" class="stack"><input type="hidden" name="id" value="${p.id || ''}">
   <label class="f"><span>Nome completo <i>*</i></span><input class="in" name="name" required value="${p.name || ''}"></label>
-  <div class="grid g3"><label class="f"><span>Nascimento</span><input class="in" type="date" name="birth_date" value="${p.birth_date || ''}"></label>
+  ${p.id ? html`<div class="grid g2"><label class="f"><span>1º atendimento</span><input class="in" type="date" name="first_visit" value="${p.first_visit || ''}" max="${ymd(new Date())}"></label>${S.me?.role === 'owner' ? html`<label class="f"><span>Nº do prontuário</span><input class="in" name="record_number" inputmode="numeric" value="${p.record_number || ''}"></label>` : ''}</div>` : html`<label class="f"><span>1º atendimento</span><input class="in" type="date" name="first_visit" max="${ymd(new Date())}"></label>`}
+  <div class="grid g3"><label class="f"><span>Nascimento</span><input class="in" type="date" name="birth_date" value="${p.birth_date || ''}" max="${ymd(new Date())}"></label>
   <label class="f"><span>Sexo</span><select class="in" name="sex"><option value="">—</option>${[['F', 'Feminino'], ['M', 'Masculino'], ['O', 'Outro']].map(([k, v]) => html`<option value="${k}" ${p.sex === k ? 'selected' : ''}>${v}</option>`)}</select></label>
   <label class="f"><span>CPF</span><input class="in" name="cpf" inputmode="numeric" value="${fCPF(p.cpf)}"></label></div>
   <div class="grid g2"><label class="f"><span>Celular (WhatsApp)</span><input class="in" name="phone" inputmode="tel" value="${fPhone(p.phone)}"></label><label class="f"><span>E-mail</span><input class="in" type="email" name="email" value="${p.email || ''}"></label></div>
@@ -226,6 +227,16 @@ act('delPatient', async el => { if (await confirmBox('Excluir o paciente e TODO 
 onForm('savePatient', async d => {
   const row = { name: d.name, birth_date: nz(d.birth_date), sex: nz(d.sex), cpf: nz(onlyDigits(d.cpf)), phone: nz(onlyDigits(d.phone)), email: nz(d.email), insurance_id: nz(d.insurance_id), insurance_card: nz(d.insurance_card), zip: nz(onlyDigits(d.zip)), city: nz(d.city), state: nz((d.state || '').toUpperCase()), address: nz(d.address), rg: nz(d.rg), occupation: nz(d.occupation), origin: nz(d.origin), guardian_name: nz(d.guardian_name), alerts: nz(d.alerts), notes: nz(d.notes), tags: (d.tags || '').split(',').map(s => s.trim()).filter(Boolean) };
   if (row.cpf && row.cpf.length !== 11) throw new Error('CPF precisa ter 11 dígitos.');
+  const T = ymd(new Date());
+  if (row.birth_date && (row.birth_date > T || row.birth_date < '1900-01-01')) throw new Error('Confira a data de nascimento.');
+  row.first_visit = nz(d.first_visit); if (row.first_visit && (row.first_visit > T || row.first_visit < '1900-01-01')) throw new Error('A data do 1º atendimento não pode ser no futuro.');
+  if (row.first_visit && row.birth_date && row.first_visit < row.birth_date) throw new Error('O 1º atendimento não pode ser antes do nascimento.');
+  if (d.id && S.me?.role === 'owner' && d.record_number !== undefined) {
+    const rn = parseInt(onlyDigits(d.record_number), 10); if (!(rn > 0)) throw new Error('Informe o número do prontuário.');
+    const dup = (await db.list('patients', { eq: { record_number: rn }, select: 'id,name', limit: 2 })).find(x => x.id !== d.id);
+    if (dup) throw new Error(`O prontuário nº ${rn} já é de ${dup.name}.`);
+    row.record_number = rn;
+  }
   if (d.id) {
     row.active = !!d.active; const before = await db.get('patients', d.id).catch(() => null);
     await db.update('patients', d.id, row); closeModal(); toast('Paciente atualizado.', 'ok');

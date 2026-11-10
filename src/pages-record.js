@@ -23,7 +23,7 @@ route('/paciente/:id', async ({ id }, q) => {
   <div class="pagehead"><div class="row"><a class="btn sm back" href="#/pacientes">${icon('back')}</a><h1>Prontuário do paciente</h1></div></div>
   <div class="card"><div class="row" style="align-items:flex-start;flex-wrap:nowrap"><span class="avatar lg">${initials(p.name)}</span>
     <div class="grow" style="min-width:0"><div style="font-weight:800;font-size:1.1rem">${p.name} <span class="muted small">[${p.record_number || ''}]</span></div>
-    <div class="small muted">${p.birth_date ? `${fDate(p.birth_date)} · ${age(p.birth_date)} anos` : 'Nascimento não informado'}${p.sex ? ' · ' + { F: 'Feminino', M: 'Masculino', O: 'Outro' }[p.sex] : ''} · <b>${insName(p.insurance_id).toUpperCase()}</b></div>
+    <div class="small muted">${p.birth_date ? `${fDate(p.birth_date)} · ${age(p.birth_date)} anos` : 'Nascimento não informado'}${p.first_visit ? ' · paciente desde ' + fDate(p.first_visit) : ''}${p.sex ? ' · ' + { F: 'Feminino', M: 'Masculino', O: 'Outro' }[p.sex] : ''} · <b>${insName(p.insurance_id).toUpperCase()}</b></div>
     <div class="row" style="gap:6px;margin-top:6px">${(p.tags || []).map(t => html`<span class="pill gray"># ${t}</span>`)}${p.active === false ? html`<span class="pill bad">inativo</span>` : ''}</div>
     ${p.alerts ? html`<div class="pill bad" style="margin-top:8px;white-space:normal">⚠ ${p.alerts}</div>` : ''}</div>
     <div class="row" style="gap:4px;flex-wrap:nowrap">${p.phone ? html`<a class="btn sm" target="_blank" rel="noopener" href="${waLink(p.phone, `Olá, ${p.name.split(' ')[0]}! Aqui é do ${S.clinic.name}.`)}" title="WhatsApp">${icon('wa')}</a>` : ''}<button class="btn sm" data-act="editPatient" data-id="${p.id}" title="Editar">${icon('edit')}</button></div></div>
