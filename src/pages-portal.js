@@ -92,6 +92,29 @@ function patientSignupMeta(d, slug, via) {
     zip: onlyDigits(d.zip), city: t(d.city), state: (d.state || '').trim().toUpperCase() || null, address: t(d.address), insurance: t(d.insurance), origin: t(d.origin),
     guardian_name: t(d.guardian_name), alerts: t(d.alerts), book_slug: slug, signup_via: via };
 }
+/* ---------- cadastro mínimo obrigatório para liberar a agenda: nome, CPF, nascimento, e-mail (e a senha da conta) ---------- */
+const profileMissing = p => [!(p?.name || '').trim() && 'nome completo', !p?.cpf && 'CPF', !p?.birth_date && 'data de nascimento', !p?.email && 'e-mail'].filter(Boolean);
+function completeProfileCard() {
+  const p = S.patient || {}; const miss = profileMissing(p);
+  return html`<div class="card"><h2 style="margin-top:0">Complete seu cadastro para liberar a agenda</h2>
+    <p class="small">Para marcar consulta, a clínica precisa de: <b>${miss.join(', ')}</b>. É rapidinho e só precisa fazer uma vez.</p>
+    <form data-form="completeProfile" class="stack"><div class="grid g2 collapse">
+      <label class="f" style="grid-column:1/-1"><span>Nome completo <i>*</i></span><input class="in" name="name" required value="${p.name || ''}" ${(p.name || '').trim() ? 'readonly' : ''}></label>
+      <label class="f"><span>CPF <i>*</i></span><input class="in" name="cpf" required inputmode="numeric" maxlength="14" placeholder="000.000.000-00" value="${p.cpf ? fCPF(p.cpf) : ''}" ${p.cpf ? 'readonly' : ''}></label>
+      <label class="f"><span>Data de nascimento <i>*</i></span><input class="in" type="date" name="birth_date" required max="${ymd(new Date())}" value="${p.birth_date || ''}" ${p.birth_date ? 'readonly' : ''}></label>
+      <label class="f" style="grid-column:1/-1"><span>E-mail <i>*</i></span><input class="in" type="email" name="email" required value="${p.email || LS.get('pepmh_auth')?.user?.email || ''}"></label>
+    </div><button class="btn primary block" type="submit">${icon('check')} Salvar e liberar a agenda</button></form>
+    <p class="tiny muted" style="margin:0">Depois de salvos, nome, CPF e nascimento só a clínica altera.</p></div>`;
+}
+onForm('completeProfile', async d => {
+  if (!cpfValid(d.cpf)) throw new Error('Confira o CPF: os números não batem.');
+  if (!d.birth_date || d.birth_date > ymd(new Date()) || d.birth_date < '1900-01-01') throw new Error('Confira a data de nascimento.');
+  if (!(d.name || '').trim().includes(' ')) throw new Error('Escreva o nome completo (nome e sobrenome).');
+  await db.update('patients', S.patient.id, { name: d.name.trim(), cpf: onlyDigits(d.cpf), birth_date: d.birth_date, email: d.email.trim().toLowerCase() });
+  S.patient = await db.get('patients', S.patient.id);
+  if (profileMissing(S.patient).length) throw new Error('Não deu para salvar tudo. Fale com a clínica para conferir seu cadastro.');
+  S.me.full_name = S.patient.name; toast('Cadastro completo! Agenda liberada.', 'ok'); router();
+});
 const checkEmailCard = email => html`<div class="card"><h2>Falta só confirmar seu e-mail</h2><p>Enviamos um link para <b>${email}</b>. Abra o e-mail e toque no link para ativar sua conta. Seu cadastro já chegou à clínica.</p><p class="small muted">Não chegou? Veja a caixa de spam ou promoções.</p></div>`;
 
 /* página de cadastro que a clínica manda para o paciente: /#/cadastro/<endereco-da-clinica> */
@@ -138,6 +161,7 @@ act('bkLoginLink', () => { location.hash = '#/'; S.clinic ? router() : renderAut
 function bookingBody() {
   const c = BK.clinic;
   if (BK.done) return bookingDone();
+  if (S.mode === 'patient' && S.patient && profileMissing(S.patient).length) return completeProfileCard();
   const proCard = p => html`<button class="card" style="text-align:left;cursor:pointer;width:100%;${BK.pro?.user_id === p.user_id ? 'border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-50)' : ''}" data-act="bkPro" data-id="${p.user_id}">
     <div class="row" style="flex-wrap:nowrap;align-items:flex-start"><span class="avatar lg">${initials(p.full_name)}</span><div class="grow"><b>${p.full_name}</b><div class="small muted">${p.specialty || PROF[p.profession] || ''}${councilOf(p) ? ' · ' + councilOf(p) : ''}</div>
     ${p.bio ? html`<div class="small" style="margin-top:4px">${p.bio}</div>` : ''}<div class="row" style="gap:6px;margin-top:8px">${p.online ? html`<span class="pill">${icon('video')} Online${p.online_price ? ' · ' + BRL(p.online_price) : ''}</span>` : ''}${p.presencial ? html`<span class="pill gray">Presencial</span>` : ''}</div></div></div></button>`;
@@ -235,6 +259,7 @@ proute('/', async () => {
 }, 'inicio');
 
 proute('/agendar', async () => {
+  if (profileMissing(S.patient).length) return html`<div class="pagehead"><h1>Marcar consulta</h1></div>${completeProfileCard()}`;
   if (S.clinic.slug && S.clinic.public_booking) {
     const c = await db.rpc('public_clinic', { p_slug: S.clinic.slug });
     if (c && c.professionals.length) {
@@ -369,12 +394,12 @@ act('delInvite', async el => { await db.remove('clinic_invites', el.dataset.id);
 /* ---------- acesso do paciente ao portal (gerado pela clínica) ---------- */
 act('patientAccess', async el => {
   const p = await db.get('patients', el.dataset.id);
-  if (p.user_id) return modal('Acesso do paciente', html`<p style="margin-top:0">${icon('check')} <b>${p.name}</b> já tem acesso à área do paciente.</p><p class="small muted">Ele(a) vê consultas, receitas, orçamentos e pode marcar consultas e atualizar contato.</p><div class="row">${isAdmin() ? html`<button class="btn" data-act="genResetLink" data-patient="${p.id}" data-name="${p.name}" data-phone="${p.phone || ''}">${icon('repeat')} Link de nova senha</button>` : ''}<button class="btn danger" data-act="revokeAccess" data-id="${p.id}">Remover acesso</button></div>`);
+  if (p.user_id) return modal('Acesso do paciente', html`<p style="margin-top:0">${icon('check')} <b>${p.name}</b> já tem acesso à área do paciente.</p><p class="small muted">Ele(a) vê consultas, receitas, orçamentos e pode marcar consultas e atualizar contato.</p><div class="row">${isAdmin() ? html`<button class="btn" data-act="genResetLink" data-patient="${p.id}" data-name="${p.name}" data-phone="${p.phone || ''}">${icon('repeat')} Link de nova senha</button>` : ''}<button class="btn danger" data-act="revokeAccess" data-id="${p.id}">Remover acesso</button></div>${patientPassBox(p)}`);
   const code = p.portal_code || randCode(); if (!p.portal_code) await db.update('patients', p.id, { portal_code: code });
   const link = `${location.origin}/#/acesso/${code}`;
   modal('Acesso do paciente', html`<p style="margin-top:0">Envie este link para <b>${p.name}</b>. Ao criar a conta, ele(a) passa a ver as próprias consultas, receitas e orçamentos, e pode marcar consultas online.</p>
     <div class="docprev" style="word-break:break-all">${link}</div><p class="small">Código: <b>${code}</b></p>
-    <div class="row"><button class="btn" data-act="copyText" data-t="${link}">${icon('clip')} Copiar</button>${p.phone ? html`<a class="btn primary" target="_blank" rel="noopener" href="${waLink(p.phone, `Olá, ${p.name.split(' ')[0]}! Este é seu acesso à área do paciente do ${S.clinic.name}, onde você vê suas consultas e receitas: ${link}`)}">${icon('wa')} Enviar no WhatsApp</a>` : ''}</div>`);
+    <div class="row"><button class="btn" data-act="copyText" data-t="${link}">${icon('clip')} Copiar</button>${p.phone ? html`<a class="btn primary" target="_blank" rel="noopener" href="${waLink(p.phone, `Olá, ${p.name.split(' ')[0]}! Este é seu acesso à área do paciente do ${S.clinic.name}, onde você vê suas consultas e receitas: ${link}`)}">${icon('wa')} Enviar no WhatsApp</a>` : ''}</div>${patientPassBox(p)}`);
 });
 act('revokeAccess', async el => { if (await confirmBox('Remover o acesso do paciente à área online? Os dados do prontuário continuam.', 'Remover')) { await db.update('patients', el.dataset.id, { user_id: null, portal_code: null }); closeModal(); toast('Acesso removido.'); router(); } });
 

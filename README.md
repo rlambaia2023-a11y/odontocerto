@@ -53,3 +53,9 @@ Marketing → **Pacientes ausentes · mala direta**: escolhe o período sem cons
 
 ## Precificador
 Cada procedimento tem botão **Excluir** (na tabela e na edição). Planos que já usaram o procedimento mantêm a descrição e o valor.
+
+## Cadastro obrigatório para liberar a agenda
+Todo paciente com conta precisa ter **nome completo, CPF, data de nascimento, e-mail e senha** para marcar consulta (página pública, portal e pedidos de consulta). Quem estiver com a ficha incompleta vê o formulário "Complete seu cadastro" no lugar da agenda; nome, CPF e nascimento só podem ser preenchidos pelo paciente quando estão vazios. O banco também barra o agendamento (migração `20261110_cadastro_obrigatorio_agenda.sql`).
+
+## Senha do paciente pelo responsável
+Em **Editar paciente** (e em "Acesso do paciente"), o responsável (master) pode **criar o acesso** de quem ainda não tem conta ou **alterar a senha** de quem já tem. Pode digitar a senha ou deixar em branco para gerar uma provisória — nesse caso o paciente cria uma senha dele no primeiro acesso. A tela já monta a mensagem para enviar pelo WhatsApp ou por e-mail. Usa a função `reset-link` (`mode: create | password`).

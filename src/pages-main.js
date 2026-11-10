@@ -221,7 +221,7 @@ function patientForm(p = {}) {
   <div class="row between">${p.id ? html`<button type="button" class="btn danger" data-act="delPatient" data-id="${p.id}">${icon('trash')} Excluir</button>` : html`<span></span>`}<button class="btn primary" type="submit">Salvar</button></div></form>`;
 }
 act('newPatient', () => modal('Novo paciente', patientForm(), { wide: true }));
-act('editPatient', async el => modal('Editar paciente', patientForm(await db.get('patients', el.dataset.id)), { wide: true }));
+act('editPatient', async el => { const p = await db.get('patients', el.dataset.id); modal('Editar paciente', html`${patientForm(p)}${patientPassBox(p)}`, { wide: true }); });
 act('delPatient', async el => { if (await confirmBox('Excluir o paciente e TODO o prontuário dele (consultas, evolução, documentos)? Essa ação não pode ser desfeita. Se quiser só esconder, desmarque "Paciente ativo".', 'Excluir definitivamente')) { await db.remove('patients', el.dataset.id); closeModal(); toast('Paciente excluído.'); go('#/pacientes'); } });
 onForm('savePatient', async d => {
   const row = { name: d.name, birth_date: nz(d.birth_date), sex: nz(d.sex), cpf: nz(onlyDigits(d.cpf)), phone: nz(onlyDigits(d.phone)), email: nz(d.email), insurance_id: nz(d.insurance_id), insurance_card: nz(d.insurance_card), zip: nz(onlyDigits(d.zip)), city: nz(d.city), state: nz((d.state || '').toUpperCase()), address: nz(d.address), rg: nz(d.rg), occupation: nz(d.occupation), origin: nz(d.origin), guardian_name: nz(d.guardian_name), alerts: nz(d.alerts), notes: nz(d.notes), tags: (d.tags || '').split(',').map(s => s.trim()).filter(Boolean) };

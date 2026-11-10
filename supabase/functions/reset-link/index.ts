@@ -1,5 +1,6 @@
 // PEPMH – gera link de troca de senha para paciente ou membro da equipe (sem depender do Site URL do Supabase).
 // Só o responsável (owner) ou a recepção (secretaria) da clínica pode gerar; o alvo precisa ser da mesma clínica.
+// Com mode = 'password', o responsável define uma senha provisória para o paciente (troca obrigatória no 1º acesso).
 const SB_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const APP_ORIGINS = ['https://pepmh-web-production.up.railway.app', 'http://localhost:4173'];
@@ -33,8 +34,8 @@ Deno.serve(async (req) => {
     if (patientId) {
       const [p] = await rest(`patients?select=clinic_id,user_id&id=eq.${patientId}`);
       if (!p) return fail(404, 'Paciente não encontrado.');
-      if (!p.user_id) return fail(400, 'Este paciente ainda não tem acesso online. Use o botão "Acesso online" para enviar o convite.');
       clinicId = p.clinic_id; targetUser = p.user_id;
+      if (!p.user_id && body.mode !== 'create') return fail(400, 'Este paciente ainda não tem acesso online. Use o botão "Acesso online" para enviar o convite.');
     } else {
       const [m] = await rest(`clinic_members?select=clinic_id,user_id&user_id=eq.${memberId}&limit=1`);
       if (!m) return fail(404, 'Membro não encontrado.');
@@ -43,8 +44,40 @@ Deno.serve(async (req) => {
     const [me] = await rest(`clinic_members?select=role&clinic_id=eq.${clinicId}&user_id=eq.${caller.id}`);
     if (!me || !(me.role === 'owner' || (me.role === 'secretaria' && patientId))) return fail(403, 'Só o responsável pela clínica (ou a recepção, para pacientes) pode gerar este link.');
 
+    // Senha escolhida pelo responsável (opcional); sem ela, o sistema gera uma provisória.
+    const genPass = () => { const abc = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; return Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) => abc[b % abc.length]).join(''); };
+    const chosen = typeof body.password === 'string' && body.password.trim() ? body.password.trim() : null;
+    if (chosen && (chosen.length < 8 || chosen.length > 72)) return fail(400, 'A senha precisa ter de 8 a 72 caracteres.');
+
+    // Criar o acesso do paciente direto pelo responsável: exige nome, CPF, nascimento e e-mail na ficha.
+    if (body.mode === 'create') {
+      if (!patientId || me.role !== 'owner') return fail(403, 'Só o responsável pela clínica pode criar o acesso do paciente.');
+      if (targetUser) return fail(400, 'Este paciente já tem acesso. Use "Alterar senha".');
+      const [pf] = await rest(`patients?select=name,cpf,birth_date,email&id=eq.${patientId}`);
+      const falta = [!(pf.name || '').trim() && 'nome', !pf.cpf && 'CPF', !pf.birth_date && 'data de nascimento', !pf.email && 'e-mail'].filter(Boolean);
+      if (falta.length) return fail(400, `Preencha na ficha antes de criar o acesso: ${falta.join(', ')}. Salve e tente de novo.`);
+      const em = String(pf.email).trim().toLowerCase();
+      const password = chosen || genPass();
+      const cr = await admin('/auth/v1/admin/users', { method: 'POST', body: JSON.stringify({ email: em, password, email_confirm: true, user_metadata: { full_name: pf.name, must_change_password: !chosen } }) });
+      const cj = await cr.json().catch(() => ({}));
+      if (!cr.ok) return fail(400, /already|registered|exists/i.test(cj.msg || cj.message || cj.error_code || '') ? 'Esse e-mail já tem uma conta no PEPMH. Use o "Acesso online" para o paciente ligar a conta dele, ou corrija o e-mail.' : (cj.msg || cj.message || 'Não foi possível criar o acesso.'));
+      const lk = await admin(`/rest/v1/patients?id=eq.${patientId}&user_id=is.null`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: cj.id, portal_code: null }) });
+      if (!lk.ok) { await admin(`/auth/v1/admin/users/${cj.id}`, { method: 'DELETE' }); return fail(500, 'Não foi possível ligar a conta à ficha.'); }
+      return new Response(JSON.stringify({ password, email: em, created: true, provisional: !chosen }), { headers: h });
+    }
+
     const tu = await admin(`/auth/v1/admin/users/${targetUser}`); if (!tu.ok) return fail(404, 'Conta não encontrada.');
     const email = (await tu.json()).email;
+
+    // Senha provisória definida pelo responsável (master): só para pacientes. O paciente entra com ela
+    // e o sistema pede uma senha nova logo no primeiro acesso (must_change_password).
+    if (body.mode === 'password') {
+      if (!patientId || me.role !== 'owner') return fail(403, 'Só o responsável pela clínica pode definir uma senha nova para o paciente.');
+      const password = chosen || genPass();
+      const up = await admin(`/auth/v1/admin/users/${targetUser}`, { method: 'PUT', body: JSON.stringify({ password, user_metadata: { must_change_password: !chosen } }) });
+      if (!up.ok) { const e = await up.json().catch(() => ({})); return fail(500, e.msg || e.message || 'Não foi possível trocar a senha.'); }
+      return new Response(JSON.stringify({ password, email, provisional: !chosen }), { headers: h });
+    }
     const gl = await admin('/auth/v1/admin/generate_link', { method: 'POST', body: JSON.stringify({ type: 'recovery', email }) });
     const g = await gl.json(); if (!gl.ok) return fail(500, g.msg || g.message || 'Falha ao gerar o link.');
     const hashed = g.hashed_token || g.properties?.hashed_token; if (!hashed) return fail(500, 'Resposta sem token.');

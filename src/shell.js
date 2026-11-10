@@ -240,6 +240,7 @@ async function boot() {
     if (ctx === 'orphan') { app.innerHTML = fv(orphanScreen()); return; }
     if (!ctx) { LS.del('pepmh_auth'); LS.del('pepmh_mode'); S.clinic = null; renderAuth(); return; }
   } catch (e) { LS.del('pepmh_auth'); S.clinic = null; renderAuth(); toast(e.message, 'bad'); return; }
+  if (!isDemo() && LS.get('pepmh_auth')?.user?.user_metadata?.must_change_password) { location.hash = '#/nova-senha'; await router(); toast('Crie uma senha sua para continuar.', 'ok'); return; }
   if (S.mode === 'patient') { const pend = LS.get('pepmh_pending_book'); if (pend) { LS.del('pepmh_pending_book'); if (!location.hash.startsWith('#/agendar')) location.hash = '#/agendar'; } }
   document.getElementById('view') || (app.innerHTML = '');
   await router();
