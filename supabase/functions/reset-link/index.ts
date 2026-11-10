@@ -1,6 +1,8 @@
 // PEPMH – gera link de troca de senha para paciente ou membro da equipe (sem depender do Site URL do Supabase).
 // Só o responsável (owner) ou a recepção (secretaria) da clínica pode gerar; o alvo precisa ser da mesma clínica.
 // Com mode = 'password', o responsável define uma senha provisória para o paciente (troca obrigatória no 1º acesso).
+// Para pacientes, o e-mail que vale é SEMPRE o da ficha: se a conta de login estiver com outro e-mail, ela é
+// corrigida antes (mode = 'sync' faz só essa correção). Ficha ligada a conta da equipe é recusada.
 const SB_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const APP_ORIGINS = ['https://pepmh-web-production.up.railway.app', 'http://localhost:4173'];
@@ -58,7 +60,7 @@ Deno.serve(async (req) => {
       if (falta.length) return fail(400, `Preencha na ficha antes de criar o acesso: ${falta.join(', ')}. Salve e tente de novo.`);
       const em = String(pf.email).trim().toLowerCase();
       const password = chosen || genPass();
-      const cr = await admin('/auth/v1/admin/users', { method: 'POST', body: JSON.stringify({ email: em, password, email_confirm: true, user_metadata: { full_name: pf.name, must_change_password: !chosen } }) });
+      const cr = await admin('/auth/v1/admin/users', { method: 'POST', body: JSON.stringify({ email: em, password, email_confirm: true, user_metadata: { full_name: pf.name, must_change_password: !chosen, created_by_clinic: true } }) });
       const cj = await cr.json().catch(() => ({}));
       if (!cr.ok) return fail(400, /already|registered|exists/i.test(cj.msg || cj.message || cj.error_code || '') ? 'Esse e-mail já tem uma conta no PEPMH. Use o "Acesso online" para o paciente ligar a conta dele, ou corrija o e-mail.' : (cj.msg || cj.message || 'Não foi possível criar o acesso.'));
       const lk = await admin(`/rest/v1/patients?id=eq.${patientId}&user_id=is.null`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: cj.id, portal_code: null }) });
@@ -67,7 +69,25 @@ Deno.serve(async (req) => {
     }
 
     const tu = await admin(`/auth/v1/admin/users/${targetUser}`); if (!tu.ok) return fail(404, 'Conta não encontrada.');
-    const email = (await tu.json()).email;
+    let email = String((await tu.json()).email || '').toLowerCase();
+
+    if (patientId) {
+      // Conta da equipe (dono, profissional, recepção) nunca pode ser mexida pela ficha de um paciente.
+      const staff = await rest(`clinic_members?select=clinic_id&user_id=eq.${targetUser}&limit=1`);
+      if (staff.length) return fail(409, 'Esta ficha está ligada à conta de um profissional da equipe, não à do paciente. Desfaça a ligação em "Acesso do paciente" e crie o acesso de novo com o e-mail do paciente.');
+      const [pf] = await rest(`patients?select=email&id=eq.${patientId}`);
+      const fichaEmail = String(pf?.email || '').trim().toLowerCase();
+      if (!fichaEmail) return fail(400, 'Cadastre o e-mail do paciente na ficha e salve antes de continuar.');
+      if (fichaEmail !== email) {
+        const up = await admin(`/auth/v1/admin/users/${targetUser}`, { method: 'PUT', body: JSON.stringify({ email: fichaEmail, email_confirm: true }) });
+        if (!up.ok) {
+          const e = await up.json().catch(() => ({}));
+          return fail(409, /already|registered|exists/i.test(e.msg || e.message || e.error_code || '') ? `O e-mail ${fichaEmail} já é usado por outra conta no PEPMH. Confira o e-mail da ficha.` : (e.msg || e.message || 'Não foi possível atualizar o e-mail da conta.'));
+        }
+        email = fichaEmail;
+      }
+      if (body.mode === 'sync') return new Response(JSON.stringify({ email, synced: true }), { headers: h });
+    }
 
     // Senha provisória definida pelo responsável (master): só para pacientes. O paciente entra com ela
     // e o sistema pede uma senha nova logo no primeiro acesso (must_change_password).

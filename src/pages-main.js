@@ -226,7 +226,15 @@ act('delPatient', async el => { if (await confirmBox('Excluir o paciente e TODO 
 onForm('savePatient', async d => {
   const row = { name: d.name, birth_date: nz(d.birth_date), sex: nz(d.sex), cpf: nz(onlyDigits(d.cpf)), phone: nz(onlyDigits(d.phone)), email: nz(d.email), insurance_id: nz(d.insurance_id), insurance_card: nz(d.insurance_card), zip: nz(onlyDigits(d.zip)), city: nz(d.city), state: nz((d.state || '').toUpperCase()), address: nz(d.address), rg: nz(d.rg), occupation: nz(d.occupation), origin: nz(d.origin), guardian_name: nz(d.guardian_name), alerts: nz(d.alerts), notes: nz(d.notes), tags: (d.tags || '').split(',').map(s => s.trim()).filter(Boolean) };
   if (row.cpf && row.cpf.length !== 11) throw new Error('CPF precisa ter 11 dígitos.');
-  if (d.id) { row.active = !!d.active; await db.update('patients', d.id, row); closeModal(); toast('Paciente atualizado.', 'ok'); router(); }
+  if (d.id) {
+    row.active = !!d.active; const before = await db.get('patients', d.id).catch(() => null);
+    await db.update('patients', d.id, row); closeModal(); toast('Paciente atualizado.', 'ok');
+    // Paciente com acesso online: o login acompanha o e-mail da ficha (é para ele que vão links e senhas).
+    if (before?.user_id && row.email && !isDemo() && ['owner', 'secretaria'].includes(S.me?.role) && (row.email || '').toLowerCase() !== (before.email || '').toLowerCase()) {
+      try { const j = await resetFn({ patient_id: d.id, mode: 'sync' }); toast(`E-mail de acesso do paciente atualizado para ${j.email}.`, 'ok'); } catch (e) { toast(e.message, 'bad'); }
+    }
+    router();
+  }
   else { const p = await db.insert('patients', row); closeModal(); toast('Paciente cadastrado.', 'ok'); go(`#/paciente/${p.id}`); }
 });
 
