@@ -1,5 +1,5 @@
 /* ===== Prontuário do paciente ===== */
-const TABS = [['resumo', 'Resumo'], ['anamnese', 'Anamnese'], ['odontograma', 'Odontograma'], ['periograma', 'Periograma'], ['exame', 'Exame clínico'], ['evolucao', 'Evolução'], ['plano', 'Plano de tratamento'], ['documentos', 'Prescrições e documentos'], ['financeiro', 'Financeiro'], ['retornos', 'Retornos'], ['consultas', 'Consultas']];
+const TABS = [['resumo', 'Resumo'], ['anamnese', 'Anamnese'], ['odontograma', 'Odontograma'], ['periograma', 'Periograma'], ['exame', 'Exame clínico'], ['evolucao', 'Evolução'], ['plano', 'Plano de tratamento'], ['documentos', 'Prescrições e documentos'], ['exames', 'Exames do paciente'], ['financeiro', 'Financeiro'], ['retornos', 'Retornos'], ['consultas', 'Consultas']];
 const DOCT = { receituario: ['Receituário', 'pill'], atestado: ['Atestado', 'edit'], declaracao: ['Declaração', 'file'], carta: ['Carta / encaminhamento', 'send'], exames: ['Solicitação de exames', 'clip'], imagem: ['Pedido de exames de imagem', 'clip'], manipulado: ['Receita de manipulado', 'pill'], medicacao: ['Pedido de medicação (aplicação)', 'pill'], cirurgia: ['Solicitação de cirurgia', 'building'], laudo: ['Laudo', 'file'] };
 /* linha de documento com ações rápidas (resumo do prontuário) */
 const docActionsRow = (d, p) => { const mine = isDemo() || d.professional_id === Auth.userId(), signed = !!d.signed_file_path;
@@ -43,6 +43,8 @@ route('/paciente/:id', async ({ id }, q) => {
 }, 'pacientes');
 
 const TABRENDER = {
+  /* ---- exames anexados pelo paciente no portal ---- */
+  exames: p => staffExamsTab(p),
   /* ---- resumo automático ---- */
   async resumo(p) {
     const [an, ev, odo, plans, fin, appts, docs] = await Promise.all([
