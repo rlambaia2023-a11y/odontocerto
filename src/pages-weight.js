@@ -103,7 +103,7 @@ route('/emagrecimento', async (_, q) => {
       <td class="hide-m small">${kg(s.ini)} → <b>${kg(s.cur)}</b> ${lostPill(s)}</td>
       <td>${ap ? html`<span class="pill ${ap[0]}">${ap[1]}</span>` : html`<span class="tiny muted">—</span>`}</td>
       <td class="hide-m"><span class="pill ${PAYST[pay][0]}">${PAYST[pay][1]}</span><div class="tiny muted">${t.valor_mensalidade ? BRL(t.valor_mensalidade) : ''}${t.data_vencimento ? ' · vence ' + fDate(t.data_vencimento) : ''}</div></td>
-      <td class="num" style="white-space:nowrap">${p.phone && t.lembrete_ativo ? html`<a class="btn sm" target="_blank" rel="noopener" title="Lembrete no WhatsApp" href="${waLink(p.phone, pay === 'atrasado' && !ap?.[0]?.match(/bad|accent/) ? payText(p, t) : reminderText(p, t))}">${icon('wa')}</a> ` : ''}<button class="btn sm ok" data-act="wDose" data-p="${p.id}" title="Registrar aplicação">${icon('check')}</button> <button class="btn sm" data-act="wWeight" data-p="${p.id}" title="Registrar peso">${icon('chart')}</button></td></tr>`)}</table></div>`
+      <td class="num" style="white-space:nowrap"><button class="btn sm" data-act="wEditTreat" data-id="${t.id}" data-p="${p.id}" title="Editar tratamento">${icon('edit')}</button> ${p.phone && t.lembrete_ativo ? html`<a class="btn sm" target="_blank" rel="noopener" title="Lembrete no WhatsApp" href="${waLink(p.phone, pay === 'atrasado' && !ap?.[0]?.match(/bad|accent/) ? payText(p, t) : reminderText(p, t))}">${icon('wa')}</a> ` : ''}<button class="btn sm ok" data-act="wDose" data-p="${p.id}" title="Registrar aplicação">${icon('check')}</button> <button class="btn sm" data-act="wWeight" data-p="${p.id}" title="Registrar peso">${icon('chart')}</button></td></tr>`)}</table></div>`
     : html`<div class="card empty">${icon('chart')}<div>${f === 'hoje' ? 'Nenhuma aplicação para hoje.' : f === 'pagamento' ? 'Nenhuma mensalidade atrasada.' : 'Nenhum paciente aqui.'}</div></div>`}`;
 }, 'emagrecimento');
 onInput('wFilter', el => { const v = el.value.trim().toLowerCase(); document.querySelectorAll('#wtbl tr[data-n]').forEach(tr => { tr.style.display = !v || tr.dataset.n.includes(v) ? '' : 'none'; }); });
@@ -134,6 +134,7 @@ function wTreatForm(p, t) {
     <div class="grid g3"><label class="f"><span>Início</span><input class="in" type="date" name="data_inicio" value="${t.data_inicio || ''}"></label>
       <label class="f"><span>Aplicar a cada (dias)</span><input class="in" name="frequencia_dias" inputmode="numeric" value="${t.frequencia_dias || 7}"></label>
       <label class="f"><span>Próxima aplicação</span><input class="in" type="date" name="proxima_aplicacao" value="${t.proxima_aplicacao || ''}"></label></div>
+    ${t.id ? html`<p class="tiny muted" style="margin:-4px 0 0">Mudou o início? A pesagem inicial acompanha a nova data. Deixe "Próxima aplicação" em branco para o sistema recalcular.</p>` : ''}
     <div class="grid g3"><label class="f"><span>Peso inicial (kg)</span><input class="in" name="peso_inicial" inputmode="decimal" value="${v(t.peso_inicial)}"></label>
       <label class="f"><span>Meta (kg)</span><input class="in" name="peso_meta" inputmode="decimal" value="${v(t.peso_meta)}"></label>
       <label class="f"><span>Altura (m)</span><input class="in" name="altura" inputmode="decimal" value="${v(t.altura)}" placeholder="1,65"></label></div>
@@ -149,7 +150,28 @@ onForm('wSaveTreat', async d => {
   let alt = n('altura'); if (alt > 3) alt = alt / 100;
   const row = { patient_id: d.patient_id, medication: d.medication || 'Tirzepatida', dose_inicial: nz(normDose(d.dose_inicial)), dose_atual: nz(normDose(d.dose_atual || d.dose_inicial)), data_inicio: nz(d.data_inicio), frequencia_dias: Math.max(1, Math.round(n('frequencia_dias') || 7)), proxima_aplicacao: nz(d.proxima_aplicacao), peso_inicial: n('peso_inicial'), peso_meta: n('peso_meta'), altura: alt, valor_mensalidade: n('valor_mensalidade'), data_vencimento: nz(d.data_vencimento), status_pagamento: d.status_pagamento, observacoes: nz(d.observacoes), ativo: !!d.ativo, lembrete_ativo: !!d.lembrete_ativo };
   if (row.peso_inicial != null && (row.peso_inicial < 20 || row.peso_inicial > 400)) throw new Error('Peso inicial fora do esperado.');
-  if (d.id) await db.update('weight_treatments', d.id, row);
+  if (row.data_inicio && row.data_inicio > ymd(addDays(new Date(), 1))) throw new Error('A data de início não pode ser no futuro.');
+  if (d.id) {
+    const old = await db.get('weight_treatments', d.id); const msgs = [];
+    // próxima aplicação em branco: recalcula pela última aplicação ou pelo início
+    if (!row.proxima_aplicacao && row.ativo && row.data_inicio) {
+      const [last] = await db.list('dose_logs', { eq: { patient_id: d.patient_id }, order: 'data_aplicacao.desc', limit: 1 });
+      const fq = row.frequencia_dias, T = ymd(new Date());
+      let nx = last ? ymd(addDays(parseYmd(last.data_aplicacao), fq)) : row.data_inicio;
+      if (!last) while (nx < T) nx = ymd(addDays(parseYmd(nx), fq));
+      row.proxima_aplicacao = nx; msgs.push('próxima aplicação em ' + fDate(nx));
+    }
+    await db.update('weight_treatments', d.id, row);
+    // início ou peso inicial mudou: a pesagem "Peso inicial" acompanha
+    if (old && (old.data_inicio !== row.data_inicio || +old.peso_inicial !== +row.peso_inicial)) {
+      const logs = await db.list('weight_logs', { eq: { patient_id: d.patient_id }, order: 'data,created_at' });
+      const first = logs.find(l => /^peso inicial/i.test(l.observacao || '')) || (old.data_inicio && logs.find(l => l.data === old.data_inicio && +l.peso === +old.peso_inicial));
+      if (first && row.peso_inicial != null) { await db.update('weight_logs', first.id, { data: row.data_inicio || first.data, peso: row.peso_inicial }); msgs.push('pesagem inicial ajustada'); }
+      else if (!first && row.peso_inicial != null && row.data_inicio) { await db.insert('weight_logs', { patient_id: d.patient_id, data: row.data_inicio, peso: row.peso_inicial, observacao: 'Peso inicial' }); msgs.push('pesagem inicial criada'); }
+      if (old.data_inicio !== row.data_inicio) msgs.unshift(`início ${old.data_inicio ? 'de ' + fDate(old.data_inicio) + ' ' : ''}para ${row.data_inicio ? fDate(row.data_inicio) : '—'}`);
+    }
+    closeModal(); toast('Acompanhamento salvo' + (msgs.length ? ': ' + msgs.join(', ') + '.' : '.'), 'ok'); go(`#/paciente/${d.patient_id}?tab=emagrecimento`); return;
+  }
   else {
     await db.insert('weight_treatments', row);
     if (row.peso_inicial != null) await db.insert('weight_logs', { patient_id: d.patient_id, data: row.data_inicio || ymd(new Date()), peso: row.peso_inicial, observacao: 'Peso inicial' });
@@ -190,25 +212,27 @@ TABRENDER.emagrecimento = async (p, q) => {
   <div class="card" style="margin-top:14px"><div class="row between"><h2 style="margin:0">Evolução do peso</h2><button class="btn sm primary" data-act="wWeight" data-p="${p.id}">${icon('plus')} Registrar peso</button></div><div style="margin-top:10px">${weightChart(s.logs, tr.peso_meta)}</div></div>
   ${isClinical() ? await staffCheckins(p) : ''}
   <div class="grid g2 collapse" style="margin-top:14px">
-    <div class="card"><h3 style="margin-top:0">Pesagens</h3>${logs.length ? html`<div class="list">${logs.map((l, i) => { const prev = logs[i + 1]; const dlt = prev ? l.peso - prev.peso : null; return html`<div class="li small"><span class="grow"><b>${kg(l.peso)}</b> ${dlt ? html`<span class="tiny" style="color:${dlt < 0 ? 'var(--ok)' : 'var(--warn)'}">${dlt < 0 ? '−' : '+'}${num1(Math.abs(dlt))}</span>` : ''}<span class="tiny muted"> ${[l.cintura_cm ? 'cintura ' + num1(l.cintura_cm) + ' cm' : '', l.observacao, l.registrado_pelo_paciente ? 'enviado pelo paciente' : ''].filter(Boolean).join(' · ')}</span></span><span class="tiny muted">${fDate(l.data)}</span><button class="btn sm ghost danger" data-act="wDelWeight" data-id="${l.id}" aria-label="Excluir">${icon('x')}</button></div>`; })}</div>` : html`<p class="small muted">Nenhuma pesagem.</p>`}</div>
-    <div class="card"><h3 style="margin-top:0">Aplicações</h3>${doses.length ? html`<div class="list">${doses.map(x => html`<div class="li small"><span class="grow"><b>${x.dose}</b><span class="tiny muted"> ${[x.local_aplicacao, x.observacao].filter(Boolean).join(' · ')}</span></span><span class="tiny muted">${fDate(x.data_aplicacao)}</span><button class="btn sm ghost danger" data-act="wDelDose" data-id="${x.id}" aria-label="Excluir">${icon('x')}</button></div>`)}</div>` : html`<p class="small muted">Nenhuma aplicação registrada no PEPMH ainda.</p>`}</div></div>`;
+    <div class="card"><h3 style="margin-top:0">Pesagens</h3>${logs.length ? html`<div class="list">${logs.map((l, i) => { const prev = logs[i + 1]; const dlt = prev ? l.peso - prev.peso : null; return html`<div class="li small"><span class="grow"><b>${kg(l.peso)}</b> ${dlt ? html`<span class="tiny" style="color:${dlt < 0 ? 'var(--ok)' : 'var(--warn)'}">${dlt < 0 ? '−' : '+'}${num1(Math.abs(dlt))}</span>` : ''}<span class="tiny muted"> ${[l.cintura_cm ? 'cintura ' + num1(l.cintura_cm) + ' cm' : '', l.observacao, l.registrado_pelo_paciente ? 'enviado pelo paciente' : ''].filter(Boolean).join(' · ')}</span></span><span class="tiny muted">${fDate(l.data)}</span><button class="btn sm ghost" data-act="wWeight" data-p="${p.id}" data-id="${l.id}" aria-label="Corrigir">${icon('edit')}</button><button class="btn sm ghost danger" data-act="wDelWeight" data-id="${l.id}" aria-label="Excluir">${icon('x')}</button></div>`; })}</div>` : html`<p class="small muted">Nenhuma pesagem.</p>`}</div>
+    <div class="card"><h3 style="margin-top:0">Aplicações</h3>${doses.length ? html`<div class="list">${doses.map(x => html`<div class="li small"><span class="grow"><b>${x.dose}</b><span class="tiny muted"> ${[x.local_aplicacao, x.observacao].filter(Boolean).join(' · ')}</span></span><span class="tiny muted">${fDate(x.data_aplicacao)}</span><button class="btn sm ghost" data-act="wEditDose" data-id="${x.id}" aria-label="Corrigir">${icon('edit')}</button><button class="btn sm ghost danger" data-act="wDelDose" data-id="${x.id}" aria-label="Excluir">${icon('x')}</button></div>`)}</div>` : html`<p class="small muted">Nenhuma aplicação registrada no PEPMH ainda.</p>`}</div></div>`;
 };
 act('wEditTreat', async el => { const [t, p] = await Promise.all([db.get('weight_treatments', el.dataset.id), db.get('patients', el.dataset.p)]); modal('Editar acompanhamento', wTreatForm(p, t), { wide: true }); });
 
 act('wWeight', async el => {
   const [t] = await db.list('weight_treatments', { eq: { patient_id: el.dataset.p }, limit: 1 });
-  modal('Registrar peso', html`<form data-form="wSaveWeight" class="stack"><input type="hidden" name="patient_id" value="${el.dataset.p}">
-    <div class="grid g2"><label class="f"><span>Data</span><input class="in" type="date" name="data" value="${ymd(new Date())}" max="${ymd(new Date())}" required></label><label class="f"><span>Peso (kg) <i>*</i></span><input class="in" name="peso" inputmode="decimal" required placeholder="82,5"></label></div>
-    <div class="grid g3"><label class="f"><span>Cintura (cm)</span><input class="in" name="cintura_cm" inputmode="decimal"></label><label class="f"><span>Quadril (cm)</span><input class="in" name="quadril_cm" inputmode="decimal"></label><label class="f"><span>Gordura (%)</span><input class="in" name="gordura_pct" inputmode="decimal"></label></div>
-    <label class="f"><span>Observação</span><input class="in" name="observacao"></label>
+  const l = el.dataset.id ? await db.get('weight_logs', el.dataset.id) : {}; const v = x => x == null ? '' : String(x).replace('.', ',');
+  modal(l.id ? 'Corrigir pesagem' : 'Registrar peso', html`<form data-form="wSaveWeight" class="stack"><input type="hidden" name="patient_id" value="${el.dataset.p}"><input type="hidden" name="id" value="${l.id || ''}">
+    <div class="grid g2"><label class="f"><span>Data</span><input class="in" type="date" name="data" value="${l.data || ymd(new Date())}" max="${ymd(new Date())}" required></label><label class="f"><span>Peso (kg) <i>*</i></span><input class="in" name="peso" inputmode="decimal" required placeholder="82,5" value="${v(l.peso)}"></label></div>
+    <div class="grid g3"><label class="f"><span>Cintura (cm)</span><input class="in" name="cintura_cm" inputmode="decimal" value="${v(l.cintura_cm)}"></label><label class="f"><span>Quadril (cm)</span><input class="in" name="quadril_cm" inputmode="decimal" value="${v(l.quadril_cm)}"></label><label class="f"><span>Gordura (%)</span><input class="in" name="gordura_pct" inputmode="decimal" value="${v(l.gordura_pct)}"></label></div>
+    <label class="f"><span>Observação</span><input class="in" name="observacao" value="${l.observacao || ''}"></label>
     ${!t ? html`<p class="tiny muted" style="margin:0">Este paciente ainda não tem acompanhamento criado; o peso fica salvo mesmo assim.</p>` : ''}
     <button class="btn primary" type="submit">Salvar peso</button></form>`);
 });
 onForm('wSaveWeight', async d => {
   const n = k => { if (d[k] === '' || d[k] == null) return null; const x = parseMoney(d[k]); if (!isFinite(x)) throw new Error('Confira os números.'); return x; };
   const peso = n('peso'); if (!(peso >= 20 && peso <= 400)) throw new Error('Informe um peso entre 20 e 400 kg.');
-  await db.insert('weight_logs', { patient_id: d.patient_id, data: d.data || ymd(new Date()), peso, cintura_cm: n('cintura_cm'), quadril_cm: n('quadril_cm'), gordura_pct: n('gordura_pct'), observacao: nz(d.observacao) });
-  closeModal(); toast('Peso registrado.', 'ok'); router();
+  const row = { data: d.data || ymd(new Date()), peso, cintura_cm: n('cintura_cm'), quadril_cm: n('quadril_cm'), gordura_pct: n('gordura_pct'), observacao: nz(d.observacao) };
+  if (d.id) await db.update('weight_logs', d.id, row); else await db.insert('weight_logs', { patient_id: d.patient_id, ...row });
+  closeModal(); toast(d.id ? 'Pesagem corrigida.' : 'Peso registrado.', 'ok'); router();
 });
 act('wDelWeight', async el => { if (await confirmBox('Excluir esta pesagem?', 'Excluir')) { await db.remove('weight_logs', el.dataset.id); router(); } });
 
@@ -231,6 +255,22 @@ onForm('wSaveDose', async d => {
   await db.update('weight_treatments', d.tid, { dose_atual: dose, proxima_aplicacao: !t.proxima_aplicacao || next > t.proxima_aplicacao || d.data >= ymd(new Date()) ? next : t.proxima_aplicacao, ativo: true });
   if (d.item_id) { const p = await db.get('patients', d.patient_id); await db.insert('stock_movements', { item_id: d.item_id, kind: 'saida', quantity: 1, note: `Aplicação · ${p?.name || ''}`, created_by: isDemo() ? null : Auth.userId() }); updateNotif(); }
   closeModal(); toast(`Aplicação registrada. Próxima: ${fDate(next)}.`, 'ok'); router();
+});
+act('wEditDose', async el => {
+  const x = await db.get('dose_logs', el.dataset.id); if (!x) return;
+  modal('Corrigir aplicação', html`<form data-form="wFixDose" class="stack"><input type="hidden" name="id" value="${x.id}"><input type="hidden" name="patient_id" value="${x.patient_id}">
+    <div class="grid g3"><label class="f"><span>Data <i>*</i></span><input class="in" type="date" name="data" value="${x.data_aplicacao}" required></label><label class="f"><span>Dose <i>*</i></span><input class="in" name="dose" list="wdoses3" value="${x.dose || ''}" required></label><label class="f"><span>Local</span><select class="in" name="local"><option value="">—</option>${WSITES.map(s => html`<option ${x.local_aplicacao === s ? 'selected' : ''}>${s}</option>`)}</select></label></div>
+    <datalist id="wdoses3">${WDOSES.map(s => html`<option>${s}</option>`)}</datalist>
+    <label class="f"><span>Observação</span><input class="in" name="obs" value="${x.observacao || ''}"></label>
+    <p class="tiny muted" style="margin:0">Se esta for a aplicação mais recente, a próxima aplicação e a dose atual são recalculadas.</p>
+    <button class="btn primary" type="submit">Salvar correção</button></form>`);
+});
+onForm('wFixDose', async d => {
+  const dose = normDose(d.dose); if (!dose) throw new Error('Informe a dose.');
+  await db.update('dose_logs', d.id, { data_aplicacao: d.data, dose, local_aplicacao: nz(d.local), observacao: nz(d.obs) });
+  const [[last], [t]] = await Promise.all([db.list('dose_logs', { eq: { patient_id: d.patient_id }, order: 'data_aplicacao.desc,created_at.desc', limit: 1 }), db.list('weight_treatments', { eq: { patient_id: d.patient_id }, limit: 1 })]);
+  if (t && last && last.id === d.id) await db.update('weight_treatments', t.id, { dose_atual: dose, proxima_aplicacao: ymd(addDays(parseYmd(d.data), t.frequencia_dias || 7)) });
+  closeModal(); toast('Aplicação corrigida.', 'ok'); router();
 });
 act('wDelDose', async el => { if (await confirmBox('Excluir este registro de aplicação? O estoque não é devolvido automaticamente.', 'Excluir')) { await db.remove('dose_logs', el.dataset.id); router(); } });
 
