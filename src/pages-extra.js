@@ -532,8 +532,10 @@ async function approvalsBlock() {
   const ap = (await db.list('appointments', { eq: { approval: 'pendente' }, gte: { ends_at: new Date().toISOString() }, order: 'starts_at' })).filter(a => a.status !== 'cancelado' && (isOwner() || a.professional_id === Auth.userId() || S.me.role === 'secretaria'));
   if (!ap.length && !S.clinic.booking_requires_approval) return '';
   const pm = await patientMap(ap.map(a => a.patient_id));
+  const feeIds = ap.filter(a => a.fee).map(a => a.id), recs = feeIds.length ? await db.list('payment_receipts', { in: { appointment_id: feeIds } }).catch(() => []) : [];
+  const paid = a => sum(recs.filter(r => r.appointment_id === a.id && r.status !== 'recusado'), r => +r.amount || 0);
   return html`<div class="card" style="${ap.length ? 'border-color:var(--warn)' : ''}"><h2>Aguardando aprovação (${ap.length})</h2>
-    ${ap.length ? html`<div class="list" style="margin-top:10px">${ap.map(a => html`<div class="li"><b class="small" style="width:110px">${fDT(a.starts_at)}</b><span class="grow"><span class="t">${pm[a.patient_id]?.name || ''}</span><span class="tiny muted">${MOD[a.modality]} · ${proName(a.professional_id)}${a.reason ? ' · ' + a.reason : ''}${a.tele_consent_at ? ' · termo aceito' : ''}</span></span>
+    ${ap.length ? html`<div class="list" style="margin-top:10px">${ap.map(a => html`<div class="li"><b class="small" style="width:110px">${fDT(a.starts_at)}</b><span class="grow"><span class="t">${pm[a.patient_id]?.name || ''}</span><span class="tiny muted">${MOD[a.modality]} · ${proName(a.professional_id)}${a.reason ? ' · ' + a.reason : ''}${a.tele_consent_at ? ' · termo aceito' : ''}${a.payment_terms_at ? ' · condições de pagamento aceitas' : ''}</span>${a.fee ? html`<span class="pill ${paid(a) >= a.fee ? 'ok' : paid(a) > 0 ? 'warn' : 'gray'}" style="margin-top:4px">comprovantes: ${BRL(paid(a))} de ${BRL(a.fee)}</span>` : ''}</span>
       ${isClinical() ? html`<button class="btn sm ok" data-act="approveAppt" data-id="${a.id}">${icon('check')} Aprovar</button>` : ''}<button class="btn sm" data-act="declineAppt" data-id="${a.id}">Recusar</button></div>`)}</div>` : html`<p class="muted small">Nenhuma consulta esperando aprovação.</p>`}</div>`;
 }
 act('approveAppt', async el => {

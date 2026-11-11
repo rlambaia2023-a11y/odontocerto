@@ -12,16 +12,20 @@ const pixCard = () => html`<div class="card" style="border-left:4px solid var(--
 async function myReceiptsBlock() {
   const list = await db.list('payment_receipts', { eq: { patient_id: S.patient.id }, order: 'created_at.desc', limit: 20 }).catch(() => []);
   if (!list.length) return '';
-  return html`<h3 style="margin-top:16px">Comprovantes enviados</h3><div class="list">${list.map(r => html`<div class="li small"><span class="grow">${r.amount ? BRL(r.amount) + ' · ' : ''}pago em ${fDate(r.paid_on)}${r.note ? html`<div class="tiny muted">${r.note}</div>` : ''}${r.response ? html`<div class="tiny" style="color:var(--brand)">Clínica: ${r.response}</div>` : ''}</span><span class="pill ${(RC_ST[r.status] || RC_ST.enviado)[0]}">${(RC_ST[r.status] || RC_ST.enviado)[1]}</span></div>`)}</div>`;
+  return html`<h3 style="margin-top:16px">Comprovantes enviados</h3><div class="list">${list.map(r => html`<div class="li small"><span class="grow">${r.appointment_id ? html`<b>Consulta online · ${r.installment || 1}ª parte</b> · ` : ''}${r.amount ? BRL(r.amount) + ' · ' : ''}pago em ${fDate(r.paid_on)}${r.note ? html`<div class="tiny muted">${r.note}</div>` : ''}${r.response ? html`<div class="tiny" style="color:var(--brand)">Clínica: ${r.response}</div>` : ''}</span><span class="pill ${(RC_ST[r.status] || RC_ST.enviado)[0]}">${(RC_ST[r.status] || RC_ST.enviado)[1]}</span></div>`)}</div>`;
 }
 
-act('pReceipt', async () => {
-  const open = (await db.list('finance_entries', { eq: { patient_id: S.patient.id }, order: 'due_date' })).filter(f => !f.paid_at && f.kind !== 'despesa');
-  modal('Anexar pagamento', html`<form data-form="pReceipt" class="stack">
+act('pReceipt', async el => {
+  const appt = el?.dataset?.appt ? await db.get('appointments', el.dataset.appt).catch(() => null) : null, inst = appt ? (+el.dataset.inst === 2 ? 2 : 1) : null;
+  const open = appt ? [] : (await db.list('finance_entries', { eq: { patient_id: S.patient.id }, order: 'due_date' })).filter(f => !f.paid_at && f.kind !== 'despesa');
+  const half = appt ? (+appt.fee || ONLINE_FEE) / 2 : null;
+  modal(appt ? `Comprovante da ${inst}ª parte da consulta` : 'Anexar pagamento', html`<form data-form="pReceipt" class="stack">
+    ${appt ? html`<input type="hidden" name="appointment_id" value="${appt.id}"><input type="hidden" name="installment" value="${inst}">
+    <div class="tip">${icon('cal')}<span>Consulta online de <b>${fDate(appt.starts_at)} às ${fTime(appt.starts_at)}</b> · ${inst}ª parte (50%) · <b>${BRL(half)}</b></span></div>` : ''}
     <div class="tip">${icon('bulb')}<span>PIX: <b>${PIX.key}</b> em nome de <b>${PIX.name}</b></span></div>
     <label class="f"><span>Comprovante (foto ou PDF) <i>*</i></span><input class="in" type="file" name="file" accept="image/*,application/pdf" required></label>
     ${open.length ? html`<label class="f"><span>Referente a</span><select class="in" name="finance_entry_id"><option value="">Outro pagamento</option>${open.map(f => html`<option value="${f.id}" data-v="${f.amount}">${f.description} · ${BRL(f.amount)} · vence ${fDate(f.due_date)}</option>`)}</select></label>` : ''}
-    <div class="grid g2"><label class="f"><span>Valor pago (R$) <i>*</i></span><input class="in" name="amount" inputmode="decimal" required placeholder="150,00"></label><label class="f"><span>Data do pagamento</span><input class="in" type="date" name="paid_on" value="${ymd(new Date())}" max="${ymd(new Date())}" required></label></div>
+    <div class="grid g2"><label class="f"><span>Valor pago (R$) <i>*</i></span><input class="in" name="amount" inputmode="decimal" required placeholder="150,00" value="${half ? String(half.toFixed(2)).replace('.', ',') : ''}"></label><label class="f"><span>Data do pagamento</span><input class="in" type="date" name="paid_on" value="${ymd(new Date())}" max="${ymd(new Date())}" required></label></div>
     <label class="f"><span>Observação (opcional)</span><input class="in" name="note" maxlength="500" placeholder="Ex.: consulta de retorno, 1ª parcela"></label>
     <button class="btn primary" type="submit">${icon('send')} Enviar comprovante</button></form>`);
   const sel = document.querySelector('[data-form=pReceipt] [name=finance_entry_id]');
@@ -35,7 +39,7 @@ onForm('pReceipt', async (d, f) => {
   else if (type !== 'application/pdf') throw new Error('Mande uma foto ou um arquivo PDF.');
   if (blob.size > 10 * 1024 * 1024) throw new Error('Arquivo muito grande (máximo 10 MB).');
   const p = S.patient, id = uid(), ext = type === 'application/pdf' ? 'pdf' : 'jpg';
-  const row = { id, status: 'enviado', patient_id: p.id, finance_entry_id: nz(d.finance_entry_id), amount, paid_on: d.paid_on || ymd(new Date()), note: nz(d.note), file_type: type, file_path: `${S.clinic.id}/${p.id}/${id}.${ext}` };
+  const row = { id, status: 'enviado', patient_id: p.id, finance_entry_id: nz(d.finance_entry_id), amount, ...(d.appointment_id ? { appointment_id: d.appointment_id, installment: +d.installment || 1 } : {}), paid_on: d.paid_on || ymd(new Date()), note: nz(d.note), file_type: type, file_path: `${S.clinic.id}/${p.id}/${id}.${ext}` };
   if (isDemo()) row.file_data = await blobToData(blob);
   else await Remote.upload('payment-receipts', row.file_path, blob, false);
   await db.insert('payment_receipts', row);
@@ -47,7 +51,9 @@ async function staffReceiptsBlock() {
   const list = await db.list('payment_receipts', { eq: { status: 'enviado' }, order: 'created_at' }).catch(() => []);
   if (!list.length) return '';
   const pm = await patientMap(list.map(r => r.patient_id));
-  return html`<div class="card" style="margin-bottom:14px"><h2>Comprovantes enviados pelos pacientes (${list.length})</h2><div class="list" style="margin-top:10px">${list.map(r => html`<div class="li"><span class="grow"><span class="t">${pm[r.patient_id]?.name || ''}</span><span class="tiny muted">${r.amount ? BRL(r.amount) + ' · ' : ''}pago em ${fDate(r.paid_on)}${r.note ? ' · ' + r.note : ''}${r.finance_entry_id ? ' · ligado a um lançamento' : ''}</span></span>
+  const aids = [...new Set(list.map(r => r.appointment_id).filter(Boolean))];
+  const am = Object.fromEntries((aids.length ? await db.list('appointments', { in: { id: aids } }).catch(() => []) : []).map(a => [a.id, a]));
+  return html`<div class="card" style="margin-bottom:14px"><h2>Comprovantes enviados pelos pacientes (${list.length})</h2><div class="list" style="margin-top:10px">${list.map(r => html`<div class="li"><span class="grow"><span class="t">${pm[r.patient_id]?.name || ''}</span><span class="tiny muted">${r.appointment_id ? `Consulta online ${am[r.appointment_id] ? 'de ' + fDT(am[r.appointment_id].starts_at) + ' ' : ''}· ${r.installment || 1}ª parte · ` : ''}${r.amount ? BRL(r.amount) + ' · ' : ''}pago em ${fDate(r.paid_on)}${r.note ? ' · ' + r.note : ''}${r.finance_entry_id ? ' · ligado a um lançamento' : ''}</span></span>
     <button class="btn sm" data-act="rcView" data-id="${r.id}">${icon('file')} Ver</button><button class="btn sm ok" data-act="rcOk" data-id="${r.id}">${icon('check')} Confirmar</button><button class="btn sm" data-act="rcNo" data-id="${r.id}">Recusar</button></div>`)}</div></div>`;
 }
 act('rcView', async el => {
@@ -61,7 +67,7 @@ act('rcView', async el => {
 act('rcOk', async el => {
   const r = await db.get('payment_receipts', el.dataset.id); const by = isDemo() ? null : Auth.userId(), now = new Date().toISOString();
   if (r.finance_entry_id) await db.update('finance_entries', r.finance_entry_id, { paid_at: r.paid_on, method: 'pix' });
-  else await db.insert('finance_entries', { kind: 'receita', description: 'Pagamento PIX (comprovante do paciente)' + (r.note ? ' – ' + r.note : ''), amount: r.amount, due_date: r.paid_on, paid_at: r.paid_on, method: 'pix', category: 'Procedimentos', patient_id: r.patient_id });
+  else await db.insert('finance_entries', { kind: 'receita', description: (r.appointment_id ? `Consulta online – ${r.installment || 1}ª parte (50%)` : 'Pagamento PIX (comprovante do paciente)') + (r.note ? ' – ' + r.note : ''), amount: r.amount, due_date: r.paid_on, paid_at: r.paid_on, method: 'pix', category: 'Procedimentos', patient_id: r.patient_id });
   await db.update('payment_receipts', r.id, { status: 'confirmado', reviewed_at: now, reviewed_by: by });
   toast('Pagamento confirmado e lançado no financeiro.', 'ok'); router();
 });

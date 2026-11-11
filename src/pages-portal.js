@@ -6,6 +6,19 @@ const gcalLink = (title, start, end, details, location) => { const f = d => new 
 const randCode = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join('');
 const TCLE = prof => `Termo de consentimento para teleconsulta. Declaro que fui informado(a) e concordo que: (1) a consulta será feita por vídeo e não substitui todas as etapas do atendimento presencial, pois não permite exame físico completo; (2) o(a) profissional pode indicar atendimento presencial a qualquer momento, e eu também posso optar por ele; (3) o atendimento será registrado em prontuário, com sigilo profissional e proteção dos meus dados conforme a LGPD; (4) receitas, atestados e pedidos de exame poderão ser emitidos quando o(a) profissional julgar adequado; (5) devo estar em local reservado e com conexão estável; a gravação da consulta não é obrigatória e só ocorrerá com meu consentimento. Referência: ${prof === 'medicina' ? 'Resolução CFM nº 2.314/2022' : prof === 'odontologia' ? 'Resolução CFO-SEC-278/2025' : 'normas do conselho profissional'}.`;
 
+/* ---------- consulta online: valor e condições de pagamento ---------- */
+const ONLINE_FEE = 300;
+const payDeadlines = start => { const s = +new Date(start); return { d1: new Date(s - 24 * 3600000), d2: new Date(s - 30 * 60000), cancel: new Date(s - 20 * 60000) }; };
+const payTermsText = start => { const h = start ? payDeadlines(start) : null, f = d => `${fDate(d)} às ${fTime(d)}`;
+  return html`<b>Condições da consulta online</b>
+  <ul style="margin:6px 0 0;padding-left:18px">
+    <li>A consulta online custa <b>${BRL(ONLINE_FEE)}</b>.</li>
+    <li><b>50% (${BRL(ONLINE_FEE / 2)})</b> precisam ser pagos até <b>24 horas antes</b> da consulta${h ? html` (até ${f(h.d1)})` : ''}.</li>
+    <li>Os outros <b>50% (${BRL(ONLINE_FEE / 2)})</b> precisam ser pagos até <b>30 minutos antes</b> da consulta${h ? html` (até ${f(h.d2)})` : ''}.</li>
+    <li>Cada pagamento é confirmado anexando o comprovante na sua área do paciente (Minhas consultas → Anexar comprovante).</li>
+    <li>Se os comprovantes não forem anexados, <b>o sistema cancela o agendamento sozinho 20 minutos antes da consulta</b>${h ? html` (às ${fTime(h.cancel)})` : ''}.</li>
+  </ul>${h && +h.d1 < Date.now() ? html`<p class="small" style="margin:8px 0 0;color:var(--warn)">Como faltam menos de 24 horas, pague os primeiros 50% logo depois de agendar.</p>` : ''}`; };
+
 /* ---------- RPCs da demonstração (espelham as funções do banco) ---------- */
 const DemoRPC = {
   clinic_professionals() { const d = Demo.load(); const cid = (d.patients.find(p => p.user_id === Auth.userId()) || {}).clinic_id || 'demo-clinic'; return d.clinic_members.filter(m => m.clinic_id === cid && ['owner', 'dentista'].includes(m.role)).map(({ cpf, ...m }) => m); },
@@ -35,17 +48,18 @@ const DemoRPC = {
     }
     return out;
   },
-  async book_appointment({ p_slug, p_professional, p_start, p_modality, p_reason, p_consent }) {
+  async book_appointment({ p_slug, p_professional, p_start, p_modality, p_reason, p_consent, p_terms }) {
     const me = Auth.userId(); if (!me) throw new Error('Entre na sua conta para agendar.');
     if (p_modality === 'online' && !p_consent) throw new Error('Para a consulta online é preciso aceitar o termo de consentimento.');
+    if (p_modality === 'online' && !p_terms) throw new Error('Para a consulta online é preciso aceitar as condições de pagamento.');
     const d = Demo.load(); const c = d.clinics.find(x => x.slug === p_slug); const m = d.clinic_members.find(x => x.user_id === p_professional);
     if (d.clinic_members.some(x => x.user_id === me)) throw new Error('Profissionais da clínica agendam pela agenda interna.');
     if (!DemoRPC.public_slots({ p_slug, p_professional, p_from: ymd(p_start), p_days: 1 }).some(s => s.starts_at === p_start && s.modality === p_modality)) throw new Error('Esse horário acabou de ser ocupado ou não está disponível. Escolha outro.');
     let p = d.patients.find(x => x.user_id === me);
     if (!p) { const meta = LS.get('pepmh_demo_signup', {}); [p] = [await Demo.insert('patients', { clinic_id: c.id, user_id: me, name: meta.full_name || 'Paciente', phone: onlyDigits(meta.phone), email: meta.email, birth_date: meta.birth_date || null, origin: 'Agendamento online' })]; }
     const pend = !!c.booking_requires_approval;
-    const a = await Demo.insert('appointments', { approval: pend ? 'pendente' : null, clinic_id: c.id, patient_id: p.id, professional_id: m.user_id, starts_at: p_start, ends_at: new Date(+new Date(p_start) + m.slot_min * 60000).toISOString(), status: 'agendado', kind: p_modality === 'online' ? 'teleconsulta' : 'consulta', modality: p_modality, meeting_url: p_modality === 'online' && !pend ? m.meet_url : null, tele_consent_at: p_modality === 'online' ? new Date().toISOString() : null, booked_by_patient: true, reason: p_reason || null });
-    return { appointment_id: a.id, patient_id: p.id, meeting_url: a.meeting_url, pending: pend };
+    const a = await Demo.insert('appointments', { approval: pend ? 'pendente' : null, clinic_id: c.id, patient_id: p.id, professional_id: m.user_id, starts_at: p_start, ends_at: new Date(+new Date(p_start) + m.slot_min * 60000).toISOString(), status: 'agendado', kind: p_modality === 'online' ? 'teleconsulta' : 'consulta', modality: p_modality, meeting_url: p_modality === 'online' && !pend ? m.meet_url : null, tele_consent_at: p_modality === 'online' ? new Date().toISOString() : null, booked_by_patient: true, reason: p_reason || null, fee: p_modality === 'online' ? ONLINE_FEE : null, payment_terms_at: p_modality === 'online' ? new Date().toISOString() : null });
+    return { appointment_id: a.id, patient_id: p.id, meeting_url: a.meeting_url, pending: pend, fee: a.fee };
   },
   async accept_tele_consent({ p_id }) { const t = new Date().toISOString(); await Demo.updateWhere('appointments', { id: p_id }, { tele_consent_at: t }); return t; },
   async cancel_my_appointment({ p_id }) { const a = await db.get('appointments', p_id); if (!a || +new Date(a.starts_at) < Date.now() + 2 * 3600000) throw new Error('Não foi possível cancelar (faltam menos de 2 horas). Fale com a clínica.'); await Demo.updateWhere('appointments', { id: p_id }, { status: 'cancelado' }); },
@@ -164,7 +178,7 @@ function bookingBody() {
   if (S.mode === 'patient' && S.patient && profileMissing(S.patient).length) return completeProfileCard();
   const proCard = p => html`<button class="card" style="text-align:left;cursor:pointer;width:100%;${BK.pro?.user_id === p.user_id ? 'border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-50)' : ''}" data-act="bkPro" data-id="${p.user_id}">
     <div class="row" style="flex-wrap:nowrap;align-items:flex-start"><span class="avatar lg">${initials(p.full_name)}</span><div class="grow"><b>${p.full_name}</b><div class="small muted">${p.specialty || PROF[p.profession] || ''}${councilOf(p) ? ' · ' + councilOf(p) : ''}</div>
-    ${p.bio ? html`<div class="small" style="margin-top:4px">${p.bio}</div>` : ''}<div class="row" style="gap:6px;margin-top:8px">${p.online ? html`<span class="pill">${icon('video')} Online${p.online_price ? ' · ' + BRL(p.online_price) : ''}</span>` : ''}${p.presencial ? html`<span class="pill gray">Presencial</span>` : ''}</div></div></div></button>`;
+    ${p.bio ? html`<div class="small" style="margin-top:4px">${p.bio}</div>` : ''}<div class="row" style="gap:6px;margin-top:8px">${p.online ? html`<span class="pill">${icon('video')} Online · ${BRL(ONLINE_FEE)}</span>` : ''}${p.presencial ? html`<span class="pill gray">Presencial</span>` : ''}</div></div></div></button>`;
   if (!c.professionals.length) return html`<div class="card empty">Nenhum profissional com horários abertos no momento.</div>`;
   let body = html`<h2 style="margin:0 0 10px">1. Escolha o profissional</h2><div class="grid g2 collapse">${c.professionals.map(proCard)}</div>`;
   if (BK.pro) {
@@ -179,12 +193,14 @@ function bookingBody() {
     </div>`;
   }
   if (BK.slot) {
-    const online = BK.slot.modality === 'online'; const logged = S.mode === 'patient'; const staff = S.mode === 'staff' && S.clinic;
+    const online = BK.slot.modality === 'online';
+    if (online) { const s = +new Date(BK.slot.starts_at); if (s - 20 * 60000 <= Date.now()) return html`${body}<div class="card" style="margin-top:14px"><p class="small" style="margin:0;color:var(--bad)">Esse horário já está muito perto: a consulta online precisa dos comprovantes até 30 minutos antes. Escolha outro horário.</p></div>`; } const logged = S.mode === 'patient'; const staff = S.mode === 'staff' && S.clinic;
     body = html`${body}<div class="card" style="margin-top:14px"><h2 style="margin:0 0 10px">3. Confirme</h2>
-      <div class="tip">${icon(online ? 'video' : 'cal')}<span><b>${fLong(new Date(BK.slot.starts_at))} às ${fTime(BK.slot.starts_at)}</b> · ${MOD[BK.slot.modality]} com ${BK.pro.full_name}${online && BK.pro.online_price ? ' · ' + BRL(BK.pro.online_price) : ''}</span></div>
+      <div class="tip">${icon(online ? 'video' : 'cal')}<span><b>${fLong(new Date(BK.slot.starts_at))} às ${fTime(BK.slot.starts_at)}</b> · ${MOD[BK.slot.modality]} com ${BK.pro.full_name}${online ? ' · ' + BRL(ONLINE_FEE) : ''}</span></div>
       <form data-form="bkConfirm" class="stack" style="margin-top:12px">
         <label class="f"><span>Motivo da consulta (opcional)</span><textarea class="in" name="reason" rows="2" placeholder="Conte rapidamente o que está sentindo ou o que precisa"></textarea></label>
-        ${online ? html`<div class="card" style="background:#fafbfc;padding:12px"><p class="small" style="margin:0">${TCLE(BK.pro.profession)}</p><label class="check" style="margin-top:10px"><input type="checkbox" name="consent" required> Li e aceito o termo de consentimento para teleconsulta</label></div>` : ''}
+        ${online ? html`<div class="card" style="background:#fafbfc;padding:12px"><p class="small" style="margin:0">${TCLE(BK.pro.profession)}</p><label class="check" style="margin-top:10px"><input type="checkbox" name="consent" required> Li e aceito o termo de consentimento para teleconsulta</label></div>
+          <div class="card" style="background:var(--warn-50);border-color:var(--warn);padding:12px"><div class="small">${payTermsText(BK.slot.starts_at)}</div><label class="check" style="margin-top:10px"><input type="checkbox" name="terms" required> Li e aceito as condições de pagamento da consulta online</label></div>` : ''}
         ${staff ? html`<div class="pill warn" style="white-space:normal">Você está conectado(a) como profissional da clínica. Para testar como paciente, saia da conta ou use outro navegador.</div>`
         : logged ? html`<p class="small muted" style="margin:0">Agendando como <b>${S.patient.name}</b>.</p>` : html`
           <div class="seg" style="width:100%"><button type="button" class="${BK.auth !== 'login' ? 'on' : ''}" style="flex:1" data-act="bkAuth" data-a="novo">Primeira vez aqui</button><button type="button" class="${BK.auth === 'login' ? 'on' : ''}" style="flex:1" data-act="bkAuth" data-a="login">Já tenho conta</button></div>
@@ -215,8 +231,8 @@ onForm('bkConfirm', async d => {
       Auth.store(ok); LS.set('pepmh_mode', 'remote');
     }
   }
-  const r = await db.rpc('book_appointment', { p_slug: BK.slug, p_professional: BK.pro.user_id, p_start: BK.slot.starts_at, p_modality: BK.slot.modality, p_reason: d.reason || null, p_consent: !!d.consent });
-  BK.done = { ...BK.slot, meeting_url: r.meeting_url, pending: !!r.pending, pro: BK.pro };
+  const r = await db.rpc('book_appointment', { p_slug: BK.slug, p_professional: BK.pro.user_id, p_start: BK.slot.starts_at, p_modality: BK.slot.modality, p_reason: d.reason || null, p_consent: !!d.consent, p_terms: !!d.terms });
+  BK.done = { ...BK.slot, id: r.appointment_id, fee: r.fee || (BK.slot.modality === 'online' ? ONLINE_FEE : null), meeting_url: r.meeting_url, pending: !!r.pending, pro: BK.pro };
   if (S.mode !== 'patient') { S.clinic = null; document.getElementById('view')?.remove(); try { await loadContext(); } catch { } }
   bkRender(); window.scrollTo(0, 0);
   const hb = document.querySelector('.topbar .btn'); if (hb) { hb.textContent = 'Minha área'; hb.removeAttribute('data-act'); hb.setAttribute('href', '#/'); hb.addEventListener('click', e => { e.preventDefault(); ACT.bkGoHome(); }); }
@@ -226,6 +242,9 @@ function bookingDone() {
   return html`<div class="card" style="text-align:center"><div style="font-size:2.2rem">${b.pending ? '⏳' : '✅'}</div><h2>${b.pending ? 'Pedido de consulta enviado!' : 'Consulta marcada!'}</h2>
     <p style="margin:8px 0"><b>${fLong(start)} às ${fTime(start)}</b><br>${MOD[b.modality]} com ${b.pro.full_name}</p>
     ${b.pending ? html`<p class="small">O horário ficou reservado para você. ${b.pro.full_name} vai confirmar o atendimento e, assim que aprovar, o link da consulta aparece na sua área do paciente. A clínica também pode te avisar pelo WhatsApp.</p>` : b.modality === 'online' && !b.meeting_url ? html`<p class="small">Consulta online marcada. A clínica vai enviar o link da sala do Google Meet, que também aparece na sua área do paciente.</p>`: b.modality === 'online' ? html`<p class="small muted">No horário, entre pela sala do Google Meet abaixo. Teste câmera e microfone alguns minutos antes.</p><a class="btn primary" target="_blank" rel="noopener" href="${b.meeting_url}">${icon('video')} Link da consulta (Google Meet)</a>` : html`<p class="small muted">${[c.address, c.city].filter(Boolean).join(' · ')}</p>`}
+    ${b.fee ? html`<div class="card" style="text-align:left;background:var(--warn-50);border-color:var(--warn);margin-top:10px"><div class="small">${payTermsText(b.starts_at)}</div>
+      <div class="tip" style="margin-top:10px">${icon('bulb')}<span>PIX: <b>${PIX.key}</b> em nome de <b>${PIX.name}</b></span></div>
+      <div class="row" style="margin-top:10px"><button class="btn sm" data-act="copyText" data-t="${PIX.key}">${icon('clip')} Copiar chave PIX</button>${S.mode === 'patient' && b.id ? html`<button class="btn sm primary" data-act="pReceipt" data-appt="${b.id}" data-inst="1">${icon('clip')} Anexar comprovante dos 50%</button>` : ''}</div></div>` : ''}
     <div class="row" style="justify-content:center;margin-top:12px"><a class="btn" target="_blank" rel="noopener" href="${gcalLink(`Consulta – ${b.pro.full_name}`, start, end, b.modality === 'online' ? 'Teleconsulta pelo Google Meet: ' + b.meeting_url : 'Consulta presencial – ' + c.name, b.modality === 'online' ? b.meeting_url : [c.address, c.city].filter(Boolean).join(', '))}">${icon('cal')} Adicionar ao Google Agenda</a><a class="btn" href="#/" data-act="bkGoHome">${icon('home')} Minha área</a></div></div>`;
 }
 act('bkGoHome', async () => { location.hash = '#/'; await boot(); });
@@ -244,13 +263,31 @@ act('pTeleAccept', async el => {
   await db.rpc('accept_tele_consent', { p_id: el.dataset.id }); closeModal(); toast('Termo aceito. O botão para entrar na consulta já está liberado.', 'ok'); router();
 });
 const proById = id => S.members.find(m => m.user_id === id) || {};
+/* situação do pagamento da consulta online (sinal de 50% até 24 h antes, restante até 30 min antes) */
+const apptReceipts = async ids => ids.length ? db.list('payment_receipts', { in: { appointment_id: ids } }).catch(() => []) : [];
+function payBox(a, recs) {
+  if (!a.fee) return '';
+  if (a.auto_cancelled_at) return html`<p class="small" style="margin:10px 0 0;color:var(--bad)">${icon('x')} Cancelada automaticamente: os comprovantes de pagamento não foram anexados até 20 minutos antes.</p>`;
+  if (['cancelado', 'faltou', 'atendido'].includes(a.status)) return '';
+  const mine = recs.filter(r => r.appointment_id === a.id && r.status !== 'recusado'), tot = sum(mine, r => +r.amount || 0), half = a.fee / 2, h = payDeadlines(a.starts_at), now = Date.now();
+  const st = (ok, list, dl) => ok ? (list.length && list.every(r => r.status === 'confirmado') ? html`<span class="pill ok">confirmado</span>` : html`<span class="pill ok">comprovante enviado</span>`) : +dl < now ? html`<span class="pill bad">atrasado</span>` : html`<span class="pill warn">pendente</span>`;
+  const ok1 = tot >= half - 0.005, ok2 = tot >= a.fee - 0.005, need = !ok1 ? 1 : !ok2 ? 2 : 0;
+  const refused = recs.filter(r => r.appointment_id === a.id && r.status === 'recusado');
+  return html`<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:${need ? 'var(--warn-50)' : 'var(--ok-50)'}">
+    <div class="small"><b>Pagamento da consulta online · ${BRL(a.fee)}</b></div>
+    <div class="row between small" style="margin-top:6px"><span>1ª parte (50% · ${BRL(half)}) até ${fDate(h.d1)} às ${fTime(h.d1)}</span>${st(ok1, mine.filter(r => r.installment === 1), h.d1)}</div>
+    <div class="row between small" style="margin-top:4px"><span>2ª parte (50% · ${BRL(half)}) até ${fDate(h.d2)} às ${fTime(h.d2)}</span>${st(ok2, mine.filter(r => r.installment === 2), h.d2)}</div>
+    ${refused.length ? html`<p class="tiny" style="margin:6px 0 0;color:var(--bad)">A clínica não confirmou um comprovante${refused[0].response ? ': ' + refused[0].response : ''}. Envie de novo.</p>` : ''}
+    ${need ? html`<p class="tiny" style="margin:6px 0 0">Sem os comprovantes, o sistema cancela a consulta sozinho às ${fTime(h.cancel)} de ${fDate(h.cancel)} (20 min antes). PIX: <b>${PIX.key}</b> (${PIX.name}).</p>
+      <div class="row" style="margin-top:8px"><button class="btn sm primary" data-act="pReceipt" data-appt="${a.id}" data-inst="${need}">${icon('clip')} Anexar comprovante da ${need}ª parte</button><button class="btn sm" data-act="copyText" data-t="${PIX.key}">Copiar chave PIX</button></div>` : html`<p class="tiny" style="margin:6px 0 0">Tudo certo com o pagamento. A clínica confere os comprovantes.</p>`}</div>`;
+}
 proute('/', async () => {
   const p = S.patient, now = new Date();
   const [ap, docs, reqs, rets] = await Promise.all([db.list('appointments', { eq: { patient_id: p.id }, gte: { ends_at: new Date(+now - 3600000).toISOString() }, order: 'starts_at' }), db.list('documents', { eq: { patient_id: p.id }, order: 'created_at.desc', limit: 20 }).then(r => r.filter(d => d.released_at && d.signed_file_path && !d.deleted_at).slice(0, 3)), db.list('appointment_requests', { eq: { patient_id: p.id, status: 'pendente' } }), db.list('return_alerts', { eq: { patient_id: p.id, done: false }, order: 'due_date', limit: 3 })]);
-  const next = ap.find(a => !['cancelado', 'faltou'].includes(a.status));
+  const next = ap.find(a => !['cancelado', 'faltou'].includes(a.status)); const nrec = next?.fee ? await apptReceipts([next.id]) : [];
   return html`<div class="pagehead"><div><h1>Olá, ${p.name.split(' ')[0]}!</h1><div class="muted small">${S.clinic.name}</div></div></div>
   <div class="grid g2 collapse"><div class="card"><h2>Próxima consulta</h2>${next ? html`<div class="row" style="margin:12px 0;flex-wrap:nowrap"><span class="avatar lg">${icon(next.modality === 'online' ? 'video' : 'cal')}</span><div><b>${fLong(new Date(next.starts_at))} às ${fTime(next.starts_at)}</b><div class="small muted">${MOD[next.modality || 'presencial']} · ${proById(next.professional_id).full_name || ''}</div>${apPill(next)}</div></div>
-      <div class="row">${joinBtn(next)}<a class="btn sm" href="#/consultas">Ver detalhes</a></div>${next.approval === 'pendente' ? html`<p class="tiny muted">Aguardando a confirmação de ${proById(next.professional_id).full_name || 'profissional'}. O link aparece aqui após a aprovação.</p>` : next.modality === 'online' ? html`<p class="tiny muted">O link do Google Meet funciona no horário da consulta.</p>` : ''}`
+      <div class="row">${joinBtn(next)}<a class="btn sm" href="#/consultas">Ver detalhes</a></div>${next.approval === 'pendente' ? html`<p class="tiny muted">Aguardando a confirmação de ${proById(next.professional_id).full_name || 'profissional'}. O link aparece aqui após a aprovação.</p>` : next.modality === 'online' ? html`<p class="tiny muted">O link do Google Meet funciona no horário da consulta.</p>` : ''}${payBox(next, nrec)}`
     : html`<div class="empty">${icon('cal')}<div>Nenhuma consulta marcada.</div><a class="btn primary sm" style="margin-top:10px" href="#/agendar">Marcar consulta</a></div>`}</div>
     <div class="quick" style="grid-template-columns:repeat(2,1fr)">${[['#/agendar', 'plus', 'Marcar consulta'], ['#/documentos', 'file', 'Receitas e documentos'], ['#/exames?anexar=1', 'clip', 'Anexar exames'], ['#/pre-consulta', 'edit', 'Ficha de saúde'], ['#/tratamentos', 'clip', 'Tratamentos'], ['#/tratamentos?anexar=1', 'money', 'Anexar pagamento']].map(([h, i, l]) => html`<a href="${h}">${icon(i)}<span>${l}</span></a>`)}</div></div>
   ${reqs.length ? html`<div class="card"><h3>Pedidos aguardando a clínica</h3>${reqs.map(r => html`<p class="small" style="margin:8px 0 0">${r.preferred_date ? fDate(r.preferred_date) + ' · ' : ''}${PERIOD[r.period]} — ${r.reason || 'Consulta'}</p>`)}</div>` : ''}
@@ -280,12 +317,13 @@ proute('/consultas', async () => {
   const p = S.patient, now = Date.now();
   const [ap, reqs] = await Promise.all([db.list('appointments', { eq: { patient_id: p.id }, order: 'starts_at.desc' }), db.list('appointment_requests', { eq: { patient_id: p.id }, order: 'created_at.desc' })]);
   const fut = ap.filter(a => +new Date(a.ends_at) >= now && !['cancelado'].includes(a.status)).reverse(), past = ap.filter(a => !fut.includes(a));
+  const recs = await apptReceipts(ap.filter(a => a.fee && +new Date(a.ends_at) >= now - 86400000).map(a => a.id));
   const card = a => { const pr = proById(a.professional_id), s = new Date(a.starts_at), e = new Date(a.ends_at); return html`<div class="card"><div class="row between"><div><b>${fLong(s)} às ${fTime(s)}</b><div class="small muted">${MOD[a.modality || 'presencial']} · ${pr.full_name || ''}${a.reason ? ' · ' + a.reason : ''}</div></div>${apPill(a)}</div>
-    ${fut.includes(a) ? html`<div class="row" style="margin-top:10px">${joinBtn(a)}<a class="btn sm" target="_blank" rel="noopener" href="${gcalLink(`Consulta – ${pr.full_name || S.clinic.name}`, s, e, a.meeting_url ? 'Google Meet: ' + a.meeting_url : S.clinic.name, a.meeting_url || S.clinic.address || '')}">${icon('cal')} Google Agenda</a>${['agendado', 'confirmado'].includes(a.status) ? html`<button class="btn sm danger" data-act="pCancel" data-id="${a.id}">Cancelar</button>` : ''}</div>` : ''}</div>`; };
+    ${fut.includes(a) ? html`<div class="row" style="margin-top:10px">${joinBtn(a)}<a class="btn sm" target="_blank" rel="noopener" href="${gcalLink(`Consulta – ${pr.full_name || S.clinic.name}`, s, e, a.meeting_url ? 'Google Meet: ' + a.meeting_url : S.clinic.name, a.meeting_url || S.clinic.address || '')}">${icon('cal')} Google Agenda</a>${['agendado', 'confirmado'].includes(a.status) ? html`<button class="btn sm danger" data-act="pCancel" data-id="${a.id}">Cancelar</button>` : ''}</div>${payBox(a, recs)}` : ''}</div>`; };
   return html`<div class="pagehead"><h1>Minhas consultas</h1><a class="btn primary" href="#/agendar">${icon('plus')} Marcar</a></div>
     <h3>Próximas</h3>${fut.length ? fut.map(card) : html`<div class="card empty small">Nenhuma consulta futura.</div>`}
     ${reqs.length ? html`<h3 style="margin-top:18px">Pedidos</h3><div class="list">${reqs.map(r => html`<div class="li"><span class="grow small">${r.preferred_date ? fDate(r.preferred_date) + ' · ' : ''}${PERIOD[r.period]} — ${r.reason || 'Consulta'}${r.response ? html`<div class="tiny muted">Resposta: ${r.response}</div>` : ''}</span><span class="pill ${r.status === 'agendado' ? 'ok' : r.status === 'pendente' ? 'warn' : 'gray'}">${r.status}</span>${r.status === 'pendente' ? html`<button class="btn sm ghost" data-act="pReqCancel" data-id="${r.id}">${icon('x')}</button>` : ''}</div>`)}</div>` : ''}
-    <h3 style="margin-top:18px">Anteriores</h3>${past.length ? html`<div class="list">${past.map(a => html`<div class="li"><b class="small" style="width:120px">${fDT(a.starts_at)}</b><span class="grow small">${MOD[a.modality || 'presencial']} · ${proById(a.professional_id).full_name || ''}</span>${apPill(a)}</div>`)}</div>` : html`<p class="muted small">Nada por aqui ainda.</p>`}`;
+    <h3 style="margin-top:18px">Anteriores</h3>${past.length ? html`<div class="list">${past.map(a => html`<div class="li"><b class="small" style="width:120px">${fDT(a.starts_at)}</b><span class="grow small">${MOD[a.modality || 'presencial']} · ${proById(a.professional_id).full_name || ''}${a.auto_cancelled_at ? html`<div class="tiny" style="color:var(--bad)">Cancelada automaticamente: comprovante de pagamento não anexado a tempo.</div>` : ''}</span>${apPill(a)}</div>`)}</div>` : html`<p class="muted small">Nada por aqui ainda.</p>`}`;
 }, 'consultas');
 act('pCancel', async el => { if (await confirmBox('Cancelar esta consulta? O horário fica livre para outra pessoa.', 'Cancelar consulta')) { await db.rpc('cancel_my_appointment', { p_id: el.dataset.id }); toast('Consulta cancelada.', 'ok'); router(); } });
 act('pReqCancel', async el => { await db.update('appointment_requests', el.dataset.id, { status: 'cancelado' }); router(); });
