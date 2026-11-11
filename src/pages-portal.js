@@ -92,6 +92,7 @@ function patientSignupFields() {
     <div class="grid g2" style="gap:8px"><label class="f"><span>Cidade <i>*</i></span><input class="in" name="city" required></label><label class="f"><span>UF <i>*</i></span><input class="in" name="state" required maxlength="2" style="text-transform:uppercase"></label></div>
     <label class="f" style="grid-column:1/-1"><span>Endereço (rua, número, bairro) <i>*</i></span><input class="in" name="address" required autocomplete="street-address"></label>
     <label class="f" style="grid-column:1/-1"><span>Alergias ou problemas de saúde que a clínica deve saber</span><input class="in" name="alerts" placeholder="Ex.: alergia a dipirona, hipertensão"></label>
+    <label class="f" style="grid-column:1/-1"><span>Qual tipo de consulta? <i>*</i></span><select class="in" name="consult_type" required><option value="">Escolha</option>${CONSULT_TYPES.map(t => html`<option>${t}</option>`)}</select></label>
     <label class="f"><span>E-mail <i>*</i></span><input class="in" type="email" name="email" required autocomplete="email"></label>
     <label class="f"><span>Crie uma senha (mín. 6) <i>*</i></span><input class="in" type="password" name="password" minlength="6" required autocomplete="new-password"></label>
   </div>
@@ -101,13 +102,16 @@ function patientSignupMeta(d, slug, via) {
   if (!cpfValid(d.cpf)) throw new Error('Confira o CPF: os números não batem.');
   if (onlyDigits(d.phone).length < 10) throw new Error('Informe o celular com DDD.');
   if (onlyDigits(d.zip).length !== 8) throw new Error('O CEP precisa ter 8 números.');
+  if (!(d.full_name || '').trim().includes(' ')) throw new Error('Escreva o nome completo (nome e sobrenome).');
+  if (!d.birth_date || d.birth_date > ymd(new Date()) || d.birth_date < '1900-01-01') throw new Error('Confira a data de nascimento.');
+  if (!CONSULT_TYPES.includes(d.consult_type)) throw new Error('Escolha o tipo de consulta.');
   const t = v => (v || '').trim() || null;
   return { full_name: t(d.full_name), birth_date: d.birth_date || null, sex: d.sex || null, cpf: onlyDigits(d.cpf), rg: t(d.rg), phone: onlyDigits(d.phone), occupation: t(d.occupation),
     zip: onlyDigits(d.zip), city: t(d.city), state: (d.state || '').trim().toUpperCase() || null, address: t(d.address), insurance: t(d.insurance), origin: t(d.origin),
-    guardian_name: t(d.guardian_name), alerts: t(d.alerts), book_slug: slug, signup_via: via };
+    guardian_name: t(d.guardian_name), alerts: t(d.alerts), consult_type: d.consult_type, book_slug: slug, signup_via: via };
 }
-/* ---------- cadastro mínimo obrigatório para liberar a agenda: nome, CPF, nascimento, e-mail (e a senha da conta) ---------- */
-const profileMissing = p => [!(p?.name || '').trim() && 'nome completo', !p?.cpf && 'CPF', !p?.birth_date && 'data de nascimento', !p?.email && 'e-mail'].filter(Boolean);
+/* ---------- cadastro mínimo obrigatório para liberar a agenda: nome, CPF, nascimento, e-mail, celular com WhatsApp (e a senha da conta) ---------- */
+const profileMissing = p => [!(p?.name || '').trim() && 'nome completo', !p?.cpf && 'CPF', !p?.birth_date && 'data de nascimento', !p?.email && 'e-mail', onlyDigits(p?.phone).length < 10 && 'celular com WhatsApp'].filter(Boolean);
 function completeProfileCard() {
   const p = S.patient || {}; const miss = profileMissing(p);
   return html`<div class="card"><h2 style="margin-top:0">Complete seu cadastro para liberar a agenda</h2>
@@ -116,7 +120,8 @@ function completeProfileCard() {
       <label class="f" style="grid-column:1/-1"><span>Nome completo <i>*</i></span><input class="in" name="name" required value="${p.name || ''}" ${(p.name || '').trim() ? 'readonly' : ''}></label>
       <label class="f"><span>CPF <i>*</i></span><input class="in" name="cpf" required inputmode="numeric" maxlength="14" placeholder="000.000.000-00" value="${p.cpf ? fCPF(p.cpf) : ''}" ${p.cpf ? 'readonly' : ''}></label>
       <label class="f"><span>Data de nascimento <i>*</i></span><input class="in" type="date" name="birth_date" required max="${ymd(new Date())}" value="${p.birth_date || ''}" ${p.birth_date ? 'readonly' : ''}></label>
-      <label class="f" style="grid-column:1/-1"><span>E-mail <i>*</i></span><input class="in" type="email" name="email" required value="${p.email || LS.get('pepmh_auth')?.user?.email || ''}"></label>
+      <label class="f"><span>E-mail <i>*</i></span><input class="in" type="email" name="email" required value="${p.email || LS.get('pepmh_auth')?.user?.email || ''}"></label>
+      <label class="f"><span>Celular (WhatsApp) <i>*</i></span><input class="in" name="phone" required inputmode="tel" autocomplete="tel" placeholder="(75) 99999-9999" value="${p.phone ? fPhone(p.phone) : ''}"></label>
     </div><button class="btn primary block" type="submit">${icon('check')} Salvar e liberar a agenda</button></form>
     <p class="tiny muted" style="margin:0">Depois de salvos, nome, CPF e nascimento só a clínica altera.</p></div>`;
 }
@@ -124,7 +129,8 @@ onForm('completeProfile', async d => {
   if (!cpfValid(d.cpf)) throw new Error('Confira o CPF: os números não batem.');
   if (!d.birth_date || d.birth_date > ymd(new Date()) || d.birth_date < '1900-01-01') throw new Error('Confira a data de nascimento.');
   if (!(d.name || '').trim().includes(' ')) throw new Error('Escreva o nome completo (nome e sobrenome).');
-  await db.update('patients', S.patient.id, { name: d.name.trim(), cpf: onlyDigits(d.cpf), birth_date: d.birth_date, email: d.email.trim().toLowerCase() });
+  if (onlyDigits(d.phone).length < 10) throw new Error('Informe o celular com DDD (o mesmo do WhatsApp).');
+  await db.update('patients', S.patient.id, { name: d.name.trim(), cpf: onlyDigits(d.cpf), birth_date: d.birth_date, email: d.email.trim().toLowerCase(), phone: onlyDigits(d.phone) });
   S.patient = await db.get('patients', S.patient.id);
   if (profileMissing(S.patient).length) throw new Error('Não deu para salvar tudo. Fale com a clínica para conferir seu cadastro.');
   S.me.full_name = S.patient.name; toast('Cadastro completo! Agenda liberada.', 'ok'); router();

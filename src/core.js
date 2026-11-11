@@ -72,6 +72,7 @@ const startOfDay = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return 
 const age = b => { if (!b) return null; const d = parseYmd(b), n = new Date(); let a = n.getFullYear() - d.getFullYear(); if (n.getMonth() < d.getMonth() || (n.getMonth() === d.getMonth() && n.getDate() < d.getDate())) a--; return a; };
 const initials = n => String(n || '?').trim().split(/\s+/).filter(w => /^\p{L}/u.test(w) && !/^(dr|dra|de|da|do|das|dos|e)\.?$/i.test(w)).map(w => w[0]).filter((_, i, a) => i === 0 || i === a.length - 1).join('').toUpperCase() || '?';
 const onlyDigits = s => String(s || '').replace(/\D/g, '');
+const CONSULT_TYPES = ['Ginecologia', 'Pré-natal (obstetrícia)', 'Emagrecimento', 'Retorno', 'Outro'];
 const isGenericMeet = u => /^https?:\/\/meet\.google\.com\/?(new|landing)?\/?(\?.*)?$/i.test((u || '').trim());
 const MEET_GENERIC_MSG = 'O endereço meet.google.com/new cria uma sala nova a cada clique — você e o paciente cairiam em salas diferentes. Abra "Criar sala nova no Meet", copie o endereço da sala que abriu (ex.: https://meet.google.com/abc-defg-hij) e cole aqui.';
 const waLink = (phone, text) => { let p = onlyDigits(phone); if (p && p.length <= 11) p = '55' + p; return `https://wa.me/${p}?text=${encodeURIComponent(text || '')}`; };

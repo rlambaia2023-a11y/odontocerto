@@ -72,3 +72,6 @@ Quando o PDF assinado de um documento chega (pasta vigiada, arrastar, celular ou
 - em "Anexar documento assinado", se o PDF é de um documento que já está aguardando assinatura, a assinatura entra nele em vez de criar outro;
 - na pasta vigiada do computador, apaga o PDF original sem assinatura do mesmo documento (precisa da permissão de leitura e escrita na pasta).
 Banco: migração `20261111_assinado_substitui_nao_assinado.sql` (colunas `sig_time`/`sig_signer`, conferência de data no banco e gatilho que exclui as cópias sem assinatura). Sem ela, o sistema faz o mesmo pela tela.
+
+## Cadastro do paciente novo (nov/2026)
+No cadastro online (link de cadastro e agendamento) são obrigatórios: **nome completo, data de nascimento, celular com WhatsApp, e-mail, CPF e "Qual tipo de consulta?"** (Ginecologia, Pré-natal, Emagrecimento, Retorno ou Outro — lista em `CONSULT_TYPES`, `src/core.js`). O tipo aparece no cabeçalho do prontuário e pode ser trocado em Editar paciente. O celular com WhatsApp também passou a ser exigido para liberar a agenda. Banco: migração `20261111_cadastro_tipo_consulta_whatsapp.sql` (coluna `consult_type`, exigência do celular e cópia do tipo para a ficha).
