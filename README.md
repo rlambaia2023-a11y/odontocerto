@@ -59,3 +59,6 @@ Todo paciente com conta precisa ter **nome completo, CPF, data de nascimento, e-
 
 ## Senha do paciente pelo responsável
 Em **Editar paciente** (e em "Acesso do paciente"), o responsável (master) pode **criar o acesso** de quem ainda não tem conta ou **alterar a senha** de quem já tem. Pode digitar a senha ou deixar em branco para gerar uma provisória — nesse caso o paciente cria uma senha dele no primeiro acesso. A tela já monta a mensagem para enviar pelo WhatsApp ou por e-mail. Usa a função `reset-link` (`mode: create | password`).
+
+## Receita com medicamento livre
+Em **Prescrições e laudos → Receita** (e também em manipulado e medicação), o médico escolhe da lista ou escreve qualquer medicamento: nome comercial, princípio ativo ou fórmula, com via de uso, composição da fórmula (um ativo por linha), quantidade e posologia. A checagem de alergia vale para o que for digitado.

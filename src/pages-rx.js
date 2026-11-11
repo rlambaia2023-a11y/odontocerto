@@ -135,6 +135,7 @@ const medById = id => { const [c, i] = String(id || '').split('::'); return (S.m
 const curMeds = () => S.me?.profession === 'medicina' ? Object.values(MEDS_MED_CATS).flat() : MEDS_ODO;
 const medOptions = type => html`<option value="">Selecione…</option>${Object.entries(medCats(type)).map(([c, list]) => html`<optgroup label="${c}">${list.map((m, i) => html`<option value="${c}::${i}">${m[0]}${m[4] ? ' ⚑' : ''}</option>`)}</optgroup>`)}`;
 const MED_TYPES = ['receituario', 'manipulado', 'medicacao'];
+const RX_VIAS = ['uso oral', 'uso sublingual', 'uso tópico', 'uso vaginal', 'uso retal', 'uso oftálmico', 'uso otológico', 'uso nasal', 'uso inalatório', 'uso subcutâneo', 'uso intramuscular', 'uso endovenoso', 'uso transdérmico'];
 const DOC_FALLBACK = { imagem: 'exames', manipulado: 'receituario', medicacao: 'receituario' };
 const RXTYPES = { simples: 'Simples (uma via)', duas_vias: 'Simples em duas vias (antimicrobiano ou retenção de receita)', controle_especial: 'Controle especial (duas vias)' };
 
@@ -161,9 +162,14 @@ route('/prescrever', async (_, q) => {
       <div class="grid g2 collapse" style="align-items:end"><label class="f"><span>Modelo personalizado</span><select class="in" id="rxtpl" data-change="rxTpl"><option value="">Selecione…</option>${protoOptions(type)}${tpls.filter(t => t.doc_type === type).map(t => html`<option value="${t.id}">${t.title}</option>`)}</select></label>
         <div class="row"><button type="button" class="btn sm" data-act="manageTpl">${icon('edit')} Editar lista de modelos</button></div></div>
       ${examBox(type)}
-      <div id="medbox" class="${MED_TYPES.includes(type) ? '' : 'hidden'}"><div class="grid g2 collapse" style="align-items:end"><label class="f"><span>Adicionar medicamento</span><select class="in" id="rxmed" data-change="rxMed">${medOptions(type)}</select></label>
-        <label class="f"><span>Quantidade</span><input class="in" id="rxqty"></label></div>
-        <label class="f" style="margin-top:10px"><span>Posologia</span><input class="in" id="rxpos"></label>
+      <div id="medbox" class="${MED_TYPES.includes(type) ? '' : 'hidden'}">
+        <label class="f"><span>Escolher da lista (opcional)</span><select class="in" id="rxmed" data-change="rxMed">${medOptions(type)}</select></label>
+        <p class="tiny muted" style="margin:6px 0 0">Não achou na lista? Escreva abaixo qualquer medicamento: nome comercial, princípio ativo ou a fórmula completa.</p>
+        <div class="grid g2 collapse" style="align-items:end;margin-top:10px"><label class="f"><span>Medicamento, princípio ativo ou fórmula <i>*</i></span><input class="in" id="rxname" placeholder="Ex.: Losartana potássica 50 mg"></label>
+          <label class="f"><span>Via de uso</span><input class="in" id="rxvia" list="rxvias" placeholder="uso oral"><datalist id="rxvias">${RX_VIAS.map(v => html`<option value="${v}">`)}</datalist></label></div>
+        <label class="f" style="margin-top:10px"><span>Composição da fórmula (opcional, um ativo por linha)</span><textarea class="in" id="rxcomp" rows="3" placeholder="Ex.:&#10;Cafeína anidra 100 mg&#10;Picolinato de cromo 200 mcg&#10;Excipiente q.s.p. 1 cápsula"></textarea></label>
+        <div class="grid g2 collapse" style="align-items:end;margin-top:10px"><label class="f"><span>Quantidade</span><input class="in" id="rxqty" placeholder="Ex.: 30 comprimidos / Manipular 60 cápsulas"></label>
+        <label class="f"><span>Posologia</span><input class="in" id="rxpos" placeholder="Ex.: Tomar 1 comprimido ao dia, pela manhã."></label></div>
         <div class="row" style="margin-top:10px"><button type="button" class="btn" data-act="rxClearMed">${icon('x')} Remover</button><button type="button" class="btn ok" data-act="rxAddMed">${icon('plus')} Adicionar</button></div>
         <p class="tiny muted" id="rxflag" style="margin:8px 0 0;color:var(--warn,#b26a00)"></p><p class="tiny muted" style="margin:8px 0 0">⚑ = exige receita em 2 vias / retenção. Posologias de referência. Confira dose, intervalo e duração para cada paciente (idade, peso, alergias, função renal/hepática).</p></div>
       <div><span class="small" style="font-weight:600;color:var(--ink-2)">Escreva o documento <i style="color:var(--bad);font-style:normal">*</i></span>
@@ -209,15 +215,22 @@ onInput('rxTpl', el => {
   const name = document.querySelector('#rxform [name=patient_name]').value || '______________';
   const ed = document.getElementById('rxed'); ed.innerHTML = (ed.innerHTML.trim() ? ed.innerHTML : '') + sanitize(t.content).replace(/\{paciente\}/g, esc(name));
 });
-onInput('rxMed', el => { const m = medById(el.value); document.getElementById('rxqty').value = m ? m[2] : ''; document.getElementById('rxpos').value = m ? m[3] : ''; document.getElementById('rxflag').textContent = m?.[4] ? '⚑ ' + MED_FLAG[m[4]] + '.' : ''; });
-act('rxClearMed', () => { document.getElementById('rxmed').value = ''; document.getElementById('rxqty').value = ''; document.getElementById('rxpos').value = ''; const fl = document.getElementById('rxflag'); if (fl) fl.textContent = ''; });
+const rxVal = id => (document.getElementById(id)?.value || '').trim();
+onInput('rxMed', el => { const m = medById(el.value); const set = (id, v) => { const i = document.getElementById(id); if (i) i.value = v; };
+  set('rxname', m ? m[0] : ''); set('rxvia', m ? m[1] : ''); set('rxcomp', ''); set('rxqty', m ? m[2] : ''); set('rxpos', m ? m[3] : '');
+  document.getElementById('rxflag').textContent = m?.[4] ? '⚑ ' + MED_FLAG[m[4]] + '.' : ''; });
+act('rxClearMed', () => { ['rxmed', 'rxname', 'rxvia', 'rxcomp', 'rxqty', 'rxpos'].forEach(id => { const i = document.getElementById(id); if (i) i.value = ''; }); const fl = document.getElementById('rxflag'); if (fl) fl.textContent = ''; });
 act('rxAddMed', async () => {
-  const m = medById(document.getElementById('rxmed').value); if (!m) return toast('Escolha um medicamento.', 'bad');
-  if (allergyHit(m[0]) && !(await confirmBox(`Atenção: o paciente tem registro de "${window.__allergy}". ${m[0]} pode estar relacionado. Incluir mesmo assim?`, 'Incluir mesmo assim'))) return;
+  const sel = medById(document.getElementById('rxmed').value); const name = rxVal('rxname');
+  if (!name) return toast('Escreva o medicamento (nome, princípio ativo ou fórmula) ou escolha um da lista.', 'bad');
+  const m = sel && sel[0] === name ? sel : null; /* da lista e sem alteração no nome: mantém o alerta de 2 vias */
+  if (allergyHit(name) && !(await confirmBox(`Atenção: o paciente tem registro de "${window.__allergy}". ${name} pode estar relacionado. Incluir mesmo assim?`, 'Incluir mesmo assim'))) return;
   const ed = document.getElementById('rxed'); const n = (ed.querySelectorAll('[data-med]').length || ed.innerHTML.match(/<p>\d+\./g)?.length || 0) + 1;
-  const via = m[1]; const hasVia = ed.textContent.toLowerCase().includes(via);
-  ed.insertAdjacentHTML('beforeend', `${hasVia ? '' : `<p><b>${esc(via[0].toUpperCase() + via.slice(1))}</b></p>`}<p data-med="1">${n}. ${esc(m[0])} ———— ${esc(document.getElementById('rxqty').value)}<br>${esc(document.getElementById('rxpos').value)}</p>`);
-  if (m[4]) { const sel = document.querySelector('#rxform [name=rx_type]'); const want = m[4] === 'ce' ? 'controle_especial' : 'duas_vias'; if (sel && sel.value !== 'controle_especial' && sel.value !== want) { sel.value = want; toast(`${m[0].split(' ')[0]}: ${MED_FLAG[m[4]]}. Ajustei o tipo de receituário.`); } }
+  const via = (rxVal('rxvia') || 'uso oral').toLowerCase(); const hasVia = ed.textContent.toLowerCase().includes(via);
+  const comp = rxVal('rxcomp').split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const qty = rxVal('rxqty'), pos = rxVal('rxpos');
+  ed.insertAdjacentHTML('beforeend', `${hasVia ? '' : `<p><b>${esc(via[0].toUpperCase() + via.slice(1))}</b></p>`}<p data-med="1">${n}. ${esc(name)}${qty ? ' ———— ' + esc(qty) : ''}${comp.map(c => '<br>&nbsp;&nbsp;&nbsp;' + esc(c)).join('')}${pos ? '<br>' + esc(pos) : ''}</p>`);
+  if (m?.[4]) { const sel = document.querySelector('#rxform [name=rx_type]'); const want = m[4] === 'ce' ? 'controle_especial' : 'duas_vias'; if (sel && sel.value !== 'controle_especial' && sel.value !== want) { sel.value = want; toast(`${m[0].split(' ')[0]}: ${MED_FLAG[m[4]]}. Ajustei o tipo de receituário.`); } }
   ACT.rxClearMed();
 });
 act('rxCmd', el => { document.getElementById('rxed').focus(); document.execCommand(el.dataset.c, false, null); });
