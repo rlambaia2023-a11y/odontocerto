@@ -78,7 +78,7 @@ pubRoute('/verificar/:code', async ({ code }) => {
   return html`<div class="auth"><div class="card stack"><div class="brand"><span class="mark" role="img" aria-label="PEPMH"></span><div><h1>Verificação de documento</h1><div class="small muted">Código ${code.toUpperCase()}</div></div></div>
     ${v ? html`${v.anulado_em ? html`<div class="pill bad" style="font-size:.9rem;white-space:normal">✗ Documento ANULADO pelo profissional em ${fDT(v.anulado_em)}. Não deve ser aceito.</div>` : html`<div class="pill ok" style="font-size:.9rem">✓ Documento emitido pelo PEPMH</div>`}
       <table class="tbl"><tr><td class="muted">Tipo</td><td><b>${DOCT[v.tipo]?.[0] || v.tipo}</b></td></tr><tr><td class="muted">Emitido em</td><td>${fDT(v.emitido_em)}</td></tr><tr><td class="muted">Profissional</td><td>${v.profissional || ''} ${v.conselho && !/^-\s*$/.test(v.conselho.trim()) ? '· ' + v.conselho : ''}</td></tr><tr><td class="muted">Clínica</td><td>${v.clinica}</td></tr><tr><td class="muted">Paciente</td><td>${v.paciente_iniciais} (iniciais)</td></tr>
-      <tr><td class="muted">Assinatura ICP-Brasil</td><td>${v.assinado_icp ? html`<span class="pill ok">PDF assinado enviado em ${fDT(v.assinado_em)}</span>` : html`<span class="pill gray">não enviada — vale a via assinada à mão</span>`}</td></tr></table>
+      <tr><td class="muted">Assinatura ICP-Brasil</td><td>${v.assinado_icp ? html`<span class="pill ok">PDF assinado enviado em ${fDT(v.assinado_em)}</span>${v.hora_assinatura ? html`<div class="tiny muted">Data e hora gravadas na assinatura: ${fDT(v.hora_assinatura)}</div>` : ''}` : html`<span class="pill gray">não enviada — vale a via assinada à mão</span>`}</td></tr></table>
       ${v.hash ? html`<p class="tiny muted" style="word-break:break-all">Impressão digital (SHA-256): ${v.hash}</p>` : ''}
       ${v.hash_pdf_assinado ? html`<p class="tiny muted" style="word-break:break-all">SHA-256 do PDF assinado: ${v.hash_pdf_assinado}</p>` : ''}
       <p class="small muted">${v.assinado_icp ? html`Para conferir a assinatura do arquivo PDF, use o validador oficial do ITI: <a href="https://validar.iti.gov.br" target="_blank" rel="noopener">validar.iti.gov.br</a>.` : 'O conteúdo não é exibido aqui para proteger os dados do paciente.'}</p>`
@@ -189,6 +189,23 @@ function _cmsNames(cms) {
   }
   return out;
 }
+/* data e hora gravadas dentro da assinatura: signingTime do CMS (1.2.840.113549.1.9.5) ou, se faltar, o /M do dicionário da assinatura */
+function _cmsSigningTime(cms) {
+  const oid = [0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x05]; const i = _findSeq(cms, oid); if (i < 0) return null;
+  let j = i + oid.length; if (cms[j] !== 0x31) return null; [, j] = _derLen(cms, j + 1);
+  const tag = cms[j]; if (tag !== 0x17 && tag !== 0x18) return null; const [l, st] = _derLen(cms, j + 1);
+  const s = new TextDecoder('latin1').decode(cms.slice(st, st + l)); const m = /^(\d{2}|\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?(?:\.\d+)?Z$/.exec(s); if (!m) return null;
+  const y = m[1].length === 2 ? (+m[1] < 50 ? 2000 : 1900) + +m[1] : +m[1];
+  const t = new Date(Date.UTC(y, +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0))); return isNaN(t) ? null : t;
+}
+function _pdfDateM(txt) {
+  const m = /\/M\s*\(D:(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?(Z|[+-])?(\d{2})?'?(\d{2})?'?\)/.exec(txt); if (!m) return null;
+  let t = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)); if (m[7] === '+' || m[7] === '-') t -= (m[7] === '+' ? 1 : -1) * ((+m[8] || 0) * 60 + (+m[9] || 0)) * 60000;
+  const d = new Date(t); return isNaN(d) ? null : d;
+}
+/* código de verificação que o PEPMH imprime no rodapé do PDF (mostra de qual documento o arquivo é) */
+const pdfVerifyCode = txt => { const m = /verifica\xe7\xe3o ([0-9A-F]{10})\)/.exec(txt) || /\/verificar\/([0-9A-F]{10})\)/.exec(txt); return m ? m[1] : null; };
+async function pdfCodeOf(f) { return pdfVerifyCode(new TextDecoder('latin1').decode(new Uint8Array(await f.arrayBuffer()))); }
 async function verifySignedPdf(f, d) {
   const buf = new Uint8Array(await f.arrayBuffer()); const txt = new TextDecoder('latin1').decode(buf);
   if (!txt.startsWith('%PDF')) throw new Error('Esse arquivo não é um PDF válido.');
@@ -210,7 +227,8 @@ async function verifySignedPdf(f, d) {
     const raw = _cmsNames(cms), names = raw.map(_normName);
     const signer = (raw.find(n => /:\d{11}$/.test(n)) || raw[0] || '').replace(/:\d+$/, '');
     if (want.length && !names.some(n => want.every(w => n.split(' ').includes(w)))) { lastErr = `Este PDF foi assinado por ${signer || 'outra pessoa'}, mas o documento é de ${d.professional_name}. Só quem emitiu pode assinar. Se o nome no PEPMH estiver diferente do certificado, ajuste o nome do profissional na equipe.`; continue; }
-    return { signer, alg };
+    const time = _cmsSigningTime(cms) || _pdfDateM(txt.slice(Math.max(0, b - 4000), b));
+    return { signer, alg, time, code: pdfVerifyCode(txt) };
   }
   throw new Error(lastErr);
 }
@@ -222,17 +240,38 @@ async function uploadSignedFile(d, f, auto = false) {
   if (f.size > 10 * 1024 * 1024) throw new Error('O PDF passa de 10 MB.');
   if (d.signed_file_path) throw new Error('Este documento já tem PDF assinado.');
   const v = await verifySignedPdf(f, d);
+  // o PDF assinado precisa ser deste documento (código de verificação impresso no rodapé)
+  if (v.code && d.verify_code && v.code !== d.verify_code) throw new Error(`Este PDF assinado é de outro documento (código ${v.code}); este aqui é o ${d.verify_code}. Confira se escolheu o arquivo certo.`);
+  // data e hora da assinatura: não pode ser antes da emissão nem no futuro (folga de 15 min para relógio)
+  if (v.time) {
+    const tol = 15 * 60000;
+    if (d.created_at && +v.time < +new Date(d.created_at) - tol) throw new Error(`A assinatura deste PDF é de ${fDT(v.time)}, antes de o documento ser emitido (${fDT(d.created_at)}). Assine de novo o PDF gerado agora pelo PEPMH.`);
+    if (+v.time > Date.now() + tol) throw new Error(`A assinatura deste PDF está com data no futuro (${fDT(v.time)}). Confira a data e a hora do computador e assine de novo.`);
+  }
   const path = `${d.clinic_id}/${d.id}-${Date.now()}.pdf`; const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', await f.arrayBuffer()))].map(x => x.toString(16).padStart(2, '0')).join('');
   const now = new Date().toISOString(), rel = d.released_at ? {} : { released_at: now };
-  if (isDemo()) { await db.update('documents', d.id, { signed_file_path: 'demo/' + d.id + '.pdf', signed_at: now, signed_sha256: hash, ...rel }); }
-  else { await Remote.upload('signed-docs', path, f, false); await db.update('documents', d.id, { signed_file_path: path, signed_at: now, signed_by: Auth.userId(), signed_sha256: hash, ...rel, ...(d.released_at ? {} : { released_by: Auth.userId() }) }); }
+  const sig = v.time ? { sig_time: v.time.toISOString(), sig_signer: (v.signer || '').slice(0, 200) || null } : {};
+  const save = async extra => { try { await db.update('documents', d.id, extra); } catch (e) { if (!/sig_time|sig_signer/.test(e.message || '')) throw e; const { sig_time, sig_signer, ...rest } = extra; await db.update('documents', d.id, rest); } };
+  if (isDemo()) { await save({ signed_file_path: 'demo/' + d.id + '.pdf', signed_at: now, signed_sha256: hash, ...sig, ...rel }); }
+  else { await Remote.upload('signed-docs', path, f, false); await save({ signed_file_path: path, signed_at: now, signed_by: Auth.userId(), signed_sha256: hash, ...sig, ...rel, ...(d.released_at ? {} : { released_by: Auth.userId() }) }); }
   stopSignWatch();
+  const twins = await dropUnsignedTwins(d).catch(() => 0);
   modal('Documento assinado', html`<div class="pill ok" style="font-size:.95rem;white-space:normal">✓ Assinatura conferida e documento liberado na área da paciente${auto ? ' (enviado automaticamente)' : ''}.</div>
-    <p class="small">Assinado por <b>${v.signer || d.professional_name}</b> com certificado ICP-Brasil. O PEPMH conferiu que o arquivo não foi alterado depois da assinatura. A validação oficial completa é no ITI (envie o arquivo <i>${esc(f.name)}</i>).</p>
+    <p class="small">Assinado por <b>${v.signer || d.professional_name}</b> com certificado ICP-Brasil${v.time ? html` em <b>${fDT(v.time)}</b> (data e hora gravadas na assinatura)` : ''}. O PEPMH conferiu que o arquivo não foi alterado depois da assinatura${v.code ? ' e que ele é deste documento (código ' + v.code + ')' : ''}. A validação oficial completa é no ITI (envie o arquivo <i>${esc(f.name)}</i>).</p>
+    ${twins ? html`<p class="small muted">${twins === 1 ? 'A cópia idêntica sem assinatura saiu' : twins + ' cópias idênticas sem assinatura saíram'} do prontuário (ficam em "Documentos excluídos").</p>` : ''}
     <div class="row wrap"><a class="btn primary" href="https://validar.iti.gov.br" target="_blank" rel="noopener">${icon('check')} Validar no ITI</a><button class="btn ok" data-act="shareDoc" data-id="${d.id}">${icon('send')} Enviar à paciente</button><button class="btn" data-act="closeModal">Fechar</button></div>`, { wide: true });
   toast('Documento assinado e liberado para a paciente.', 'ok');
   saveSignedCopy(d, f).catch(() => { });
   if (location.hash.includes('/paciente/')) { const iv = setInterval(() => { if (!document.getElementById('modal')) { clearInterval(iv); router(); } }, 400); }
+}
+/* tira do prontuário as cópias idênticas (mesmo paciente, tipo, profissional e conteúdo) que ficaram sem assinatura.
+   Exclusão lógica: vão para "Documentos excluídos" com o motivo. O banco faz o mesmo por gatilho. */
+async function dropUnsignedTwins(d) {
+  if (!d?.content_hash) return 0;
+  const list = await db.list('documents', { eq: { patient_id: d.patient_id, doc_type: d.doc_type, content_hash: d.content_hash } });
+  const twins = (list || []).filter(x => x.id !== d.id && !x.signed_file_path && !x.deleted_at && (x.professional_id || null) === (d.professional_id || null));
+  for (const x of twins) await db.update('documents', x.id, { deleted_at: new Date().toISOString(), delete_reason: 'Substituído pela via assinada digitalmente' + (d.verify_code ? ' (' + d.verify_code + ')' : '') }).catch(() => { });
+  return twins.length;
 }
 async function saveSignedCopy(d, f) {
   if (S.mode !== 'staff' || !PdfDirs.supported() || !(await PdfDirs.opts()).assinadosAuto) return;
@@ -257,7 +296,10 @@ const SignDir = {
   supported: () => 'showDirectoryPicker' in window,
   async ready(ask) {
     const h = await this.get(); if (!h) return null;
-    try { if ((await h.queryPermission({ mode: 'read' })) === 'granted') return h; if (ask && (await h.requestPermission({ mode: 'read' })) === 'granted') return h; } catch { }
+    // leitura e escrita: escrita serve para apagar da pasta o PDF sem assinatura depois que o assinado sobe
+    for (const mode of ['readwrite', 'read']) {
+      try { if ((await h.queryPermission({ mode })) === 'granted') return h; if (ask && (await h.requestPermission({ mode })) === 'granted') return h; } catch { }
+    }
     return null;
   },
 };
@@ -280,10 +322,26 @@ async function startSignWatch(d, base, since) {
         seen.set(name, f.lastModified);
         if (!pdfHasSig(new TextDecoder('latin1').decode(await f.arrayBuffer()))) continue;
         stopSignWatch(); setSignStatus('PDF assinado encontrado. Enviando…', 'ok');
-        await uploadSignedFile(await db.get('documents', d.id), f, true); return;
+        try { await uploadSignedFile(await db.get('documents', d.id), f, true); }
+        catch (e) { setSignStatus(e.message, 'bad'); toast(e.message, 'bad'); return; }
+        removeUnsignedOriginal(dir, d, base, name).catch(() => { }); return;
       }
     } catch (e) { stopSignWatch(); setSignStatus('Não consegui ler a pasta: ' + e.message + '. Arraste o PDF assinado para cá.', 'bad'); }
   }, 2000) };
+}
+/* depois que o assinado subiu: apaga da pasta vigiada o PDF original sem assinatura do MESMO documento
+   (mesmo nome-base e mesmo código de verificação no rodapé). Nunca apaga arquivo assinado nem de outro documento. */
+async function removeUnsignedOriginal(dir, d, base, signedName) {
+  if (!d.verify_code) return;
+  try { if ((await dir.queryPermission({ mode: 'readwrite' })) !== 'granted') return; } catch { return; }
+  const gone = [];
+  for await (const [name, h] of dir.entries()) {
+    if (h.kind !== 'file' || name === signedName || !/\.pdf$/i.test(name) || !name.toLowerCase().startsWith(base)) continue;
+    const txt = new TextDecoder('latin1').decode(new Uint8Array(await (await h.getFile()).arrayBuffer()));
+    if (pdfHasSig(txt) || pdfVerifyCode(txt) !== d.verify_code) continue;
+    await dir.removeEntry(name).then(() => gone.push(name)).catch(() => { });
+  }
+  if (gone.length) toast(`PDF sem assinatura apagado da pasta "${dir.name}" (${gone.join(', ')}). Ficou só o assinado.`, 'ok');
 }
 async function desktopSign(docId) {
   const b = await docBundle(docId); const name = pdfName(b.doc, b.patient);
@@ -295,7 +353,7 @@ async function desktopSign(docId) {
 act('desktopSign', el => desktopSign(el.dataset.id));
 act('pickSignDir', async el => {
   if (!SignDir.supported()) throw new Error('Este navegador não deixa vigiar pastas. Use o Google Chrome ou o Microsoft Edge no computador.');
-  let h; try { h = await window.showDirectoryPicker({ id: 'pepmh-assinatura', mode: 'read', startIn: 'downloads' }); } catch (e) { if (e.name === 'AbortError') return; throw new Error('O navegador não liberou essa pasta. Crie uma pasta, por exemplo Documentos\\PEPMH Assinados, e escolha ela (e salve os PDFs assinados lá).'); }
+  let h; try { h = await window.showDirectoryPicker({ id: 'pepmh-assinatura', mode: 'readwrite', startIn: 'downloads' }); } catch (e) { if (e.name === 'AbortError') return; throw new Error('O navegador não liberou essa pasta. Crie uma pasta, por exemplo Documentos\\PEPMH Assinados, e escolha ela (e salve os PDFs assinados lá).'); }
   await SignDir.set(h); toast(`Pasta "${h.name}" ativada. Os PDFs assinados salvos nela sobem sozinhos.`, 'ok');
   const lbl = document.getElementById('signdirname'); if (lbl) lbl.textContent = h.name;
   if (el.dataset.id && signWatch?.id !== el.dataset.id) { const d = await db.get('documents', el.dataset.id); const b = await docBundle(d.id); startSignWatch(d, pdfName(b.doc, b.patient).replace(/\.pdf$/i, '').toLowerCase(), Date.now() - 30 * 60 * 1000); }
@@ -517,7 +575,17 @@ act('attachSigned', async el => {
 onForm('attachSigned', async (d, f) => {
   const file = f.querySelector('[name=file]').files[0]; if (!file) throw new Error('Escolha o PDF assinado.');
   if (file.size > 10 * 1024 * 1024) throw new Error('O PDF passa de 10 MB.');
-  await verifySignedPdf(file, { professional_name: S.me.full_name });
+  const v0 = await verifySignedPdf(file, { professional_name: S.me.full_name });
+  // PDF gerado pelo PEPMH? Então ele já tem documento aqui: a assinatura entra nele e não cria um duplicado
+  if (v0.code) {
+    const same = (await db.list('documents', { eq: { verify_code: v0.code } }).catch(() => []) || [])[0];
+    if (same) {
+      if (same.patient_id !== d.patient_id) throw new Error(`Este PDF assinado é de um documento de outro paciente (código ${v0.code}). Anexe na ficha certa.`);
+      if (same.deleted_at) throw new Error(`O documento ${v0.code} foi excluído. Restaure ele em "Documentos excluídos" antes de anexar a via assinada.`);
+      if (same.signed_file_path) throw new Error(`O documento ${v0.code} já está assinado e na área do paciente.`);
+      closeModal(); await uploadSignedFile(same, file); return;
+    }
+  }
   const content = sanitize(`<p><b>Documento anexado</b> (PDF assinado digitalmente).</p>${d.desc ? `<p>${esc(d.desc)}</p>` : ''}`);
   const row = { patient_id: d.patient_id, professional_id: Auth.userId(), professional_name: S.me.full_name, doc_type: d.doc_type, rx_type: ['receituario', 'manipulado'].includes(d.doc_type) ? 'simples' : null, content, content_hash: await sha256(content), no_date: false, sent_to: null };
   let doc; try { doc = await db.insert('documents', row); } catch (e) {

@@ -52,7 +52,7 @@ const DemoRPC = {
   verify_document({ p_code }) {
     const d = Demo.load(); const doc = d.documents.find(x => x.verify_code === String(p_code).toUpperCase()); if (!doc) return null;
     const m = d.clinic_members.find(x => x.user_id === doc.professional_id) || {}; const p = d.patients.find(x => x.id === doc.patient_id) || {};
-    return { tipo: doc.doc_type, emitido_em: doc.created_at, profissional: doc.professional_name, conselho: councilOf(m), clinica: d.clinics[0].name, paciente_iniciais: initials(p.name), hash: doc.content_hash, assinado_icp: !!doc.signed_file_path, assinado_em: doc.signed_at, hash_pdf_assinado: doc.signed_sha256 || null, anulado_em: doc.deleted_at || null };
+    return { tipo: doc.doc_type, emitido_em: doc.created_at, profissional: doc.professional_name, conselho: councilOf(m), clinica: d.clinics[0].name, paciente_iniciais: initials(p.name), hash: doc.content_hash, assinado_icp: !!doc.signed_file_path, assinado_em: doc.signed_at, hash_pdf_assinado: doc.signed_sha256 || null, hora_assinatura: doc.sig_time || null, anulado_em: doc.deleted_at || null };
   },
   accept_invite() { throw new Error('Convites funcionam só na versão real (fora da demonstração).'); },
   link_patient_account() { throw new Error('Códigos de acesso funcionam só na versão real (fora da demonstração).'); },

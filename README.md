@@ -62,3 +62,13 @@ Em **Editar paciente** (e em "Acesso do paciente"), o responsável (master) pode
 
 ## Receita com medicamento livre
 Em **Prescrições e laudos → Receita** (e também em manipulado e medicação), o médico escolhe da lista ou escreve qualquer medicamento: nome comercial, princípio ativo ou fórmula, com via de uso, composição da fórmula (um ativo por linha), quantidade e posologia. A checagem de alergia vale para o que for digitado.
+
+## Assinado substitui o não assinado
+Quando o PDF assinado de um documento chega (pasta vigiada, arrastar, celular ou "Anexar documento assinado"), o PEPMH:
+- confere que o PDF é **daquele documento** pelo código de verificação impresso no rodapé (PDF de outro documento ou de outro paciente é recusado);
+- lê a **data e a hora gravadas na assinatura** (signingTime do certificado) e recusa assinatura anterior à emissão ou no futuro (folga de 15 min); a hora fica no prontuário e na verificação pública;
+- mantém as conferências de antes (ICP-Brasil, nome de quem emitiu, arquivo não alterado depois de assinado);
+- tira do prontuário as cópias idênticas que ficaram sem assinatura (mesmo paciente, tipo, profissional e conteúdo) — vão para "Documentos excluídos" com o motivo;
+- em "Anexar documento assinado", se o PDF é de um documento que já está aguardando assinatura, a assinatura entra nele em vez de criar outro;
+- na pasta vigiada do computador, apaga o PDF original sem assinatura do mesmo documento (precisa da permissão de leitura e escrita na pasta).
+Banco: migração `20261111_assinado_substitui_nao_assinado.sql` (colunas `sig_time`/`sig_signer`, conferência de data no banco e gatilho que exclui as cópias sem assinatura). Sem ela, o sistema faz o mesmo pela tela.
