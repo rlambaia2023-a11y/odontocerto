@@ -75,3 +75,6 @@ Banco: migração `20261111_assinado_substitui_nao_assinado.sql` (colunas `sig_t
 
 ## Cadastro do paciente novo (nov/2026)
 No cadastro online (link de cadastro e agendamento) são obrigatórios: **nome completo, data de nascimento, celular com WhatsApp, e-mail, CPF e "Qual tipo de consulta?"** (Ginecologia, Pré-natal, Emagrecimento, Retorno ou Outro — lista em `CONSULT_TYPES`, `src/core.js`). O tipo aparece no cabeçalho do prontuário e pode ser trocado em Editar paciente. O celular com WhatsApp também passou a ser exigido para liberar a agenda. Banco: migração `20261111_cadastro_tipo_consulta_whatsapp.sql` (coluna `consult_type`, exigência do celular e cópia do tipo para a ficha).
+
+## Exames pós-consulta
+No prontuário, aba **Exames pós-consulta**: o médico/dentista anexa PDFs ou imagens (resultados, laudos, orientações) com título, data e recado. O paciente vê na área dele, em **Exames pós-consulta** (menu e atalho no início), de qualquer lugar, e recebe um e-mail avisando (um aviso por envio, mesmo com vários arquivos). A equipe vê se o paciente já abriu e pode excluir arquivo errado. A recepção não tem acesso. Migração `20261112_exames_pos_consulta.sql` (tabela `post_consult_exams` e bucket privado `post-consult`).

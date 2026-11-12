@@ -10,7 +10,7 @@ const NAV = [
 ];
 const PNAV = [
   ['inicio', '#/', 'home', 'Início'], ['agendar', '#/agendar', 'plus', 'Marcar consulta'], ['consultas', '#/consultas', 'cal', 'Minhas consultas'],
-  ['documentos', '#/documentos', 'file', 'Receitas e documentos'], ['exames', '#/exames', 'clip', 'Meus exames'], ['tratamentos', '#/tratamentos', 'clip', 'Tratamentos e pagamentos'], ['tratamento', '#/meu-tratamento', 'scale', 'Meu emagrecimento'],
+  ['documentos', '#/documentos', 'file', 'Receitas e documentos'], ['exames', '#/exames', 'clip', 'Meus exames'], ['poscons', '#/pos-consulta', 'send', 'Exames pós-consulta'], ['tratamentos', '#/tratamentos', 'clip', 'Tratamentos e pagamentos'], ['tratamento', '#/meu-tratamento', 'scale', 'Meu emagrecimento'],
   ['guia', '#/guia', 'leaf', 'Dietas e exercícios'],
   ['precons', '#/pre-consulta', 'edit', 'Ficha de saúde'], ['dados', '#/meus-dados', 'user', 'Meus dados'],
 ];
