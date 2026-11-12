@@ -3,17 +3,8 @@ const PC_COMMON = ['Resultado de exame', 'Laudo de ultrassonografia', 'Laudo de 
 const pcFileOk = f => /^image\//.test(f.type) || f.type === 'application/pdf';
 
 async function pcOpen(r) {
-  if (r.file_data && /^data:image\//.test(r.file_data)) modal(r.title, html`<img alt="${r.title}" src="${r.file_data}" style="max-width:100%;border-radius:8px">`, { wide: true });
-  else if (r.file_data) toast('Na demonstração o PDF não abre. Na versão real ele é baixado.', 'bad');
-  else {
-    const blob = await Remote.download('post-consult', r.file_path);
-    if (/^image\//.test(r.file_type)) { const src = await blobToData(blob); modal(r.title, html`<img alt="${r.title}" src="${src}" style="max-width:100%;border-radius:8px">`, { wide: true }); }
-    else {
-      const u = URL.createObjectURL(blob); const w = window.open(u, '_blank');
-      if (!w) { const a = document.createElement('a'); a.href = u; a.download = (r.file_name || r.title || 'exame').replace(/[^\w.\- ]+/g, '') + (/\.pdf$/i.test(r.file_name || '') ? '' : '.pdf'); document.body.appendChild(a); a.click(); a.remove(); }
-      setTimeout(() => URL.revokeObjectURL(u), 120000);
-    }
-  }
+  if (r.file_data) await fileViewer(r.title, r.file_data, { type: r.file_type, name: r.file_name || r.title });
+  else await fileViewer(r.title, await Remote.download('post-consult', r.file_path), { type: r.file_type, name: r.file_name || r.title });
   if (S.mode === 'patient' && !r.viewed_at) {
     if (isDemo()) await db.update('post_consult_exams', r.id, { viewed_at: new Date().toISOString() });
     else await db.rpc('post_consult_seen', { p_id: r.id }).catch(() => null);

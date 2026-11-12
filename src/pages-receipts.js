@@ -57,12 +57,10 @@ async function staffReceiptsBlock() {
     <button class="btn sm" data-act="rcView" data-id="${r.id}">${icon('file')} Ver</button><button class="btn sm ok" data-act="rcOk" data-id="${r.id}">${icon('check')} Confirmar</button><button class="btn sm" data-act="rcNo" data-id="${r.id}">Recusar</button></div>`)}</div></div>`;
 }
 act('rcView', async el => {
-  const r = await db.get('payment_receipts', el.dataset.id);
-  if (r.file_data && /^data:image\//.test(r.file_data)) return modal('Comprovante', html`<img alt="Comprovante" src="${r.file_data}" style="max-width:100%;border-radius:8px">`, { wide: true });
-  if (r.file_data) return toast('Na demonstração o PDF não abre. Na versão real ele é baixado.', 'bad');
-  const blob = await Remote.download('payment-receipts', r.file_path);
-  if (/^image\//.test(r.file_type)) { const src = await blobToData(blob); modal('Comprovante', html`<img alt="Comprovante" src="${src}" style="max-width:100%;border-radius:8px">`, { wide: true }); }
-  else { const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = `comprovante-${fDate(r.paid_on).replace(/\//g, '-')}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); }
+  const r = await db.get('payment_receipts', el.dataset.id); if (!r) return toast('Comprovante não encontrado.', 'bad');
+  const name = `comprovante-${fDate(r.paid_on).replace(/\//g, '-')}`;
+  if (r.file_data) return fileViewer('Comprovante de pagamento', r.file_data, { type: r.file_type, name });
+  await fileViewer('Comprovante de pagamento', await Remote.download('payment-receipts', r.file_path), { type: r.file_type, name });
 });
 async function confirmReceipt(r) {
   const by = isDemo() ? null : Auth.userId(), now = new Date().toISOString();

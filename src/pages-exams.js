@@ -4,13 +4,9 @@ const EX_COMMON = ['Hemograma completo', 'Glicemia de jejum', 'Hemoglobina glica
 const exFileOk = f => /^image\//.test(f.type) || f.type === 'application/pdf';
 
 async function exOpen(r) {
-  if (r.file_data && /^data:image\//.test(r.file_data)) return modal(r.exam_name, html`<img alt="${r.exam_name}" src="${r.file_data}" style="max-width:100%;border-radius:8px">`, { wide: true });
-  if (r.file_data) return toast('Na demonstração o PDF não abre. Na versão real ele é baixado.', 'bad');
+  if (r.file_data) return fileViewer(r.exam_name, r.file_data, { type: r.file_type, name: r.file_name || r.exam_name });
   const blob = await Remote.download('patient-exams', r.file_path);
-  if (/^image\//.test(r.file_type)) { const src = await blobToData(blob); return modal(r.exam_name, html`<img alt="${r.exam_name}" src="${src}" style="max-width:100%;border-radius:8px">`, { wide: true }); }
-  const u = URL.createObjectURL(blob); const w = window.open(u, '_blank');
-  if (!w) { const a = document.createElement('a'); a.href = u; a.download = (r.file_name || r.exam_name || 'exame').replace(/[^\w.\- ]+/g, '') + (/\.pdf$/i.test(r.file_name || '') ? '' : '.pdf'); document.body.appendChild(a); a.click(); a.remove(); }
-  setTimeout(() => URL.revokeObjectURL(u), 120000);
+  await fileViewer(r.exam_name, blob, { type: r.file_type, name: r.file_name || r.exam_name });
 }
 
 /* ---------- paciente ---------- */

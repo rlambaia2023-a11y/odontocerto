@@ -312,6 +312,40 @@ function modal(title, body, { wide = false, footer = '' } = {}) {
 }
 function closeModal() { document.getElementById('modal')?.remove(); }
 act('closeModal', closeModal);
+
+/* ===== Visualizador de anexos (exames, comprovantes, pós-consulta): abrir, baixar e imprimir ===== */
+const FV = { url: '', name: '', type: '', title: '' };
+const fvTouch = () => matchMedia('(pointer:coarse)').matches;
+async function fileViewer(title, src, { type = '', name = '' } = {}) {
+  let blob = src;
+  if (typeof src === 'string') { const [h, b64 = ''] = src.split(','), bin = atob(b64); blob = new Blob([Uint8Array.from(bin, c => c.charCodeAt(0))], { type: (h.match(/data:([^;]+)/) || [])[1] || '' }); }
+  type = type || blob.type || 'application/pdf';
+  if (blob.type !== type) blob = new Blob([blob], { type });
+  if (FV.url) URL.revokeObjectURL(FV.url);
+  const isImg = /^image\//.test(type), ext = isImg ? (type.split('/')[1] || 'jpg').replace('jpeg', 'jpg') : 'pdf';
+  let fname = String(name || title || 'arquivo').replace(/[\\/:*?"<>|]+/g, '').trim().slice(0, 120) || 'arquivo';
+  if (!new RegExp('\\.' + ext + '$', 'i').test(fname)) fname = fname.replace(/\.(pdf|jpe?g|png|webp|heic)$/i, '') + '.' + ext;
+  Object.assign(FV, { url: URL.createObjectURL(blob), name: fname, type, title });
+  const preview = isImg ? html`<img alt="${title}" src="${isImg && typeof src === 'string' ? src : await blobToData(blob)}" style="max-width:100%;border-radius:8px;display:block;margin:0 auto">`
+    : fvTouch() ? html`<div class="card empty" style="margin:0">${icon('file')}<div><b>${fname}</b></div><div class="small muted">No celular o PDF abre no leitor do aparelho. Use os botões abaixo.</div></div>`
+    : html`<iframe title="${title}" src="${FV.url}" style="width:100%;height:70vh;border:1px solid var(--line);border-radius:8px;background:#f4f6f9"></iframe>`;
+  modal(title, preview, { wide: true, footer: html`<button class="btn" data-act="fvOpen">${icon('file')} Abrir em nova aba</button><button class="btn" data-act="fvDown">${icon('down')} Baixar</button><button class="btn primary" data-act="fvPrint">${icon('print')} Imprimir</button>` });
+}
+act('fvOpen', () => { if (!FV.url) return; const w = window.open(FV.url, '_blank'); if (!w) ACT.fvDown(); });
+act('fvDown', () => { if (!FV.url) return; const a = document.createElement('a'); a.href = FV.url; a.download = FV.name; document.body.appendChild(a); a.click(); a.remove(); });
+act('fvPrint', () => {
+  if (!FV.url) return;
+  if (fvTouch() && !/^image\//.test(FV.type)) { ACT.fvOpen(); return toast('Abrimos o PDF. Para imprimir, use o menu do leitor (⋮ ou compartilhar → Imprimir).'); }
+  document.getElementById('fv-print')?.remove();
+  const fr = document.createElement('iframe'); fr.id = 'fv-print'; fr.title = 'Impressão';
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  const run = () => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch { ACT.fvOpen(); } };
+  if (/^image\//.test(FV.type)) {
+    document.body.appendChild(fr);
+    const d = fr.contentDocument; d.open(); d.write('<!doctype html><title></title><style>@page{margin:10mm}html,body{margin:0}img{max-width:100%;max-height:95vh;display:block;margin:0 auto}</style><img>'); d.close();
+    const img = d.querySelector('img'); img.onload = () => setTimeout(run, 50); img.src = FV.url;
+  } else { fr.onload = () => setTimeout(run, 300); fr.src = FV.url; document.body.appendChild(fr); }
+});
 function confirmBox(msg, okLabel = 'Confirmar') {
   return new Promise(res => {
     const m = modal('Confirmação', html`<p style="margin:0">${msg}</p>`, { footer: html`<button class="btn" data-act="cfNo">Cancelar</button><button class="btn primary" data-act="cfYes">${okLabel}</button>` });
