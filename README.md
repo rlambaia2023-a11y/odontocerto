@@ -78,3 +78,6 @@ No cadastro online (link de cadastro e agendamento) são obrigatórios: **nome c
 
 ## Exames pós-consulta
 No prontuário, aba **Exames pós-consulta**: o médico/dentista anexa PDFs ou imagens (resultados, laudos, orientações) com título, data e recado. O paciente vê na área dele, em **Exames pós-consulta** (menu e atalho no início), de qualquer lugar, e recebe um e-mail avisando (um aviso por envio, mesmo com vários arquivos). A equipe vê se o paciente já abriu e pode excluir arquivo errado. A recepção não tem acesso. Migração `20261112_exames_pos_consulta.sql` (tabela `post_consult_exams` e bucket privado `post-consult`).
+
+## Comprovantes de pagamento (paciente e equipe)
+O paciente anexa pelo portal (Tratamentos e pagamentos, Minhas consultas). A equipe (master, profissionais e recepção) também anexa: botão **Anexar comprovante** no Financeiro (escolhe o paciente) e na aba Financeiro do prontuário. Dá para ligar a uma consulta online (1ª/2ª parte) ou a um lançamento em aberto e já dar baixa na hora. O paciente vê todos no portal, marcados como "anexado pela clínica" quando for o caso. Migração `20261112_comprovante_pela_clinica.sql` (coluna `sent_by` e permissão da equipe na pasta `payment-receipts`).

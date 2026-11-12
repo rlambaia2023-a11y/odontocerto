@@ -141,6 +141,7 @@ const TABRENDER = {
     const fin = await db.list('finance_entries', { eq: { patient_id: p.id }, order: 'due_date.desc' });
     const rec = fin.filter(f => f.kind === 'receita');
     return html`<div class="grid g3" style="margin-bottom:14px"><div class="card kpi"><div class="l">Pago</div><div class="v" style="color:var(--ok)">${BRL(sum(rec.filter(f => f.paid_at), f => f.amount))}</div></div><div class="card kpi"><div class="l">Em aberto</div><div class="v">${BRL(sum(rec.filter(f => !f.paid_at), f => f.amount))}</div></div><div class="card kpi"><div class="l">Vencido</div><div class="v" style="color:var(--bad)">${BRL(sum(rec.filter(f => !f.paid_at && f.due_date < ymd(new Date())), f => f.amount))}</div></div></div>
+    ${await patientReceiptsCard(p)}
     <div class="row between" style="margin-bottom:10px"><h2>Lançamentos</h2><a class="btn primary sm" href="#/financeiro?novo=receita&p=${p.id}">${icon('plus')} Receber pagamento</a></div>
     ${financeTable(fin, { [p.id]: p })}`;
   },
