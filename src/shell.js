@@ -82,9 +82,13 @@ async function updateNotif() {
   } catch (e) { console.warn(e); }
 }
 act('openNotif', el => {
+  const aberto = el.parentElement.querySelector('.menu-pop.float');
   document.querySelectorAll('.menu-pop.float').forEach(m => m.remove());
+  if (aberto) return; /* segundo clique no sino fecha */
   const p = document.createElement('div'); p.className = 'menu-pop float'; p.style.minWidth = '300px'; p.style.maxWidth = '92vw';
   p.innerHTML = fv(NOTIF.items.length ? NOTIF.items.map(n => html`<a href="${n.h}">${icon(n.ic)}<span><b class="small">${n.t}</b><br><span class="tiny muted">${n.s}</span></span></a>`) : html`<div class="empty small">Nada pendente por aqui.</div>`);
+  p.style.maxHeight = '70vh'; p.style.overflowY = 'auto';
+  p.addEventListener('click', e => { if (e.target.closest('a')) p.remove(); });
   el.parentElement.appendChild(p);
 });
 
