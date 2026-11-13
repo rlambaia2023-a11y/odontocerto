@@ -32,7 +32,7 @@ const EXAM_PACKS = {
   'Tirzepatida / semaglutida (antes e acompanhamento)': ['Glicemia de jejum', 'Hemoglobina glicada (HbA1c)', 'Amilase', 'Lipase', 'Creatinina com taxa de filtração glomerular estimada', 'TGO (AST)', 'TGP (ALT)', 'Colesterol total e frações (HDL, LDL, VLDL)', 'Triglicerídeos', 'TSH', 'Ultrassonografia de abdome superior'],
   'Pós-bariátrica': ['Hemograma completo', 'Ferro sérico', 'Ferritina', 'Vitamina B12', 'Ácido fólico', '25-OH vitamina D', 'PTH (paratormônio)', 'Cálcio', 'Zinco', 'Magnésio', 'Albumina', 'Proteínas totais e frações'],
   'Check-up adulto': ['Hemograma completo', 'Glicemia de jejum', 'Hemoglobina glicada (HbA1c)', 'Colesterol total e frações (HDL, LDL, VLDL)', 'Triglicerídeos', 'Creatinina', 'TGO (AST)', 'TGP (ALT)', 'TSH', 'Urina tipo 1 (EAS)', '25-OH vitamina D'],
-  'Pré-operatório': ['Hemograma completo', 'Coagulograma completo', 'Glicemia de jejum', 'Ureia', 'Creatinina', 'Sódio', 'Potássio', 'Eletrocardiograma (ECG)', 'Radiografia de tórax PA e perfil'],
+  'Pré-operatório': ['Hemograma completo', 'Coagulograma completo', 'TGO (AST)', 'TGP (ALT)', 'Ureia', 'Creatinina', 'Urina tipo 1 (EAS)', 'Radiografia de tórax PA e perfil', 'Eletrocardiograma (ECG)'],
   'Pré-cirurgia oral': ['Hemograma completo', 'Coagulograma completo', 'Glicemia de jejum', 'Radiografia panorâmica', 'Tomografia computadorizada de feixe cônico (especificar região)'],
   'Ortodontia': ['Documentação ortodôntica completa', 'Radiografia panorâmica', 'Telerradiografia lateral com traçado cefalométrico', 'Fotografias intra e extraorais', 'Modelos de estudo / escaneamento intraoral'],
   'Diabetes – acompanhamento': ['Glicemia de jejum', 'Hemoglobina glicada (HbA1c)', 'Creatinina', 'Microalbuminúria', 'Colesterol total e frações (HDL, LDL, VLDL)', 'Triglicerídeos', 'Urina tipo 1 (EAS)'],
@@ -56,7 +56,7 @@ function examBox(type) {
 onInput('exFilter', el => { const q = norm(el.value); document.querySelectorAll('#exambox .exitem').forEach(l => l.classList.toggle('hidden', q && !norm(l.textContent).includes(q))); document.querySelectorAll('#exambox .exgroup').forEach(g => g.classList.toggle('hidden', ![...g.querySelectorAll('.exitem')].some(l => !l.classList.contains('hidden')))); });
 const exCount = () => { const n = document.querySelectorAll('#exambox [data-ex]:checked').length; const el = document.getElementById('excount'); if (el) el.textContent = n ? `${n} exame(s) marcado(s)` : 'Nenhum exame marcado'; };
 document.addEventListener('change', e => { if (e.target.matches?.('#exambox [data-ex]')) exCount(); });
-act('exPack', el => { let n = 0; EXAM_PACKS[el.dataset.k].forEach(x => { const cb = [...document.querySelectorAll('#exambox [data-ex]')].find(c => c.value === x); if (cb) { cb.checked = true; n++; } }); exCount(); toast(`Pacote "${el.dataset.k}" marcado (${n} exames).`); });
+act('exPack', el => { let n = 0; EXAM_PACKS[el.dataset.k].forEach(x => { const cb = [...document.querySelectorAll('#exambox [data-ex]')].find(c => c.value === x); if (cb) { cb.checked = true; n++; } }); exCount(); const ind = document.getElementById('exind'); if (ind && !ind.value.trim() && el.dataset.k === 'Pré-operatório') ind.value = 'Avaliação pré-operatória'; toast(`Pacote "${el.dataset.k}" marcado (${n} exames).`); });
 act('exBuild', () => {
   const sel = [...document.querySelectorAll('#exambox [data-ex]:checked')]; const obs = document.getElementById('exobs').value.trim();
   if (!sel.length && !obs) return toast('Marque pelo menos um exame.', 'bad');
