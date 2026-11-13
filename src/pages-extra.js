@@ -397,6 +397,7 @@ act('downloadSigned', async el => {
 /* ---------- teleconsulta: iniciar com registro no prontuário ---------- */
 act('startTele', async el => {
   const a = await db.get('appointments', el.dataset.id);
+  if (!['atendido', 'em_atendimento'].includes(a.status) && !(await canStartAppt(a))) return;
   if (a.meeting_url) window.open(a.meeting_url, '_blank', 'noopener');
   if (!['atendido', 'em_atendimento'].includes(a.status)) await db.update('appointments', a.id, { status: 'em_atendimento' });
   closeModal(); location.hash = `#/paciente/${a.patient_id}?tab=evolucao`;

@@ -1,8 +1,12 @@
 /* ===== Início, Agenda, Pacientes ===== */
-const STATUS = { agendado: ['Agendado', 'gray'], confirmado: ['Confirmado', 'ok'], em_atendimento: ['Em atendimento', 'warn'], atendido: ['Atendido', ''], faltou: ['Faltou', 'bad'], cancelado: ['Cancelado', 'bad'] };
+const STATUS = { agendado: ['Agendado', 'gray'], confirmado: ['Confirmado', 'ok'], em_atendimento: ['Em andamento', 'warn'], atendido: ['Consulta finalizada', ''], faltou: ['Faltou', 'bad'], cancelado: ['Cancelado', 'bad'] };
+/* consulta com valor (online): antes de começar só fica "Confirmado" depois que a clínica confirma o comprovante dos 50% */
+const AG_PAG = ['Aguardando confirmação de pagamento', 'warn'];
+const apptLabel = a => a && +a.fee > 0 && a.status === 'agendado' ? AG_PAG : STATUS[a?.status] || [a?.status || '', ''];
+const START_EARLY_MIN = 30; /* "Em andamento" só quando o atendimento começa: no máximo 30 min antes do horário */
 const KINDS = { consulta: 'Consulta', teleconsulta: 'Teleconsulta (online)', avaliacao: 'Avaliação', retorno: 'Retorno', procedimento: 'Procedimento', urgencia: 'Urgência', manutencao: 'Manutenção' };
 const statusPill = s => html`<span class="pill ${STATUS[s]?.[1] || ''}">${STATUS[s]?.[0] || s}</span>`;
-const apPill = a => a && a.approval === 'pendente' && !['cancelado', 'faltou'].includes(a.status) ? html`<span class="pill warn">aguardando aprovação</span>` : statusPill(a?.status);
+const apPill = a => { if (a && a.approval === 'pendente' && !['cancelado', 'faltou'].includes(a.status)) return html`<span class="pill warn">aguardando aprovação</span>`; const [l, c] = apptLabel(a); return html`<span class="pill ${c}">${l}</span>`; };
 async function patientMap(ids) {
   const u = [...new Set(ids.filter(Boolean))]; if (!u.length) return {};
   const rows = await db.list('patients', { in: { id: u }, select: 'id,name,phone,birth_date,insurance_id' });
@@ -35,7 +39,7 @@ route('/', async () => {
     <div class="card">
       <div class="row between"><h2>Próximo paciente</h2>${next ? apPill(next) : ''}</div>
       ${np ? html`<div class="row" style="margin:14px 0"><span class="avatar lg">${initials(np.name)}</span><div><div style="font-weight:700;font-size:1.05rem">${np.name}</div><div class="muted small">${fTime(next.starts_at)} – ${fTime(next.ends_at)} · ${KINDS[next.kind] || 'Consulta'}${np.birth_date ? ' · ' + age(np.birth_date) + ' anos' : ''}</div></div></div>
-        <div class="row">${next.modality === 'online' && next.meeting_url ? (isClinical() ? html`<button class="btn accent" data-act="startTele" data-id="${next.id}">${icon('video')} Iniciar teleconsulta</button>` : html`<a class="btn accent" target="_blank" rel="noopener" href="${next.meeting_url}">${icon('video')} Link da teleconsulta</a>`) : ''}${next.status !== 'em_atendimento' ? html`<button class="btn primary" data-act="startAppt" data-id="${next.id}" data-p="${np.id}">${icon('check')} Iniciar atendimento</button>` : html`<a class="btn primary" href="#/paciente/${np.id}?tab=evolucao">${icon('clip')} Abrir prontuário</a>`}
+        <div class="row">${next.modality === 'online' && next.meeting_url ? (isClinical() ? html`<button class="btn accent" data-act="startTele" data-id="${next.id}">${icon('video')} Iniciar teleconsulta</button>` : html`<a class="btn accent" target="_blank" rel="noopener" href="${next.meeting_url}">${icon('video')} Link da teleconsulta</a>`) : ''}${next.status !== 'em_atendimento' ? html`<button class="btn primary" data-act="startAppt" data-id="${next.id}" data-p="${np.id}">${icon('check')} Iniciar atendimento</button>` : html`<a class="btn primary" href="#/paciente/${np.id}?tab=evolucao">${icon('clip')} Abrir prontuário</a><button class="btn" data-act="finishAppt" data-id="${next.id}">${icon('check')} Finalizar consulta</button>`}
         ${np.phone ? html`<a class="btn" target="_blank" rel="noopener" href="${waLink(np.phone, confirmMsg(np, next))}">${icon('wa')} WhatsApp</a>` : ''}</div>`
       : html`<div class="empty">${icon('user')}<div>Nenhum próximo paciente para hoje.</div><a class="btn sm" style="margin-top:10px" href="#/agenda?novo=1">Agendar</a></div>`}
     </div>
@@ -55,7 +59,16 @@ route('/', async () => {
     </div>
   </div>`;
 }, 'inicio');
-act('startAppt', async el => { await db.update('appointments', el.dataset.id, { status: 'em_atendimento' }); go(`#/paciente/${el.dataset.p}?tab=evolucao`); });
+async function canStartAppt(a) {
+  const ini = new Date(a.starts_at);
+  if (+ini - Date.now() <= START_EARLY_MIN * 60000) return true;
+  return confirmBox(`Esta consulta está marcada para ${fDate(ini)} às ${fTime(ini)}. O status "Em andamento" só deve aparecer quando o atendimento começar de verdade. O paciente já está sendo atendido agora?`, 'Sim, começar agora');
+}
+act('startAppt', async el => { const a = await db.get('appointments', el.dataset.id); if (!(await canStartAppt(a))) return; await db.update('appointments', a.id, { status: 'em_atendimento' }); go(`#/paciente/${el.dataset.p}?tab=evolucao`); });
+act('finishAppt', async el => {
+  if (!(await confirmBox('Encerrar esta consulta? Ela passa a aparecer como "Consulta finalizada" e o paciente recebe a pesquisa de atendimento na área dele.', 'Finalizar consulta'))) return;
+  await db.update('appointments', el.dataset.id, { status: 'atendido' }); closeModal(); toast('Consulta finalizada.', 'ok'); router();
+});
 
 /* ---------- seletor de paciente reutilizável ---------- */
 function patientPicker(sel = null, { allowNew = true, required = true } = {}) {
@@ -97,7 +110,7 @@ function agendaPage(mine) {
     if (mine) gsyncMaybe().then(ch => { if (ch && location.hash.startsWith('#/minha-agenda')) router(); });
     const base = mine ? '#/minha-agenda' : '#/agenda'; const link = (dd, v = view) => `${base}?d=${ymd(dd)}&v=${v}${pro && !mine ? '&pro=' + pro : ''}`;
     const step = view === 'semana' ? 7 : 1;
-    const card = a => { const p = pm[a.patient_id]; return html`<div class="appt ${a.status}" data-act="editAppt" data-id="${a.id}"><div class="grow" style="min-width:0"><div class="t">${a.modality === 'online' ? icon('video', 'small') : ''}${fTime(a.starts_at)} ${p?.name || a.title || 'Compromisso'}</div><div class="tiny muted">${KINDS[a.kind] || ''} · ${STATUS[a.status]?.[0]}${S.members.length > 1 ? ' · ' + proName(a.professional_id) : ''}</div></div></div>`; };
+    const card = a => { const p = pm[a.patient_id]; return html`<div class="appt ${a.status}" data-act="editAppt" data-id="${a.id}"><div class="grow" style="min-width:0"><div class="t">${a.modality === 'online' ? icon('video', 'small') : ''}${fTime(a.starts_at)} ${p?.name || a.title || 'Compromisso'}</div><div class="tiny muted">${KINDS[a.kind] || ''} · ${apptLabel(a)[0]}${S.members.length > 1 ? ' · ' + proName(a.professional_id) : ''}</div></div></div>`; };
     let body;
     if (view === 'semana') {
       body = html`<div class="week">${[...Array(7)].map((_, i) => { const day = addDays(from, i), k = ymd(day), list = appts.filter(a => ymd(a.starts_at) === k), el = evs.filter(e => ymd(e.starts_at) === k || (ymd(e.starts_at) < k && ymd(e.ends_at) >= k && fTime(e.ends_at) !== '00:00')); return html`<div class="day ${k === ymd(new Date()) ? 'today' : ''}"><h4 class="row between"><a href="${link(day, 'dia')}">${WD[day.getDay()].slice(0, 3)} ${pad(day.getDate())}/${pad(day.getMonth() + 1)}</a><button class="btn sm ghost" data-act="newAppt" data-date="${k}" data-time="08:00" aria-label="Novo">${icon('plus')}</button></h4>${[...list.map(a => [new Date(a.starts_at), card(a)]), ...el.map(e => [new Date(e.starts_at), evCard(e)])].sort((x, y) => x[0] - y[0]).map(x => x[1])}${!list.length && !el.length ? html`<div class="tiny muted">Livre</div>` : ''}</div>`; })}</div>`;
@@ -112,7 +125,7 @@ function agendaPage(mine) {
       <div class="row">${!mine && S.members.length > 1 ? html`<select class="in" style="height:32px;width:auto" data-change="agPro" data-d="${ymd(d)}" data-v="${view}"><option value="">Todos os profissionais</option>${S.members.map(m => html`<option value="${m.user_id}" ${pro === m.user_id ? 'selected' : ''}>${m.full_name}</option>`)}</select>` : ''}
       <div class="seg"><a class="${view === 'dia' ? 'on' : ''}" href="${link(d, 'dia')}">Dia</a><a class="${view === 'semana' ? 'on' : ''}" href="${link(d, 'semana')}">Semana</a></div></div></div></div>
     ${body}
-    <div class="legend" style="margin-top:10px">${Object.entries(STATUS).map(([k, v]) => html`<span>${statusPill(k)}</span>`)}<span class="pill" style="background:#7c3aed14;color:#7c3aed">compromisso externo</span><span class="pill gray">Google Agenda</span>${mine && !isDemo() && isOwner() ? html`<button class="btn sm ghost" data-act="gsyncNow">${icon('repeat')} Atualizar do Google</button>` : ''}</div>`;
+    <div class="legend" style="margin-top:10px">${Object.entries(STATUS).map(([k, v]) => html`<span>${statusPill(k)}</span>`)}<span class="pill warn">${AG_PAG[0]}</span><span class="pill" style="background:#7c3aed14;color:#7c3aed">compromisso externo</span><span class="pill gray">Google Agenda</span>${mine && !isDemo() && isOwner() ? html`<button class="btn sm ghost" data-act="gsyncNow">${icon('repeat')} Atualizar do Google</button>` : ''}</div>`;
   };
 }
 route('/agenda', agendaPage(false), 'agenda');
@@ -128,7 +141,7 @@ function apptForm(a = {}, p = null) {
     <label class="f"><span>Início</span><input class="in" type="time" name="time" required step="300" value="${s ? fTime(s) : a._time || '08:00'}"></label>
     <label class="f"><span>Duração</span><select class="in" name="dur">${[15, 20, 30, 40, 45, 60, 90, 120, 180].map(m => html`<option value="${m}" ${m === dur ? 'selected' : ''}>${m} min</option>`)}</select></label></div>
     <div class="grid g3"><label class="f"><span>Tipo</span><select class="in" name="kind">${Object.entries(KINDS).map(([k, v]) => html`<option value="${k}" ${a.kind === k ? 'selected' : ''}>${v}</option>`)}</select></label>
-    <label class="f"><span>Status</span><select class="in" name="status">${Object.entries(STATUS).map(([k, v]) => html`<option value="${k}" ${(a.status || 'agendado') === k ? 'selected' : ''}>${v[0]}</option>`)}</select></label>
+    <label class="f"><span>Status</span><select class="in" name="status">${Object.entries(STATUS).map(([k, v]) => html`<option value="${k}" ${(a.status || 'agendado') === k ? 'selected' : ''}>${+a.fee > 0 && k === 'agendado' ? AG_PAG[0] : v[0]}</option>`)}</select>${+a.fee > 0 && ['agendado', 'confirmado'].includes(a.status || 'agendado') ? html`<span class="tiny muted">Fica "Confirmado" sozinho quando o comprovante dos 50% é confirmado no Financeiro.</span>` : ''}</label>
     <label class="f"><span>Profissional</span><select class="in" name="professional_id" data-change="apptPro">${pros().map(m => html`<option value="${m.user_id}" ${(a.professional_id || Auth.userId()) === m.user_id ? 'selected' : ''}>${m.full_name}</option>`)}</select></label></div>
     <div class="grid g2"><label class="f"><span>Modalidade</span><select class="in" name="modality" data-change="apptMod"><option value="presencial">Presencial</option><option value="online" ${a.modality === 'online' ? 'selected' : ''}>Online (Google Meet)</option></select></label>
     <label class="f ${a.modality === 'online' ? '' : 'hidden'}" id="meetbox"><span>Link da chamada</span><input class="in" name="meeting_url" type="url" placeholder="https://meet.google.com/…" value="${[a.meeting_url, (pros().find(m => m.user_id === (a.professional_id || Auth.userId())) || {}).meet_url].find(u => u && !isGenericMeet(u)) || ''}"><span class="tiny muted"><a href="https://meet.google.com/new" target="_blank" rel="noopener">Criar sala nova no Meet</a>, copie o endereço e cole aqui — ou salve a sua sala fixa em Configurações › Atendimento online.</span></label></div>
@@ -139,7 +152,8 @@ function apptForm(a = {}, p = null) {
     <label class="f"><span>Observações</span><textarea class="in" name="notes" rows="2">${a.notes || ''}</textarea></label>
     <div class="row between"><div class="row">${a.id ? html`<button type="button" class="btn danger" data-act="delAppt" data-id="${a.id}">${icon('trash')} Excluir</button>` : ''}
     ${a.id && p?.phone ? html`<a class="btn" target="_blank" rel="noopener" href="${waLink(p.phone, confirmMsg(p, a))}">${icon('wa')} Confirmar no WhatsApp</a>` : ''}
-    ${a.id && p ? html`<a class="btn" href="#/paciente/${p.id}" data-act="closeModalNav">${icon('clip')} Prontuário</a>` : ''}</div>
+    ${a.id && p ? html`<a class="btn" href="#/paciente/${p.id}" data-act="closeModalNav">${icon('clip')} Prontuário</a>` : ''}
+    ${a.id && a.status === 'em_atendimento' ? html`<button type="button" class="btn" data-act="finishAppt" data-id="${a.id}">${icon('check')} Finalizar consulta</button>` : ''}</div>
     <button class="btn primary" type="submit">Salvar</button></div></form>`;
 }
 act('teleSendId', async el => { const a = await db.get('appointments', el.dataset.id); teleSendModal(a, await db.get('patients', a.patient_id)); });
@@ -150,6 +164,8 @@ onForm('saveAppt', async d => {
   const pid = await resolvePatient(d, { phone: d.phone });
   const s = new Date(`${d.date}T${d.time}`); const e = new Date(s.getTime() + (+d.dur) * 60000);
   if (!['cancelado', 'faltou'].includes(d.status)) { const clash = await findConflicts({ pro: d.professional_id, start: s, end: e, online: d.modality === 'online', ignoreAppt: d.id || null }); if (!(await conflictGate(clash))) return; }
+  if (d.status === 'em_atendimento' && (!d.id || (await db.get('appointments', d.id))?.status !== 'em_atendimento') && +s - Date.now() > START_EARLY_MIN * 60000)
+    throw new Error('"Em andamento" só pode ser marcado quando o atendimento começar. Na hora da consulta, use "Iniciar atendimento".');
   if (d.modality === 'online' && d.meeting_url && !/^https:\/\//.test(d.meeting_url)) throw new Error('O link da chamada precisa começar com https://');
   if (d.modality === 'online' && isGenericMeet(d.meeting_url)) throw new Error(MEET_GENERIC_MSG);
   const row = { patient_id: pid, starts_at: s.toISOString(), ends_at: e.toISOString(), kind: d.modality === 'online' && d.kind === 'consulta' ? 'teleconsulta' : d.kind, status: d.status, professional_id: d.professional_id, notes: nz(d.notes), modality: d.modality, meeting_url: d.modality === 'online' ? nz(d.meeting_url) : null };

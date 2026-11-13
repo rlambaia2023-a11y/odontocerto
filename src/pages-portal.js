@@ -287,11 +287,39 @@ function payBox(a, recs) {
     ${need ? html`<p class="tiny" style="margin:6px 0 0">Sem os comprovantes, o sistema cancela a consulta sozinho às ${fTime(h.cancel)} de ${fDate(h.cancel)} (20 min antes). PIX: <b>${PIX.key}</b> (${PIX.name}).</p>
       <div class="row" style="margin-top:8px"><button class="btn sm primary" data-act="pReceipt" data-appt="${a.id}" data-inst="${need}">${icon('clip')} Anexar comprovante da ${need}ª parte</button><button class="btn sm" data-act="copyText" data-t="${PIX.key}">Copiar chave PIX</button></div>` : html`<p class="tiny" style="margin:6px 0 0">Tudo certo com o pagamento. A clínica confere os comprovantes.</p>`}</div>`;
 }
+/* ---------- pesquisa de atendimento (3 perguntas, ao final da consulta) ---------- */
+const FB_DAYS = 30;
+async function pendingFeedback(pid) {
+  const ap = await db.list('appointments', { eq: { patient_id: pid, status: 'atendido' }, gte: { starts_at: new Date(Date.now() - FB_DAYS * 864e5).toISOString() }, order: 'starts_at.desc', limit: 10 }).catch(() => []);
+  if (!ap.length) return [];
+  const done = new Set((await db.list('appointment_feedback', { in: { appointment_id: ap.map(a => a.id) } }).catch(() => [])).map(f => f.appointment_id));
+  return ap.filter(a => !done.has(a.id));
+}
+const fbCard = a => html`<div class="card" style="border:1px solid var(--ok);background:var(--ok-50)"><h2>Como foi a sua consulta?</h2>
+  <p class="small" style="margin:6px 0 10px">Sua consulta de ${fDate(a.starts_at)} às ${fTime(a.starts_at)} foi finalizada. São só 3 perguntas rápidas, e a sua resposta ajuda a gente a melhorar o atendimento.</p>
+  <button class="btn primary sm" data-act="pFeedback" data-id="${a.id}">${icon('edit')} Responder a pesquisa</button></div>`;
+act('pFeedback', async el => {
+  const a = await db.get('appointments', el.dataset.id);
+  const opt = (name, v, l) => html`<label class="check" style="margin:4px 14px 4px 0;display:inline-flex"><input type="radio" name="${name}" value="${v}" required> ${l}</label>`;
+  modal('Pesquisa de atendimento', html`<form data-form="pFeedbackSave" class="stack"><input type="hidden" name="appointment_id" value="${a.id}"><input type="hidden" name="clinic_id" value="${a.clinic_id}">
+    <p class="small muted" style="margin:0">Consulta de ${fDate(a.starts_at)} às ${fTime(a.starts_at)}${proById(a.professional_id).full_name ? ' com ' + proById(a.professional_id).full_name : ''}.</p>
+    <div class="f"><span><b>1.</b> De 1 a 5, que nota você dá para o atendimento? <i>*</i></span><div class="row wrap">${[1, 2, 3, 4, 5].map(n => opt('nota', n, '★'.repeat(n) + ' ' + n))}</div></div>
+    <div class="f"><span><b>2.</b> Foi fácil marcar, pagar e ser atendido(a) no horário? <i>*</i></span><div class="row wrap">${opt('facilidade', 'sim', 'Sim')}${opt('facilidade', 'mais_ou_menos', 'Mais ou menos')}${opt('facilidade', 'nao', 'Não')}</div></div>
+    <label class="f"><span><b>3.</b> O que podemos melhorar? (opcional)</span><textarea class="in" name="sugestao" rows="3" maxlength="1500" placeholder="Pode falar à vontade: horário, atendimento, sistema, o que quiser."></textarea></label>
+    <div class="row between"><button type="button" class="btn" data-act="closeModal">Agora não</button><button class="btn primary" type="submit">Enviar respostas</button></div></form>`);
+});
+onForm('pFeedbackSave', async d => {
+  if (!d.nota || !d.facilidade) throw new Error('Responda as perguntas 1 e 2.');
+  await db.insert('appointment_feedback', { clinic_id: d.clinic_id, appointment_id: d.appointment_id, patient_id: S.patient.id, nota: +d.nota, facilidade: d.facilidade, sugestao: nz(d.sugestao) });
+  closeModal(); toast('Obrigado! Sua resposta foi enviada para a clínica.', 'ok'); router();
+});
 proute('/', async () => {
   const p = S.patient, now = new Date();
+  const fbs = await pendingFeedback(p.id);
   const [ap, docs, reqs, rets] = await Promise.all([db.list('appointments', { eq: { patient_id: p.id }, gte: { ends_at: new Date(+now - 3600000).toISOString() }, order: 'starts_at' }), db.list('documents', { eq: { patient_id: p.id }, order: 'created_at.desc', limit: 20 }).then(r => r.filter(d => d.released_at && d.signed_file_path && !d.deleted_at).slice(0, 3)), db.list('appointment_requests', { eq: { patient_id: p.id, status: 'pendente' } }), db.list('return_alerts', { eq: { patient_id: p.id, done: false }, order: 'due_date', limit: 3 })]);
   const next = ap.find(a => !['cancelado', 'faltou'].includes(a.status)); const nrec = next?.fee ? await apptReceipts([next.id]) : [];
   return html`<div class="pagehead"><div><h1>Olá, ${p.name.split(' ')[0]}!</h1><div class="muted small">${S.clinic.name}</div></div></div>
+  ${fbs.length ? fbCard(fbs[0]) : ''}
   <div class="grid g2 collapse"><div class="card"><h2>Próxima consulta</h2>${next ? html`<div class="row" style="margin:12px 0;flex-wrap:nowrap"><span class="avatar lg">${icon(next.modality === 'online' ? 'video' : 'cal')}</span><div><b>${fLong(new Date(next.starts_at))} às ${fTime(next.starts_at)}</b><div class="small muted">${MOD[next.modality || 'presencial']} · ${proById(next.professional_id).full_name || ''}</div>${apPill(next)}</div></div>
       <div class="row">${joinBtn(next)}<a class="btn sm" href="#/consultas">Ver detalhes</a></div>${next.approval === 'pendente' ? html`<p class="tiny muted">Aguardando a confirmação de ${proById(next.professional_id).full_name || 'profissional'}. O link aparece aqui após a aprovação.</p>` : next.modality === 'online' ? html`<p class="tiny muted">O link do Google Meet funciona no horário da consulta.</p>` : ''}${payBox(next, nrec)}`
     : html`<div class="empty">${icon('cal')}<div>Nenhuma consulta marcada.</div><a class="btn primary sm" style="margin-top:10px" href="#/agendar">Marcar consulta</a></div>`}</div>
@@ -324,12 +352,13 @@ proute('/consultas', async () => {
   const [ap, reqs] = await Promise.all([db.list('appointments', { eq: { patient_id: p.id }, order: 'starts_at.desc' }), db.list('appointment_requests', { eq: { patient_id: p.id }, order: 'created_at.desc' })]);
   const fut = ap.filter(a => +new Date(a.ends_at) >= now && !['cancelado'].includes(a.status)).reverse(), past = ap.filter(a => !fut.includes(a));
   const recs = await apptReceipts(ap.filter(a => a.fee && +new Date(a.ends_at) >= now - 86400000).map(a => a.id));
+  const fbPend = new Set((await pendingFeedback(p.id)).map(a => a.id));
   const card = a => { const pr = proById(a.professional_id), s = new Date(a.starts_at), e = new Date(a.ends_at); return html`<div class="card"><div class="row between"><div><b>${fLong(s)} às ${fTime(s)}</b><div class="small muted">${MOD[a.modality || 'presencial']} · ${pr.full_name || ''}${a.reason ? ' · ' + a.reason : ''}</div></div>${apPill(a)}</div>
     ${fut.includes(a) ? html`<div class="row" style="margin-top:10px">${joinBtn(a)}<a class="btn sm" target="_blank" rel="noopener" href="${gcalLink(`Consulta – ${pr.full_name || S.clinic.name}`, s, e, a.meeting_url ? 'Google Meet: ' + a.meeting_url : S.clinic.name, a.meeting_url || S.clinic.address || '')}">${icon('cal')} Google Agenda</a>${['agendado', 'confirmado'].includes(a.status) ? html`<button class="btn sm danger" data-act="pCancel" data-id="${a.id}">Cancelar</button>` : ''}</div>${payBox(a, recs)}` : ''}</div>`; };
   return html`<div class="pagehead"><h1>Minhas consultas</h1><a class="btn primary" href="#/agendar">${icon('plus')} Marcar</a></div>
     <h3>Próximas</h3>${fut.length ? fut.map(card) : html`<div class="card empty small">Nenhuma consulta futura.</div>`}
     ${reqs.length ? html`<h3 style="margin-top:18px">Pedidos</h3><div class="list">${reqs.map(r => html`<div class="li"><span class="grow small">${r.preferred_date ? fDate(r.preferred_date) + ' · ' : ''}${PERIOD[r.period]} — ${r.reason || 'Consulta'}${r.response ? html`<div class="tiny muted">Resposta: ${r.response}</div>` : ''}</span><span class="pill ${r.status === 'agendado' ? 'ok' : r.status === 'pendente' ? 'warn' : 'gray'}">${r.status}</span>${r.status === 'pendente' ? html`<button class="btn sm ghost" data-act="pReqCancel" data-id="${r.id}">${icon('x')}</button>` : ''}</div>`)}</div>` : ''}
-    <h3 style="margin-top:18px">Anteriores</h3>${past.length ? html`<div class="list">${past.map(a => html`<div class="li"><b class="small" style="width:120px">${fDT(a.starts_at)}</b><span class="grow small">${MOD[a.modality || 'presencial']} · ${proById(a.professional_id).full_name || ''}${a.auto_cancelled_at ? html`<div class="tiny" style="color:var(--bad)">Cancelada automaticamente: comprovante de pagamento não anexado a tempo.</div>` : ''}</span>${apPill(a)}</div>`)}</div>` : html`<p class="muted small">Nada por aqui ainda.</p>`}`;
+    <h3 style="margin-top:18px">Anteriores</h3>${past.length ? html`<div class="list">${past.map(a => html`<div class="li"><b class="small" style="width:120px">${fDT(a.starts_at)}</b><span class="grow small">${MOD[a.modality || 'presencial']} · ${proById(a.professional_id).full_name || ''}${a.auto_cancelled_at ? html`<div class="tiny" style="color:var(--bad)">Cancelada automaticamente: comprovante de pagamento não anexado a tempo.</div>` : ''}</span>${apPill(a)}${fbPend.has(a.id) ? html`<button class="btn sm primary" data-act="pFeedback" data-id="${a.id}">Avaliar</button>` : ''}</div>`)}</div>` : html`<p class="muted small">Nada por aqui ainda.</p>`}`;
 }, 'consultas');
 act('pCancel', async el => { if (await confirmBox('Cancelar esta consulta? O horário fica livre para outra pessoa.', 'Cancelar consulta')) { await db.rpc('cancel_my_appointment', { p_id: el.dataset.id }); toast('Consulta cancelada.', 'ok'); router(); } });
 act('pReqCancel', async el => { await db.update('appointment_requests', el.dataset.id, { status: 'cancelado' }); router(); });
