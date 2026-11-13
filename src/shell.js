@@ -64,32 +64,75 @@ async function updateNotif() {
     const toApprove = online.filter(a => a.approval === 'pendente' && a.status !== 'cancelado');
     NOTIF.pending = reqs.length + toApprove.length;
     NOTIF.items = [
-      ...toApprove.map(a => ({ ic: 'check', t: `Aprovar consulta: ${pm[a.patient_id]?.name || ''}`, s: `${fDT(a.starts_at)} · ${a.modality === 'online' ? 'online' : 'presencial'}`, h: '#/solicitacoes' })),
-      ...reqs.map(r => ({ ic: 'globe', t: `Pedido de consulta: ${pm[r.patient_id]?.name || 'paciente'}`, s: r.reason || 'Aguardando resposta', h: '#/solicitacoes' })),
-      ...online.filter(a => a.status !== 'cancelado').map(a => ({ ic: a.modality === 'online' ? 'video' : 'cal', t: `Agendado pelo paciente: ${pm[a.patient_id]?.name || ''}`, s: `${fDT(a.starts_at)} · ${a.modality === 'online' ? 'online' : 'presencial'}`, h: '#/solicitacoes' })),
-      ...rcs.map(r => ({ ic: 'money', t: `Comprovante enviado: ${pm[r.patient_id]?.name || 'paciente'}`, s: `${r.amount ? BRL(r.amount) + ' · ' : ''}${r.appointment_id ? `consulta online · ${r.installment || 1}ª parte · ` : ''}${fDT(r.created_at)}`, h: '#/financeiro' })),
-      ...cancs.map(a => ({ ic: 'x', t: `Cancelada sem pagamento: ${pm[a.patient_id]?.name || 'paciente'}`, s: `Consulta online de ${fDT(a.starts_at)} · comprovante não anexado`, h: '#/agenda' })),
-      ...exs.map(x => ({ ic: 'clip', t: `Exame enviado: ${pm[x.patient_id]?.name || 'paciente'}`, s: `${x.exam_name} · ${fDate(x.created_at)}`, h: `#/paciente/${x.patient_id}?tab=exames` })),
-      ...cks.map(c => ({ ic: 'scale', t: `Acompanhamento semanal: ${pm[c.patient_id]?.name || 'paciente'}`, s: `${fDate(c.data)}${c.sintomas?.length ? ' · ' + c.sintomas.join(', ') : ''}`, h: `#/paciente/${c.patient_id}?tab=emagrecimento` })),
-      ...rets.map(r => ({ ic: 'alarm', t: `Retorno: ${pm[r.patient_id]?.name || 'paciente'}`, s: `${r.due_date <= today ? 'Vencido/hoje' : 'Em ' + fDate(r.due_date)} · ${r.reason || ''}`, h: `#/paciente/${r.patient_id}?tab=retornos` })),
-      ...bdays.map(p => ({ ic: 'cake', t: `Aniversário: ${p.name}`, s: 'Mande uma mensagem hoje', h: `#/marketing` })),
-      ...low.map(s => ({ ic: 'box', t: `Estoque baixo: ${s.name}`, s: `Restam ${s.quantity}`, h: '#/estoque' })),
+      ...toApprove.map(a => ({ k: 'apr:' + a.id, ic: 'check', t: `Aprovar consulta: ${pm[a.patient_id]?.name || ''}`, s: `${fDT(a.starts_at)} · ${a.modality === 'online' ? 'online' : 'presencial'}`, h: '#/solicitacoes' })),
+      ...reqs.map(r => ({ k: 'req:' + r.id, ic: 'globe', t: `Pedido de consulta: ${pm[r.patient_id]?.name || 'paciente'}`, s: r.reason || 'Aguardando resposta', h: '#/solicitacoes' })),
+      ...online.filter(a => a.status !== 'cancelado').map(a => ({ k: 'bk:' + a.id, ic: a.modality === 'online' ? 'video' : 'cal', t: `Agendado pelo paciente: ${pm[a.patient_id]?.name || ''}`, s: `${fDT(a.starts_at)} · ${a.modality === 'online' ? 'online' : 'presencial'}`, h: '#/solicitacoes' })),
+      ...rcs.map(r => ({ k: 'rc:' + r.id, ic: 'money', t: `Comprovante enviado: ${pm[r.patient_id]?.name || 'paciente'}`, s: `${r.amount ? BRL(r.amount) + ' · ' : ''}${r.appointment_id ? `consulta online · ${r.installment || 1}ª parte · ` : ''}${fDT(r.created_at)}`, h: '#/financeiro' })),
+      ...cancs.map(a => ({ k: 'cn:' + a.id, ic: 'x', t: `Cancelada sem pagamento: ${pm[a.patient_id]?.name || 'paciente'}`, s: `Consulta online de ${fDT(a.starts_at)} · comprovante não anexado`, h: '#/agenda' })),
+      ...exs.map(x => ({ k: 'ex:' + x.id, ic: 'clip', t: `Exame enviado: ${pm[x.patient_id]?.name || 'paciente'}`, s: `${x.exam_name} · ${fDate(x.created_at)}`, h: `#/paciente/${x.patient_id}?tab=exames` })),
+      ...cks.map(c => ({ k: 'ck:' + c.id, ic: 'scale', t: `Acompanhamento semanal: ${pm[c.patient_id]?.name || 'paciente'}`, s: `${fDate(c.data)}${c.sintomas?.length ? ' · ' + c.sintomas.join(', ') : ''}`, h: `#/paciente/${c.patient_id}?tab=emagrecimento` })),
+      ...rets.map(r => ({ k: 'rt:' + r.id + ':' + r.due_date, ic: 'alarm', t: `Retorno: ${pm[r.patient_id]?.name || 'paciente'}`, s: `${r.due_date <= today ? 'Vencido/hoje' : 'Em ' + fDate(r.due_date)} · ${r.reason || ''}`, h: `#/paciente/${r.patient_id}?tab=retornos` })),
+      ...bdays.map(p => ({ k: 'bd:' + p.id + ':' + today.slice(0, 4), ic: 'cake', t: `Aniversário: ${p.name}`, s: 'Mande uma mensagem hoje', h: `#/marketing` })),
+      ...low.map(s => ({ k: 'st:' + s.id + ':' + s.quantity, ic: 'box', t: `Estoque baixo: ${s.name}`, s: `Restam ${s.quantity}`, h: '#/estoque' })),
     ];
-    const b = document.getElementById('bellbtn'); if (!b) return;
-    b.querySelector('.dot')?.remove();
-    if (NOTIF.items.length) b.insertAdjacentHTML('beforeend', `<span class="dot">${NOTIF.items.length > 9 ? '9+' : NOTIF.items.length}</span>`);
+    await nsLoad();
+    NOTIF.items = NOTIF.items.filter(n => !NS.map[n.k]?.dismissed_at);
+    bellDot();
     const on = document.querySelector('.side a[href="#/solicitacoes"]'); if (on && NOTIF.pending && !on.querySelector('.pill')) on.insertAdjacentHTML('beforeend', `<span class="pill accent" style="margin-left:auto">${NOTIF.pending}</span>`);
   } catch (e) { console.warn(e); }
+}
+/* lido / apagado: guardado por usuário no banco (notif_state); sem a tabela, fica neste aparelho */
+const NS = { map: {}, remote: false };
+const nsLocal = () => 'pepmh_notif_' + (Auth.userId() || 'x');
+async function nsLoad() {
+  if (!isDemo()) try { const r = await Remote.list('notif_state', { select: 'key,read_at,dismissed_at' }); NS.map = Object.fromEntries(r.map(x => [x.key, x])); NS.remote = true; return; } catch { }
+  NS.map = LS.get(nsLocal(), {}); NS.remote = false;
+}
+async function nsSet(keys, patch) {
+  if (!keys.length) return;
+  keys.forEach(k => { NS.map[k] = { ...(NS.map[k] || {}), key: k, ...patch }; });
+  if (NS.remote) {
+    try { await Remote.req('/rest/v1/notif_state?on_conflict=user_id,key', { method: 'POST', body: keys.map(k => ({ key: k, read_at: NS.map[k].read_at || null, dismissed_at: NS.map[k].dismissed_at || null })), headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } }); return; }
+    catch { NS.remote = false; }
+  }
+  LS.set(nsLocal(), NS.map);
+}
+const nUnread = () => NOTIF.items.filter(n => !NS.map[n.k]?.read_at);
+function bellDot() {
+  const b = document.getElementById('bellbtn'); if (!b) return;
+  b.querySelector('.dot')?.remove(); const n = nUnread().length;
+  if (n) b.insertAdjacentHTML('beforeend', `<span class="dot">${n > 9 ? '9+' : n}</span>`);
+}
+function notifBody(novos) {
+  const lidos = NOTIF.items.filter(n => NS.map[n.k]?.read_at).length;
+  if (!NOTIF.items.length) return html`<div class="empty small">Nada pendente por aqui.</div>`;
+  return html`<div class="row between" style="padding:4px 8px 8px;border-bottom:1px solid var(--line);margin-bottom:4px"><b class="small">Avisos (${NOTIF.items.length})</b>${lidos ? html`<button class="btn sm ghost" style="width:auto;padding:4px 8px" data-act="notifClearRead">${icon('trash', 'small')} Apagar lidos (${lidos})</button>` : ''}</div>
+    ${NOTIF.items.map(n => html`<div class="row" style="gap:0;flex-wrap:nowrap;align-items:stretch"><a href="${n.h}" data-k="${n.k}" style="flex:1;min-width:0${novos.has(n.k) ? ';background:var(--brand-50)' : ''}">${icon(n.ic)}<span><b class="small">${n.t}</b>${novos.has(n.k) ? html` <span class="pill accent" style="font-size:.62rem;padding:1px 6px">novo</span>` : ''}<br><span class="tiny muted">${n.s}</span></span></a><button style="width:36px;flex:none;justify-content:center;color:var(--ink-2)" data-act="notifDel" data-k="${n.k}" title="Apagar este aviso" aria-label="Apagar este aviso">${icon('x', 'small')}</button></div>`)}`;
 }
 act('openNotif', el => {
   const aberto = el.parentElement.querySelector('.menu-pop.float');
   document.querySelectorAll('.menu-pop.float').forEach(m => m.remove());
   if (aberto) return; /* segundo clique no sino fecha */
-  const p = document.createElement('div'); p.className = 'menu-pop float'; p.style.minWidth = '300px'; p.style.maxWidth = '92vw';
-  p.innerHTML = fv(NOTIF.items.length ? NOTIF.items.map(n => html`<a href="${n.h}">${icon(n.ic)}<span><b class="small">${n.t}</b><br><span class="tiny muted">${n.s}</span></span></a>`) : html`<div class="empty small">Nada pendente por aqui.</div>`);
+  const p = document.createElement('div'); p.className = 'menu-pop float'; p.id = 'notifpop'; p.style.minWidth = '320px'; p.style.maxWidth = '92vw';
+  const novos = new Set(nUnread().map(n => n.k)); p.dataset.novos = [...novos].join('|');
+  p.innerHTML = fv(notifBody(novos));
   p.style.maxHeight = '70vh'; p.style.overflowY = 'auto';
   p.addEventListener('click', e => { if (e.target.closest('a')) p.remove(); });
   el.parentElement.appendChild(p);
+  /* abriu e viu: o que estava novo passa a contar como lido (some o número do sino) */
+  const now = new Date().toISOString();
+  nsSet([...novos], { read_at: now }).then(bellDot);
+});
+const notifRefresh = () => { const p = document.getElementById('notifpop'); if (p) p.innerHTML = fv(notifBody(new Set((p.dataset.novos || '').split('|').filter(Boolean)))); bellDot(); };
+act('notifDel', async el => {
+  const k = el.dataset.k; const now = new Date().toISOString();
+  NOTIF.items = NOTIF.items.filter(n => n.k !== k); notifRefresh();
+  await nsSet([k], { read_at: NS.map[k]?.read_at || now, dismissed_at: now });
+});
+act('notifClearRead', async () => {
+  const ks = NOTIF.items.filter(n => NS.map[n.k]?.read_at).map(n => n.k); if (!ks.length) return;
+  NOTIF.items = NOTIF.items.filter(n => !ks.includes(n.k)); notifRefresh();
+  await nsSet(ks, { dismissed_at: new Date().toISOString() }); toast(ks.length === 1 ? '1 aviso apagado.' : `${ks.length} avisos apagados.`, 'ok');
 });
 
 /* busca global de pacientes */

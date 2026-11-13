@@ -248,9 +248,9 @@ const councilOf = m => m?.council_number ? `${m.council || (m.profession === 'me
 const ACT = {}, FORMS = {}, INPUTS = {};
 const act = (n, f) => (ACT[n] = f), onForm = (n, f) => (FORMS[n] = f), onInput = (n, f) => (INPUTS[n] = f);
 document.addEventListener('click', e => {
-  const el = e.target.closest('[data-act]');
+  const el = e.target.closest('[data-act]'); const inPop = !!e.target.closest('.menu-pop');
   if (el && ACT[el.dataset.act]) { e.preventDefault(); Promise.resolve(ACT[el.dataset.act](el, e)).catch(err => toast(err.message, 'bad')); }
-  if (!e.target.closest('.menu-pop') && !e.target.closest('[data-act="popmenu"],[data-act="openNotif"]')) document.querySelectorAll('.menu-pop.float').forEach(m => m.remove());
+  if (!inPop && !e.target.closest('[data-act="popmenu"],[data-act="openNotif"]')) document.querySelectorAll('.menu-pop.float').forEach(m => m.remove());
 });
 document.addEventListener('submit', async e => {
   const f = e.target; if (!f.dataset.form) return; e.preventDefault();
