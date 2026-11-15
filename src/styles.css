@@ -307,3 +307,7 @@ body.branded .pagehead h1{background:linear-gradient(90deg,var(--brand-600),var(
 body:has(.auth) .appfoot{background:#083d80;border-top-color:rgba(255,255,255,.12);color:#cfe0ff}
 body:has(.auth) .appfoot a{color:#fff}
 @media print{.appfoot{display:none}}
+/* indicador offline / sincronização */
+.netpill{border:0;border-radius:999px;padding:5px 11px;font:inherit;font-size:.74rem;font-weight:700;cursor:pointer;white-space:nowrap;background:rgba(255,255,255,.2);color:inherit}
+.netpill.off{background:#fff3cd;color:#7a5600}.netpill.sync{background:rgba(255,255,255,.9);color:var(--brand)}.netpill.bad{background:#fde2e1;color:#b42318}
+.topbar.light .netpill.sync{background:var(--brand-50)}

@@ -1,9 +1,9 @@
-import json, pathlib, sys
+import json, pathlib, sys, hashlib
 root = pathlib.Path(__file__).resolve().parent.parent
 src = root / 'src'
 html = (src / 'index.html').read_text()
 css = (src / 'styles.css').read_text()
-js = '\n'.join((src / f).read_text() for f in ['core.js', 'shell.js', 'pages-main.js', 'pages-record.js', 'pages-rx.js', 'pages-dental.js', 'pages-admin.js', 'pages-portal.js', 'pages-extra.js', 'pages-pdf.js', 'pages-auth.js', 'pages-weight.js', 'pages-guide.js', 'pages-places.js', 'pages-checkin.js', 'pages-receipts.js', 'pages-exams.js', 'pages-poscons.js', 'pages-contabil.js', 'pages-pastas.js', 'pages-online.js'])
+js = '\n'.join((src / f).read_text() for f in ['core.js', 'shell.js', 'pages-main.js', 'pages-record.js', 'pages-rx.js', 'pages-dental.js', 'pages-admin.js', 'pages-portal.js', 'pages-extra.js', 'pages-pdf.js', 'pages-auth.js', 'pages-weight.js', 'pages-guide.js', 'pages-places.js', 'pages-checkin.js', 'pages-receipts.js', 'pages-exams.js', 'pages-poscons.js', 'pages-contabil.js', 'pages-pastas.js', 'pages-online.js', 'offline.js'])
 js = js + '\nconst GAS_CODE = ' + json.dumps((root / 'google' / 'Codigo.gs').read_text()).replace('</', '<\\/') + ';\n'
 out = html.replace('/*CSS*/', css).replace('/*JS*/', js)
 dist = root / 'dist'; dist.mkdir(exist_ok=True)
@@ -16,6 +16,7 @@ server = '''// PEPMH – servidor (Railway Function / Bun). Gerado por scripts/b
 const HTML = %s;
 const ICON = %s;
 const PNGS = Object.fromEntries(Object.entries(%s).map(([k, v]) => [k, Uint8Array.from(atob(v), c => c.charCodeAt(0))]));
+const SW = %s;
 const URL_SB = Bun.env.SUPABASE_URL || "";
 const KEY_SB = Bun.env.SUPABASE_KEY || "";
 const page = HTML.replace('/*CONFIG*/{url:"",key:""}', JSON.stringify({ url: URL_SB, key: KEY_SB }).replace(/</g, "\\\\u003c"));
@@ -42,12 +43,13 @@ Bun.serve({
     if (pathname === "/icon.svg") return new Response(ICON, { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" } });
     const png = PNGS[pathname.slice(1)];
     if (png) return new Response(png, { headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" } });
+    if (pathname === "/sw.js") return new Response(SW, { headers: { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache", "Service-Worker-Allowed": "/" } });
     if (pathname === "/manifest.webmanifest") return new Response(manifest, { headers: { "Content-Type": "application/manifest+json" } });
     return new Response(page, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache", ...sec } });
   },
 });
 console.log("PEPMH no ar");
-''' % (json.dumps(out, ensure_ascii=False), json.dumps(icon), json.dumps(pngs))
+''' % (json.dumps(out, ensure_ascii=False), json.dumps(icon), json.dumps(pngs), json.dumps((src / 'sw.js').read_text(encoding='utf-8').replace('__VER__', hashlib.sha1(out.encode()).hexdigest()[:10])))
 (dist / 'index.tsx').write_text(server)
 print('ok', len(out), 'bytes html;', len(server), 'bytes server')
 for f in icons.iterdir():

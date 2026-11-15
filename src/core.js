@@ -96,10 +96,12 @@ const Remote = {
     const auth = LS.get('pepmh_auth');
     const headers = { apikey: CFG.key, 'Content-Type': 'application/json', ...(opt.headers || {}) };
     if (auth?.access_token) headers.Authorization = 'Bearer ' + auth.access_token;
-    const res = await fetch(CFG.url + path, { method: opt.method || 'GET', headers, body: opt.body ? JSON.stringify(opt.body) : undefined });
+    let res;
+    try { res = await fetch(CFG.url + path, { method: opt.method || 'GET', headers, body: opt.body ? JSON.stringify(opt.body) : undefined, signal: AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined }); }
+    catch (e) { const err = new Error('Sem conexão com a internet.'); err.net = true; throw err; }
     if (res.status === 401 && retry && auth?.refresh_token) { if (await Auth.refresh()) return Remote.req(path, opt, false); }
     const txt = await res.text(); let data = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
-    if (!res.ok) { const m = data?.msg || data?.message || data?.error_description || data?.error || ('Erro ' + res.status); throw new Error(traduzErro(m)); }
+    if (!res.ok) { const m = data?.msg || data?.message || data?.error_description || data?.error || ('Erro ' + res.status); const err = new Error(traduzErro(m + (data?.code === '23505' ? ' (23505)' : ''))); err.status = res.status; throw err; }
     return data;
   },
   qs(q = {}) {
@@ -122,7 +124,7 @@ const Remote = {
   removeWhere(t, eq) { return Remote.req(`/rest/v1/${t}?${Remote.qs({ eq })}`, { method: 'DELETE' }); },
   async storageFetch(path, opt = {}, retry = true) {
     const auth = LS.get('pepmh_auth'); const headers = { apikey: CFG.key, ...(opt.headers || {}) }; if (auth?.access_token) headers.Authorization = 'Bearer ' + auth.access_token;
-    const res = await fetch(CFG.url + '/storage/v1/' + path, { ...opt, headers });
+    let res; try { res = await fetch(CFG.url + '/storage/v1/' + path, { ...opt, headers }); } catch { const err = new Error('Sem conexão com a internet. Arquivos precisam de internet para enviar ou abrir.'); err.net = true; throw err; }
     if ((res.status === 401 || res.status === 400 || res.status === 403) && retry && auth?.refresh_token && Date.now() > (auth.expires_at || 0) - 60000) { if (await Auth.refresh()) return Remote.storageFetch(path, opt, false); }
     if (!res.ok) { let m = 'Erro ' + res.status; try { const j = await res.json(); m = j.message || j.error || m; } catch { } throw new Error(m); }
     return res;
@@ -134,6 +136,8 @@ const Remote = {
 };
 
 /* Demonstração: mesmas operações sobre localStorage, com dados fictícios */
+/* valores padrão das colunas (demonstração e registros criados sem internet) */
+const DEMO_DEF = () => ({ treatment_items: { status: 'pendente', faces: [], price: 0 }, treatment_plans: { status: 'orcamento', discount: 0, title: 'Plano de tratamento' }, appointments: { status: 'agendado', kind: 'consulta' }, odontogram: { faces: [], status: 'existente' }, documents: { no_date: false, verify_code: Array.from(crypto.getRandomValues(new Uint8Array(10)), b => '0123456789ABCDEF'[b % 16]).join('') }, finance_entries: { due_date: ymd(new Date()) }, stock_items: { quantity: 0, min_quantity: 0, unit_cost: 0, unit: 'un' }, crm_leads: { stage: 'novo', value: 0 }, return_alerts: { done: false }, ideas: { votes: 0, status: 'nova' }, insurances: { active: true, discount_pct: 0 }, procedures: { active: true, duration_min: 30, material_cost: 0, hour_cost: 0, tax_pct: 0, margin_pct: 30, price: 0 }, campaigns: { audience: 'todos' }, appointment_requests: { status: 'pendente', period: 'qualquer', modality: 'presencial' }, weight_treatments: { medication: 'Tirzepatida', frequencia_dias: 7, status_pagamento: 'pendente', ativo: true, lembrete_ativo: true }, weight_logs: { registrado_pelo_paciente: false }, clinic_invites: { expires_at: new Date(Date.now() + 14 * 864e5).toISOString() } });
 const Demo = {
   load() { let d = LS.get('pepmh_demo_db_v2'); if (!d) { d = seedDemo(); LS.set('pepmh_demo_db_v2', d); } return d; },
   save(d) { LS.set('pepmh_demo_db_v2', d); },
@@ -153,7 +157,7 @@ const Demo = {
   },
   async insert(t, row) {
     const d = Demo.load(); d[t] = d[t] || [];
-    const DEF = { treatment_items: { status: 'pendente', faces: [], price: 0 }, treatment_plans: { status: 'orcamento', discount: 0, title: 'Plano de tratamento' }, appointments: { status: 'agendado', kind: 'consulta' }, odontogram: { faces: [], status: 'existente' }, documents: { no_date: false, verify_code: Array.from(crypto.getRandomValues(new Uint8Array(10)), b => '0123456789ABCDEF'[b % 16]).join('') }, finance_entries: { due_date: ymd(new Date()) }, stock_items: { quantity: 0, min_quantity: 0, unit_cost: 0, unit: 'un' }, crm_leads: { stage: 'novo', value: 0 }, return_alerts: { done: false }, ideas: { votes: 0, status: 'nova' }, insurances: { active: true, discount_pct: 0 }, procedures: { active: true, duration_min: 30, material_cost: 0, hour_cost: 0, tax_pct: 0, margin_pct: 30, price: 0 }, campaigns: { audience: 'todos' }, appointment_requests: { status: 'pendente', period: 'qualquer', modality: 'presencial' }, weight_treatments: { medication: 'Tirzepatida', frequencia_dias: 7, status_pagamento: 'pendente', ativo: true, lembrete_ativo: true }, weight_logs: { registrado_pelo_paciente: false }, clinic_invites: { expires_at: new Date(Date.now() + 14 * 864e5).toISOString() } };
+    const DEF = DEMO_DEF();
     const one = r => {
       const x = { id: uid(), created_at: new Date().toISOString(), ...(DEF[t] || {}), ...r };
       if (t === 'patients') { x.record_number = (Math.max(0, ...d.patients.map(p => p.record_number || 0)) + 1); x.tags = x.tags || []; x.active = x.active ?? true; }
@@ -172,7 +176,7 @@ const Demo = {
 };
 
 const isDemo = () => LS.get('pepmh_mode') === 'demo';
-const B = () => isDemo() ? Demo : Remote;
+const B = () => isDemo() ? Demo : Offline;
 const db = {
   list: (t, q) => B().list(t, q),
   async get(t, id) { const r = await B().list(t, { eq: { id }, limit: 1 }); return r[0] || null; },
@@ -180,7 +184,7 @@ const db = {
   update: (t, id, patch) => B().updateWhere(t, { id }, patch),
   updateWhere: (t, eq, patch) => B().updateWhere(t, eq, patch),
   remove: (t, id) => B().removeWhere(t, { id }),
-  rpc: (fn, args) => isDemo() ? DemoRPC[fn](args || {}) : Remote.rpc(fn, args),
+  rpc: (fn, args) => isDemo() ? DemoRPC[fn](args || {}) : Offline.rpc(fn, args),
 };
 
 function traduzErro(m) {
@@ -202,7 +206,7 @@ const Auth = {
   store(d) { LS.set('pepmh_auth', { access_token: d.access_token, refresh_token: d.refresh_token, expires_at: Date.now() + (d.expires_in || 3600) * 1000, user: d.user }); },
   async signIn(email, password) { const d = await Auth.call('token?grant_type=password', { email, password }); Auth.store(d); LS.set('pepmh_mode', 'remote'); },
   async signUp(email, password, meta) { const d = await Auth.call('signup?redirect_to=' + encodeURIComponent(location.origin + '/'), { email, password, data: meta }); if (d.access_token) { Auth.store(d); LS.set('pepmh_mode', 'remote'); return true; } return false; },
-  async refresh() { try { const a = LS.get('pepmh_auth'); const d = await Auth.call('token?grant_type=refresh_token', { refresh_token: a.refresh_token }); Auth.store(d); return true; } catch { LS.del('pepmh_auth'); return false; } },
+  async refresh() { try { const a = LS.get('pepmh_auth'); const d = await Auth.call('token?grant_type=refresh_token', { refresh_token: a.refresh_token }); Auth.store(d); return true; } catch (e) { if (!(e instanceof TypeError) && !e.net) LS.del('pepmh_auth'); return false; } },
   async recover(email) { await Auth.call('recover?redirect_to=' + encodeURIComponent(location.origin + '/'), { email }); },
   signOut() { const a = LS.get('pepmh_auth'); if (a && !isDemo()) fetch(CFG.url + '/auth/v1/logout', { method: 'POST', headers: { apikey: CFG.key, Authorization: 'Bearer ' + a.access_token } }).catch(() => { }); LS.del('pepmh_auth'); LS.del('pepmh_mode'); location.hash = '#/'; location.reload(); },
   userId() { return isDemo() ? (LS.get('pepmh_demo_user') || 'demo-user') : LS.get('pepmh_auth')?.user?.id; },

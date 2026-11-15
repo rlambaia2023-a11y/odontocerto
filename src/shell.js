@@ -25,6 +25,7 @@ function renderShell(active) {
       <button class="iconbtn only-m" data-act="toggleMenu" aria-label="Menu">${icon('menu')}</button>
       <a class="logo" href="#/">${hasLogo ? brandLogo(S.clinic) : html`<span class="mark" role="img" aria-label="PEPMH"></span>PEPMH${patient ? html`<span class="small hide-m" style="font-weight:500;opacity:.85;letter-spacing:0"> · ${S.clinic.name}</span>` : ''}`}</a>
       <span class="sp"></span>
+      ${!isDemo() ? html`<button class="netpill" id="netpill" data-act="netInfo" hidden></button>` : ''}
       ${!patient ? html`<button class="iconbtn" data-act="globalSearch" aria-label="Buscar paciente">${icon('search')}</button>
       <div class="rel"><button class="iconbtn" data-act="openNotif" aria-label="Notificações" id="bellbtn">${icon('bell')}</button></div>` : S.clinic.phone ? html`<a class="iconbtn" target="_blank" rel="noopener" href="${waLink(S.clinic.phone, 'Olá! Sou paciente e gostaria de falar com a clínica.')}" aria-label="Falar com a clínica">${icon('wa')}</a>` : ''}
       <div class="rel"><button class="iconbtn" data-act="popmenu" data-menu="usermenu" aria-label="Conta" style="width:auto;padding:0 8px;gap:6px;display:inline-flex"><span class="avatar" style="width:30px;height:30px;font-size:.75rem;background:#fff">${initials(S.me.full_name || 'U')}</span></button></div>
@@ -33,6 +34,7 @@ function renderShell(active) {
       ${!patient ? html`<a href="#/configuracoes">${icon('gear')} Configurações</a>` : html`<a href="#/meus-dados">${icon('user')} Meus dados</a>`}${isDemo() ? html`<button data-act="resetDemo">${icon('repeat')} Reiniciar demonstração</button>` : ''}<button data-act="logout">${icon('logout')} Sair</button></template>
     <div class="shell"><nav class="side" id="side"></nav><div class="scrim" data-act="toggleMenu"></div><main id="view"></main></div>`);
     if (hasLogo) document.getElementById('side').classList.add('withfoot');
+    if (!isDemo()) Sync.count().then(() => Sync.pending && navigator.onLine && Sync.flush());
     if (!patient) { updateNotif(); clearInterval(window.__notifT); window.__notifT = setInterval(() => { if (!document.hidden && document.getElementById('bellbtn')) updateNotif(); }, 60000); }
   }
   const items = patient ? PNAV : NAV.filter(n => (n[4] !== 'clin' || isClinical()) && (n[4] !== 'dent' || (isClinical() && showDental())) && (!ADM_NAV.includes(n[0]) || isAdmin())).filter((n, i, a) => !(n[0] === 'sep' && n[1] === 'Gestão' && !isAdmin()));
@@ -292,7 +294,10 @@ async function boot() {
     const ctx = await loadContext();
     if (ctx === 'orphan') { app.innerHTML = fv(orphanScreen()); return; }
     if (!ctx) { LS.del('pepmh_auth'); LS.del('pepmh_mode'); S.clinic = null; renderAuth(); return; }
-  } catch (e) { LS.del('pepmh_auth'); S.clinic = null; renderAuth(); toast(e.message, 'bad'); return; }
+  } catch (e) {
+    if (isNetErr(e)) { app.innerHTML = fv(html`<div class="auth"><div class="card"><h2>Sem internet</h2><p class="muted">Este aparelho ainda não tem os dados da clínica guardados. Conecte-se uma vez à internet e abra o PEPMH: depois disso ele funciona mesmo sem conexão.</p><button class="btn primary" onclick="location.reload()">Tentar de novo</button></div></div>`); return; }
+    LS.del('pepmh_auth'); S.clinic = null; renderAuth(); toast(e.message, 'bad'); return;
+  }
   if (!isDemo() && LS.get('pepmh_auth')?.user?.user_metadata?.must_change_password) { location.hash = '#/nova-senha'; await router(); toast('Crie uma senha sua para continuar.', 'ok'); return; }
   if (S.mode === 'patient') { const pend = LS.get('pepmh_pending_book'); if (pend) { LS.del('pepmh_pending_book'); if (!location.hash.startsWith('#/agendar')) location.hash = '#/agendar'; } }
   document.getElementById('view') || (app.innerHTML = '');

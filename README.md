@@ -26,6 +26,13 @@ Gerado por `python scripts/make_icons.py` (requer Pillow) em `src/icons/` (SVG e
 - Banco: view `online_patients` (com `security_invoker`, respeita o RLS), colunas `appointments.waiting_since` / `started_at` e RPC `online_enter_waiting` (migração `supabase/migrations/20261115_online_patients.sql`).
 - Sala de espera: o paciente toca em "Estou na sala de espera" no portal (abre 30 min antes, exige termo aceito); a equipe vê a fila de hoje, atualizada a cada 30 s, e atende com um clique.
 
+## Modo offline
+- Sem internet, a equipe continua usando o sistema: cadastra pacientes, evolui, agenda, edita e exclui. Tudo fica salvo no aparelho (IndexedDB, `src/offline.js`) e entra numa fila.
+- Quando a conexão volta, a fila é enviada sozinha, na ordem em que foi feita (evento `online` e nova tentativa a cada 30 s). Os ids são gerados no aparelho, então paciente novo + consulta/evolução dele chegam ligados. O nº do prontuário chega depois do envio.
+- O selo no topo mostra **Offline · N na fila**, **Enviando…** ou **N com erro**; tocando nele dá para ver a fila, sincronizar agora, tentar de novo ou descartar o que o servidor recusou.
+- O service worker (`src/sw.js`, servido em `/sw.js`) guarda a página, então o PEPMH abre mesmo sem conexão, desde que o aparelho já tenha sido usado online uma vez.
+- Precisam de internet: login, envio/abertura de arquivos (Storage), RPCs que gravam (agendamento online, sala de espera etc.), convites e tabelas sem `id` uuid (ex.: membros da clínica).
+
 ## Arquitetura
 - Front-end em JavaScript puro, sem dependências (`src/`).
 - `scripts/build.py` junta tudo em um único servidor Bun (`dist/index.tsx`).
