@@ -21,6 +21,11 @@ Gerado por `python scripts/make_icons.py` (requer Pillow) em `src/icons/` (SVG e
 - Teleconsulta exige aceite do termo de consentimento (Res. CFM 2.314/2022; Res. CFO-SEC-278/2025), registrado na consulta.
 - Cada profissional cadastra a própria sala do Google Meet e os horários de atendimento.
 
+## Pacientes online (`#/pacientes-online`)
+- Cadastro automático de todo paciente com consulta `modality = 'online'`: em atendimento, na sala de espera, agendados, já atendidos e sem consulta ativa.
+- Banco: view `online_patients` (com `security_invoker`, respeita o RLS), colunas `appointments.waiting_since` / `started_at` e RPC `online_enter_waiting` (migração `supabase/migrations/20261115_online_patients.sql`).
+- Sala de espera: o paciente toca em "Estou na sala de espera" no portal (abre 30 min antes, exige termo aceito); a equipe vê a fila de hoje, atualizada a cada 30 s, e atende com um clique.
+
 ## Arquitetura
 - Front-end em JavaScript puro, sem dependências (`src/`).
 - `scripts/build.py` junta tudo em um único servidor Bun (`dist/index.tsx`).

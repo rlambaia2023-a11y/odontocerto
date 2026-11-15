@@ -1,7 +1,7 @@
 /* ===== Casca do app, login/cadastro, dados de demonstração ===== */
 const NAV = [
   ['inicio', '#/', 'home', 'Início'], ['agenda', '#/agenda', 'cal', 'Agenda'], ['minha', '#/minha-agenda', 'calme', 'Minha agenda', 'clin'],
-  ['online', '#/solicitacoes', 'globe', 'Agendamentos online'],
+  ['online', '#/solicitacoes', 'globe', 'Agendamentos online'], ['pacientesOnline', '#/pacientes-online', 'video', 'Pacientes online'],
   ['pacientes', '#/pacientes', 'user', 'Pacientes'], ['emagrecimento', '#/emagrecimento', 'scale', 'Emagrecimento'], ['guia', '#/guia', 'leaf', 'Dietas e exercícios'], ['prescrever', '#/prescrever', 'pill', 'Prescrever', 'clin'], ['odonto', '#/odontologia', 'tooth', 'Ferramentas do dentista', 'dent'],
   ['sep', 'Gestão'], ['financeiro', '#/financeiro', 'money', 'Financeiro'], ['contabil', '#/contabil', 'calc', 'Contábil', 'clin'], ['precificador', '#/precificador', 'tag', 'Precificador'],
   ['convenios', '#/convenios', 'building', 'Convênios'], ['relatorios', '#/relatorios', 'chart', 'Relatórios'], ['estoque', '#/estoque', 'box', 'Estoque'],
