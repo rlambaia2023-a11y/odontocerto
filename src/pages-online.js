@@ -16,7 +16,11 @@ function aggregateOnline(appts, pm) {
   }).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
 async function onlinePatients() {
-  if (!isDemo()) return db.list('online_patients', { order: 'name' });
+  if (!isDemo()) {
+    /* sem internet: usa a última lista guardada; se o aparelho nunca abriu esta tela online, monta com as consultas guardadas */
+    try { return await db.list('online_patients', { order: 'name' }); }
+    catch (e) { if (!isNetErr(e)) throw e; }
+  }
   const ap = await db.list('appointments', { eq: { modality: 'online' } });
   return aggregateOnline(ap, await patientMap(ap.map(a => a.patient_id)));
 }

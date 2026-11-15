@@ -58,7 +58,7 @@ const Cache = {
   /* guarda as linhas vindas do servidor; remove do cache as que sumiram do servidor */
   async putRows(t, rows, q = {}) {
     if (!Array.isArray(rows)) return;
-    if (OFF_NOID.has(t) || rows.some(r => !r || r.id == null)) return IDB.tx('kv', 'readwrite', s => s.put({ k: offQKey(t, q), v: rows })).catch(() => { });
+    if (OFF_NOID.has(t) || rows.some(r => !r || r.id == null)) return IDB.tx('kv', 'readwrite', s => { s.put({ k: offQKey(t, q), v: rows }); if (!q.limit) s.put({ k: 'last|' + t, v: rows, q }); }).catch(() => { });
     const ids = new Set(rows.map(r => String(r.id)));
     const reconcile = !q.limit && !Object.keys({ ...q.eq, ...q.neq, ...q.gte, ...q.lte, ...q.lt, ...q.gt, ...q.ilike, ...q.in, ...q.is }).some(k => k.includes('.'));
     return IDB.tx('rows', 'readwrite', async s => {
@@ -72,6 +72,9 @@ const Cache = {
     if (OFF_NOID.has(t) || !(await Cache.hasTable(t))) {
       const hit = await IDB.tx('kv', 'readonly', s => IDB.req(s.get(offQKey(t, q))));
       if (hit) return JSON.parse(JSON.stringify(hit.v));
+      /* outra consulta da mesma tabela, sem filtros que cortem linhas: filtra aqui mesmo */
+      const last = await IDB.tx('kv', 'readonly', s => IDB.req(s.get('last|' + t)));
+      if (last && !Object.keys({ ...last.q.eq, ...last.q.neq, ...last.q.gte, ...last.q.lte, ...last.q.lt, ...last.q.gt, ...last.q.ilike, ...last.q.in, ...last.q.is }).length) return offApply(last.v, q);
       if (OFF_NOID.has(t)) { const e = new Error(NET_MSG + ' Estes dados ainda não foram abertos neste aparelho.'); e.net = true; throw e; }
     }
     return offApply((await Cache.all(t)).map(o => o.row), q);
@@ -115,7 +118,7 @@ const Sync = {
             await IDB.tx(['outbox', 'failed'], 'readwrite', (ob, fl) => { ob.delete(it.seq); fl.put({ ...it, error: e.message, failed_at: new Date().toISOString() }); });
           }
         }
-        if (!(await IDB.tx('outbox', 'readonly', s => IDB.req(s.count())))) { this.setOffline(false); this.lastOk = new Date().toISOString(); LS.set('pepmh_last_sync', this.lastOk); }
+        if (sent && !(await IDB.tx('outbox', 'readonly', s => IDB.req(s.count())))) { this.setOffline(false); this.lastOk = new Date().toISOString(); LS.set('pepmh_last_sync', this.lastOk); }
       } finally {
         this.busy = null; await this.count();
         if (sent) { toast(`${sent} alteraç${sent > 1 ? 'ões feitas' : 'ão feita'} sem internet ${sent > 1 ? 'foram enviadas' : 'foi enviada'} ao servidor.`, 'ok'); }
@@ -242,9 +245,15 @@ act('netDiscard', async () => {
   await IDB.tx('failed', 'readwrite', s => s.clear()); await Sync.count(); toast('Descartadas.');
 });
 
-window.addEventListener('online', () => { Sync.setOffline(false); Sync.flush(); });
+window.addEventListener('online', async () => { if (Sync.pending) { Sync.lastFail = 0; Sync.flush(); } else Sync.setOffline(!(await offProbe())); });
 window.addEventListener('offline', () => Sync.setOffline(true));
-setInterval(() => { if (!document.hidden && navigator.onLine && (Sync.pending || Sync.offline) && !isDemo()) Sync.flush().then(() => { if (!Sync.pending) Sync.setOffline(false); }); }, 30000);
+/* a cada 30 s: com fila, tenta enviar; sem fila mas offline, testa se a conexão voltou */
+async function offProbe() { try { await Remote.req('/auth/v1/health'); return true; } catch (e) { return !isNetErr(e); } }
+setInterval(async () => {
+  if (document.hidden || !navigator.onLine || isDemo() || !LS.get('pepmh_auth')) return;
+  if (Sync.pending) return Sync.flush();
+  if (Sync.offline) Sync.setOffline(!(await offProbe()));
+}, 30000);
 
 /* app abre sem internet: service worker guarda a página e os ícones */
 if ('serviceWorker' in navigator && location.protocol !== 'file:') window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => { }));
