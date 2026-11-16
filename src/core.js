@@ -96,6 +96,9 @@ const Remote = {
     const auth = LS.get('pepmh_auth');
     const headers = { apikey: CFG.key, 'Content-Type': 'application/json', ...(opt.headers || {}) };
     if (auth?.access_token) headers.Authorization = 'Bearer ' + auth.access_token;
+    else if (opt.method && opt.method !== 'GET' && !path.startsWith('/auth/') && typeof S !== 'undefined' && S.me && !isDemo()) {
+      const err = new Error('Sua sessão foi encerrada neste navegador (alguém saiu da conta em outra aba). Entre de novo para salvar.'); err.status = 401; setTimeout(() => location.reload(), 2500); throw err;
+    }
     let res;
     try { res = await fetch(CFG.url + path, { method: opt.method || 'GET', headers, body: opt.body ? JSON.stringify(opt.body) : undefined, signal: AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined }); }
     catch (e) { const err = new Error('Sem conexão com a internet.'); err.net = true; throw err; }
@@ -191,6 +194,7 @@ function traduzErro(m) {
   const map = { 'Invalid login credentials': 'E-mail ou senha incorretos.', 'Email not confirmed': 'Confirme seu e-mail antes de entrar (veja sua caixa de entrada).', 'User already registered': 'Já existe uma conta com esse e-mail.', 'Password should be at least 6 characters': 'A senha precisa ter pelo menos 6 caracteres.' };
   for (const k in map) if (String(m).includes(k)) return map[k];
   if (/Database error saving new user/i.test(m)) return 'Não foi possível concluir o cadastro: confira o código de convite/acesso ou o link da clínica.';
+  if (/row-level security/i.test(m)) return 'Sua conta não tem permissão para salvar isso. Saia e entre de novo com a conta da clínica (se outra pessoa entrou ou saiu neste navegador, a sessão muda em todas as abas).';
   if (/rate limit/i.test(m)) return 'Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.';
   return m;
 }
@@ -205,12 +209,31 @@ const Auth = {
   },
   store(d) { LS.set('pepmh_auth', { access_token: d.access_token, refresh_token: d.refresh_token, expires_at: Date.now() + (d.expires_in || 3600) * 1000, user: d.user }); },
   async signIn(email, password) { const d = await Auth.call('token?grant_type=password', { email, password }); Auth.store(d); LS.set('pepmh_mode', 'remote'); },
-  async signUp(email, password, meta) { const d = await Auth.call('signup?redirect_to=' + encodeURIComponent(location.origin + '/'), { email, password, data: meta }); if (d.access_token) { Auth.store(d); LS.set('pepmh_mode', 'remote'); return true; } return false; },
+  // Paciente (clínica/código) e equipe (convite): cria a conta já confirmada pela função "signup", sem depender do
+  // e-mail de confirmação do Supabase (que tem limite de envios por hora e travava o cadastro com "muitas tentativas").
+  async signUp(email, password, meta, redirect = '/') {
+    if (meta && (meta.invite_code || meta.patient_code || meta.book_slug)) {
+      let res; try { res = await fetch(CFG.url + '/functions/v1/signup', { method: 'POST', headers: { apikey: CFG.key, Authorization: 'Bearer ' + CFG.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: String(email).trim(), password, data: meta }) }); }
+      catch { const e = new Error('Sem conexão com a internet.'); e.net = true; throw e; }
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(traduzErro(j.message || j.msg || 'Não foi possível criar a conta.'));
+      await Auth.signIn(String(email).trim(), password); return true;
+    }
+    const d = await Auth.call('signup?redirect_to=' + encodeURIComponent(location.origin + redirect), { email, password, data: meta }); if (d.access_token) { Auth.store(d); LS.set('pepmh_mode', 'remote'); return true; } return false;
+  },
   async refresh() { try { const a = LS.get('pepmh_auth'); const d = await Auth.call('token?grant_type=refresh_token', { refresh_token: a.refresh_token }); Auth.store(d); return true; } catch (e) { if (!(e instanceof TypeError) && !e.net) LS.del('pepmh_auth'); return false; } },
   async recover(email) { await Auth.call('recover?redirect_to=' + encodeURIComponent(location.origin + '/'), { email }); },
   signOut() { const a = LS.get('pepmh_auth'); if (a && !isDemo()) fetch(CFG.url + '/auth/v1/logout', { method: 'POST', headers: { apikey: CFG.key, Authorization: 'Bearer ' + a.access_token } }).catch(() => { }); LS.del('pepmh_auth'); LS.del('pepmh_mode'); location.hash = '#/'; location.reload(); },
   userId() { return isDemo() ? (LS.get('pepmh_demo_user') || 'demo-user') : LS.get('pepmh_auth')?.user?.id; },
 };
+
+// Login/logout em outra aba muda a sessão de todas: recarrega para não mostrar a tela de um usuário com a sessão de outro.
+window.addEventListener('storage', e => {
+  if (e.key !== 'pepmh_auth') return;
+  const id = v => { try { return JSON.parse(v)?.user?.id || null; } catch { return null; } };
+  const was = id(e.oldValue), now = id(e.newValue);
+  if (was && was !== now) location.reload();
+});
 
 /* ---------- estado global ---------- */
 const S = { mode: 'staff', clinic: null, me: null, patient: null, members: [], insurances: [], procedures: [] };

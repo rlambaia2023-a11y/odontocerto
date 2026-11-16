@@ -154,8 +154,7 @@ pubRoute('/cadastro/:slug', async ({ slug }) => {
 onForm('cadSignup', async d => {
   if (isDemo()) throw new Error('O cadastro por link funciona só na versão real (fora da demonstração).');
   const meta = patientSignupMeta(d, BK.slug, 'cadastro');
-  const ok = await Auth.call('signup?redirect_to=' + encodeURIComponent(location.origin + '/'), { email: d.email.trim(), password: d.password, data: meta });
-  if (ok.access_token) { Auth.store(ok); LS.set('pepmh_mode', 'remote'); location.hash = '#/'; S.clinic = null; await boot(); toast('Cadastro concluído!', 'ok'); return; }
+  if (await Auth.signUp(d.email.trim(), d.password, meta)) { location.hash = '#/'; S.clinic = null; await boot(); toast('Cadastro concluído!', 'ok'); return; }
   document.getElementById('cad').innerHTML = fv(checkEmailCard(d.email.trim())); window.scrollTo(0, 0);
 });
 
@@ -232,9 +231,8 @@ onForm('bkConfirm', async d => {
     if (isDemo()) { const u = 'demo-p-' + uid().slice(0, 8); LS.set('pepmh_demo_user', u); LS.set('pepmh_demo_signup', { full_name: d.full_name || 'Paciente demonstração', phone: d.phone, email: d.email, birth_date: d.birth_date || null }); }
     else if (BK.auth === 'login') await Auth.signIn(d.email, d.password);
     else {
-      const ok = await Auth.call('signup?redirect_to=' + encodeURIComponent(location.origin + '/?agendar=' + BK.slug), { email: d.email.trim(), password: d.password, data: patientSignupMeta(d, BK.slug, 'agendamento') });
-      if (!ok.access_token) { LS.set('pepmh_pending_book', { slug: BK.slug }); document.getElementById('bk').innerHTML = fv(html`<div class="card"><h2>Falta só confirmar seu e-mail</h2><p>Enviamos um link para <b>${d.email}</b>. Abra o e-mail, toque no link e você volta para cá já com a conta ativa para escolher o horário.</p><p class="small muted">Seu cadastro já chegou à clínica. Não chegou o e-mail? Veja a caixa de spam ou promoções.</p></div>`); return; }
-      Auth.store(ok); LS.set('pepmh_mode', 'remote');
+      const ok = await Auth.signUp(d.email.trim(), d.password, patientSignupMeta(d, BK.slug, 'agendamento'), '/?agendar=' + BK.slug);
+      if (!ok) { LS.set('pepmh_pending_book', { slug: BK.slug }); document.getElementById('bk').innerHTML = fv(html`<div class="card"><h2>Falta só confirmar seu e-mail</h2><p>Enviamos um link para <b>${d.email}</b>. Abra o e-mail, toque no link e você volta para cá já com a conta ativa para escolher o horário.</p><p class="small muted">Seu cadastro já chegou à clínica. Não chegou o e-mail? Veja a caixa de spam ou promoções.</p></div>`); return; }
     }
   }
   const r = await db.rpc('book_appointment', { p_slug: BK.slug, p_professional: BK.pro.user_id, p_start: BK.slot.starts_at, p_modality: BK.slot.modality, p_reason: d.reason || null, p_consent: !!d.consent, p_terms: !!d.terms });
