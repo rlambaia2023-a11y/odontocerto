@@ -168,3 +168,8 @@ end $function$;
 -- novos tipos de tarefa na fila do Google: código de confirmação e e-mail do link do Meet
 alter table public.google_jobs drop constraint if exists google_jobs_ref_table_check;
 alter table public.google_jobs add constraint google_jobs_ref_table_check check (ref_table = any (array['appointments', 'work_events', 'weight_checkins', 'patient_email', 'appointments_mail']));
+
+-- ajustes do linter de segurança
+alter function private.html_esc(text) set search_path to 'pg_catalog';
+revoke execute on function public.book_appointment(text, uuid, timestamptz, text, text, boolean, boolean) from public, anon;
+grant execute on function public.book_appointment(text, uuid, timestamptz, text, text, boolean, boolean) to authenticated;
