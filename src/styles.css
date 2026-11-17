@@ -324,6 +324,7 @@ body:has(.auth) .appfoot a{color:#fff}
 .hb-d .n{font-weight:700;font-size:.95rem}
 .hb-d.closed{background:repeating-linear-gradient(135deg,#f3f5f8 0 6px,#eceff3 6px 12px)}
 .hb-d.partial{background:var(--warn-50)}
+.hb-d.extra{background:#e0f2fe;border-color:#bae6fd}
 .hb-d.blocked{background:var(--bad-50);border-color:#f1b9b9}
 .hb-d.past{opacity:.38;cursor:default}
 .hb-d.today .n{color:var(--brand);text-decoration:underline}
@@ -331,11 +332,11 @@ body:has(.auth) .appfoot a{color:#fff}
 .hb-d.sel::after{content:'✓';position:absolute;top:3px;left:5px;font-size:.7rem;font-weight:800;color:var(--brand)}
 .hb-tag{font-size:.62rem;font-weight:700;color:var(--ink-3);display:inline-flex;align-items:center;gap:2px;line-height:1.1;text-align:center}
 .hb-tag .icon{width:11px;height:11px}
-.hb-tag.ok{color:var(--ok)} .hb-tag.warn{color:var(--warn)} .hb-tag.bad{color:var(--bad)}
+.hb-tag.ok{color:var(--ok)} .hb-tag.info{color:#0369a1} .hb-tag.warn{color:var(--warn)} .hb-tag.bad{color:var(--bad)}
 .hb-dot{position:absolute;top:3px;right:4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--brand);color:#fff;font-size:.62rem;font-weight:700;display:grid;place-items:center}
 .hb-dot.static{position:static;display:inline-grid}
 .hb-sw{display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid var(--line);background:#eceff3;vertical-align:-2px;margin-right:4px}
-.hb-sw.ok{background:var(--ok-50)} .hb-sw.warn{background:var(--warn-50)} .hb-sw.bad{background:var(--bad-50)}
+.hb-sw.ok{background:var(--ok-50)} .hb-sw.info{background:#e0f2fe} .hb-sw.warn{background:var(--warn-50)} .hb-sw.bad{background:var(--bad-50)}
 .hb-sel{border-color:var(--brand-100)}
 .hb-sel.empty{display:flex;gap:10px;align-items:center;color:var(--ink-2)}
 .hb-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px;align-items:start}
@@ -359,3 +360,6 @@ body:has(.auth) .appfoot a{color:#fff}
 .hb-times{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
 .hb-times span{font-size:.78rem;font-weight:600;background:var(--ok-50);color:var(--ok);border-radius:6px;padding:2px 7px}
 @media (max-width:600px){.hb-d{min-height:52px}.hb-tag{font-size:.56rem}.hb-steps{font-size:.75rem}}
+
+.btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.ok .icon{color:#fff}

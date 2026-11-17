@@ -22,8 +22,9 @@ async function hbLoad() {
   const first = new Date(HB.month.getFullYear(), HB.month.getMonth(), 1), last = new Date(HB.month.getFullYear(), HB.month.getMonth() + 1, 1);
   const from = addDays(first, -7), to = addDays(last, 7); const T = startOfDay(new Date());
   const range = { lt: { starts_at: to.toISOString() }, gt: { ends_at: from.toISOString() } };
-  const [av, evs, aps] = await Promise.all([
+  const [av, extra, evs, aps] = await Promise.all([
     db.list('availability', { eq: { professional_id: HB.pro }, order: 'weekday,start_time' }),
+    db.list('availability_dates', { eq: { professional_id: HB.pro }, gte: { day: ymd(from) }, lt: { day: ymd(to) }, order: 'day,start_time' }).catch(() => []),
     db.list('work_events', { eq: { professional_id: HB.pro }, ...range, order: 'starts_at' }),
     db.list('appointments', { eq: { professional_id: HB.pro }, ...range, order: 'starts_at' }),
   ]);
@@ -38,7 +39,7 @@ async function hbLoad() {
     if (days > 0) monthSlots = await hbRpc('public_slots', { p_slug: S.clinic.slug, p_professional: HB.pro, p_from: ymd(f0), p_days: Math.min(31, days) });
   }
   const pm = await patientMap(live.map(a => a.patient_id));
-  HB.data = { av, evs, aps: live, slots, monthSlots, pm };
+  HB.data = { av, extra, evs, aps: live, slots, monthSlots, pm };
 }
 
 async function hbRefresh(keepSel = true) {
@@ -66,7 +67,7 @@ function hbBody() {
   const D = HB.data; const pro = pros().find(m => m.user_id === HB.pro) || {};
   return html`
   ${hbCanPick() && pros().length > 1 ? html`<div class="card hb-pros"><span class="small muted">Agenda de</span><div class="seg" style="flex-wrap:wrap">${pros().map(m => html`<button class="${m.user_id === HB.pro ? 'on' : ''}" data-act="hbPro" data-id="${m.user_id}">${m.full_name}</button>`)}</div></div>` : ''}
-  <div class="hb-steps small"><span><b>1</b> Monte a semana padrão</span><span><b>2</b> Toque nos dias para bloquear</span><span><b>3</b> Pronto: some para os pacientes e vai para o Google Agenda</span></div>
+  <div class="hb-steps small"><span><b>1</b> Monte a semana padrão</span><span><b>2</b> Toque nos dias para abrir, bloquear ou desbloquear</span><span><b>3</b> Pronto: os pacientes veem na hora e o Google Agenda recebe os bloqueios</span></div>
   <div class="hb-grid">
     <div class="stack" style="gap:14px">${hbCalendar(D)}${hbSelectionPanel(D)}</div>
     <div class="stack" style="gap:14px">${hbWeek(D, pro)}${hbPreview(D)}${hbGoogleBox()}</div>
@@ -114,14 +115,15 @@ act('hbDelHours', async el => {
 /* ---------- calendário do mês ---------- */
 function hbDayInfo(D, k) {
   const day = parseYmd(k); const wd = day.getDay();
-  const av = D.av.filter(a => +a.weekday === wd);
+  const weekly = D.av.filter(a => +a.weekday === wd), extra = D.extra.filter(x => x.day === k);
+  const av = [...weekly, ...extra].sort((a, b) => a.start_time < b.start_time ? -1 : 1);
   const evs = D.evs.filter(e => hbOverlap(e.starts_at, e.ends_at, k));
   const blocks = evs.filter(hbIsBlock), others = evs.filter(e => !hbIsBlock(e));
   const whole = blocks.some(e => hbWholeDay(e, k)) || (av.length && av.every(a => blocks.some(b => new Date(b.starts_at) <= new Date(`${k}T${hbTime(a.start_time)}`) && new Date(b.ends_at) >= new Date(`${k}T${hbTime(a.end_time)}`))));
   const aps = D.aps.filter(a => ymd(a.starts_at) === k);
   const free = D.monthSlots.filter(s => ymd(s.starts_at) === k);
   const freeTimes = new Set(free.map(s => s.starts_at)).size;
-  return { k, day, av, blocks, others, whole, partial: !whole && (blocks.length > 0 || others.length > 0), aps, freeTimes, past: day < startOfDay(new Date()) };
+  return { k, day, av, weekly, extra, blocks, others, whole, partial: !whole && (blocks.length > 0 || others.length > 0), aps, freeTimes, past: day < startOfDay(new Date()) };
 }
 function hbCalendar(D) {
   const y = HB.month.getFullYear(), mo = HB.month.getMonth(); const first = new Date(y, mo, 1);
@@ -129,14 +131,14 @@ function hbCalendar(D) {
   const cells = [...Array(lead)].map(() => null).concat([...Array(n)].map((_, i) => ymd(new Date(y, mo, i + 1))));
   return html`<div class="card hb-cal-card"><div class="row between"><h2 style="margin:0">${icon('cal')} ${HB_MONTHS[mo]} de ${y}</h2>
       <div class="row" style="gap:4px"><button class="btn sm" data-act="hbMonth" data-n="-1" aria-label="Mês anterior">${icon('chevl')}</button><button class="btn sm" data-act="hbMonth" data-n="0">Hoje</button><button class="btn sm" data-act="hbMonth" data-n="1" aria-label="Próximo mês">${icon('chev')}</button></div></div>
-    <p class="small muted" style="margin:6px 0 10px">Toque em um ou vários dias. Depois escolha: bloquear o dia todo, bloquear só um horário ou liberar de novo.</p>
+    <p class="small muted" style="margin:6px 0 10px">Toque em um ou vários dias. Depois escolha: abrir um dia fechado, bloquear o dia todo, bloquear só um horário ou desbloquear.</p>
     <div class="hb-cal">${['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map(w => html`<div class="hb-h">${w}</div>`)}
       ${cells.map(k => { if (!k) return html`<div></div>`; const i = hbDayInfo(D, k);
-        const cls = ['hb-d', i.past ? 'past' : '', !i.av.length ? 'closed' : '', i.whole ? 'blocked' : '', i.partial ? 'partial' : '', HB.sel.has(k) ? 'sel' : '', k === T ? 'today' : ''].join(' ');
-        const tag = i.whole ? html`<span class="hb-tag bad">${icon('lock')} bloqueado</span>` : !i.av.length ? html`<span class="hb-tag">fechado</span>` : i.past ? '' : i.partial ? html`<span class="hb-tag warn">parcial</span>` : (S.clinic.public_booking ? html`<span class="hb-tag ok">${i.freeTimes} vaga${i.freeTimes === 1 ? '' : 's'}</span>` : '');
+        const cls = ['hb-d', i.past ? 'past' : '', !i.av.length ? 'closed' : '', i.extra.length && !i.whole ? 'extra' : '', i.whole ? 'blocked' : '', i.partial ? 'partial' : '', HB.sel.has(k) ? 'sel' : '', k === T ? 'today' : ''].join(' ');
+        const tag = i.whole ? html`<span class="hb-tag bad">${icon('lock')} bloqueado</span>` : !i.av.length ? html`<span class="hb-tag">fechado</span>` : i.past ? '' : i.extra.length && !i.weekly.length && !i.partial ? html`<span class="hb-tag info">aberto · ${i.freeTimes}</span>` : i.partial ? html`<span class="hb-tag warn">parcial</span>` : (S.clinic.public_booking ? html`<span class="hb-tag ok">${i.freeTimes} vaga${i.freeTimes === 1 ? '' : 's'}</span>` : '');
         return html`<button class="${cls}" data-act="hbDay" data-k="${k}" ${i.past ? 'disabled' : ''} aria-pressed="${HB.sel.has(k)}"><span class="n">${+k.slice(8)}</span>${tag}${i.aps.length ? html`<span class="hb-dot" title="${i.aps.length} consulta(s)">${i.aps.length}</span>` : ''}</button>`; })}
     </div>
-    <div class="legend small" style="margin-top:10px"><span><i class="hb-sw ok"></i>com vagas</span><span><i class="hb-sw warn"></i>bloqueio parcial</span><span><i class="hb-sw bad"></i>bloqueado</span><span><i class="hb-sw"></i>fechado</span><span><span class="hb-dot static">2</span> consultas marcadas</span></div>
+    <div class="legend small" style="margin-top:10px"><span><i class="hb-sw ok"></i>com vagas</span><span><i class="hb-sw warn"></i>bloqueio parcial</span><span><i class="hb-sw bad"></i>bloqueado</span><span><i class="hb-sw info"></i>aberto só nesse dia</span><span><i class="hb-sw"></i>fechado</span><span><span class="hb-dot static">2</span> consultas marcadas</span></div>
     <div class="row" style="margin-top:10px;gap:6px"><button class="btn sm" data-act="hbRangeModal">${icon('lock')} Bloquear um período (férias, congresso…)</button></div></div>`;
 }
 act('hbMonth', async el => { const n = +el.dataset.n; HB.month = n === 0 ? new Date(new Date().getFullYear(), new Date().getMonth(), 1) : new Date(HB.month.getFullYear(), HB.month.getMonth() + n, 1); await hbRefresh(); });
@@ -148,13 +150,15 @@ act('hbClear', () => { HB.sel.clear(); hbRender(); });
 function hbSelectionPanel(D) {
   const keys = [...HB.sel].sort();
   if (!keys.length) return html`<div class="card hb-sel empty small" id="hbsel">${icon('bulb')}<div>Nenhum dia selecionado. Toque nos dias do calendário para bloquear ou liberar.</div></div>`;
-  const infos = keys.map(k => hbDayInfo(D, k)); const anyBlock = infos.some(i => i.blocks.length);
+  const infos = keys.map(k => hbDayInfo(D, k)); const anyBlock = infos.some(i => i.blocks.length), anyExtra = infos.some(i => i.extra.length), allClosed = infos.every(i => !i.av.length);
   const label = keys.length === 1 ? fLong(parseYmd(keys[0])) : `${keys.length} dias selecionados`;
   return html`<div class="card hb-sel" id="hbsel"><div class="row between"><h3 style="margin:0">${label}</h3><button class="btn sm ghost" data-act="hbClear">Limpar seleção</button></div>
-    <div class="hb-actions"><button class="btn danger" data-act="hbBlockDay">${icon('lock')} Bloquear dia inteiro</button><button class="btn" data-act="hbBlockHours">${icon('alarm')} Bloquear só um horário</button>${anyBlock ? html`<button class="btn" data-act="hbUnblock">${icon('check')} Liberar (tirar bloqueios)</button>` : ''}</div>
+    ${allClosed ? html`<div class="tip" style="margin:10px 0 0">${icon('bulb')}<span>${keys.length === 1 ? 'Este dia está fechado' : 'Esses dias estão fechados'} na semana padrão. Toque em <b>Abrir atendimento</b> para liberar só ${keys.length === 1 ? 'nesta data' : 'nessas datas'}.</span></div>` : ''}
+    <div class="hb-actions">${anyBlock ? html`<button class="btn ok" data-act="hbUnblock">${icon('check')} Desbloquear</button>` : ''}<button class="btn ${allClosed ? 'ok' : ''}" data-act="hbOpen">${icon('plus')} ${allClosed ? 'Abrir atendimento' : 'Abrir horário extra'}</button>${anyExtra ? html`<button class="btn" data-act="hbCloseExtra">${icon('x')} Fechar de novo</button>` : ''}${!allClosed ? html`<button class="btn danger" data-act="hbBlockDay">${icon('lock')} Bloquear dia inteiro</button><button class="btn" data-act="hbBlockHours">${icon('alarm')} Bloquear só um horário</button>` : ''}</div>
     <div class="list" style="margin-top:10px">${infos.map(i => html`<div class="li small hb-li"><span class="grow"><b>${keys.length > 1 ? fLong(i.day) : 'Neste dia'}</b>
-      <span class="tiny muted"> · ${i.av.length ? 'atende ' + i.av.map(a => `${hbTime(a.start_time)}–${hbTime(a.end_time)}`).join(', ') : 'fechado na semana padrão'}</span>
-      ${i.blocks.map(b => html`<div class="hb-row"><span class="pill bad">${icon('lock')} ${hbWholeDay(b, i.k) ? 'dia inteiro' : `${fTime(b.starts_at)}–${fTime(b.ends_at)}`}</span><span class="tiny">${b.notes || ''}</span>${b.google_event_id ? html`<span class="pill ok" title="Já está no Google Agenda">no Google</span>` : html`<span class="pill gray" title="O script da clínica envia em até 5 minutos">indo pro Google…</span>`}<button class="btn sm ghost danger" data-act="hbDelBlock" data-id="${b.id}">${icon('x')} liberar</button></div>`)}
+      <span class="tiny muted"> · ${i.weekly.length ? 'semana padrão ' + i.weekly.map(a => `${hbTime(a.start_time)}–${hbTime(a.end_time)}`).join(', ') : 'fechado na semana padrão'}</span>
+      ${i.extra.map(x => html`<div class="hb-row"><span class="pill" style="background:#e0f2fe;color:#0369a1">${icon('plus')} aberto ${hbTime(x.start_time)}–${hbTime(x.end_time)}</span><span class="tiny">${HB_MOD[x.modality]}${x.notes ? ' · ' + x.notes : ''}</span><button class="btn sm ghost danger" data-act="hbDelExtra" data-id="${x.id}">${icon('x')} fechar</button></div>`)}
+      ${i.blocks.map(b => html`<div class="hb-row"><span class="pill bad">${icon('lock')} ${hbWholeDay(b, i.k) ? 'dia inteiro' : `${fTime(b.starts_at)}–${fTime(b.ends_at)}`}</span><span class="tiny">${b.notes || ''}</span>${b.google_event_id ? html`<span class="pill ok" title="Já está no Google Agenda">no Google</span>` : html`<span class="pill gray" title="O script da clínica envia em até 5 minutos">indo pro Google…</span>`}<button class="btn sm ghost danger" data-act="hbDelBlock" data-id="${b.id}">${icon('check')} desbloquear</button></div>`)}
       ${i.others.map(e => html`<div class="hb-row"><span class="pill gray">${fTime(e.starts_at)}–${fTime(e.ends_at)}</span><span class="tiny">${e.title}${e.source === 'google' ? ' (Google Agenda)' : ''}</span></div>`)}
       ${i.aps.map(a => html`<div class="hb-row"><span class="pill">${fTime(a.starts_at)}</span><span class="tiny">${D.pm[a.patient_id]?.name || a.title || 'Paciente'} · ${apptLabel(a)[0]}</span></div>`)}
       </span></div>`)}</div></div>`;
@@ -228,12 +232,12 @@ async function hbRemoveBlocks(list) {
 act('hbUnblock', async () => {
   const keys = [...HB.sel]; const list = HB.data.evs.filter(e => hbIsBlock(e) && keys.some(k => hbOverlap(e.starts_at, e.ends_at, k)));
   if (!list.length) return toast('Não há bloqueio nos dias selecionados.');
-  if (!(await confirmBox(`Liberar ${list.length} bloqueio${list.length > 1 ? 's' : ''}? Os horários voltam a aparecer para os pacientes e saem do Google Agenda.`, 'Liberar'))) return;
-  await hbRemoveBlocks(list); HB.sel.clear(); toast('Agenda liberada.', 'ok'); await hbRefresh(false);
+  if (!(await confirmBox(`Desbloquear ${list.length === 1 ? 'este período' : list.length + ' bloqueios'}? Os horários voltam a aparecer para os pacientes e saem do Google Agenda.`, 'Desbloquear'))) return;
+  await hbRemoveBlocks(list); HB.sel.clear(); toast('Desbloqueado. Os horários já voltaram para os pacientes.', 'ok'); await hbRefresh(false);
 });
 act('hbDelBlock', async el => {
   const b = HB.data.evs.find(e => e.id === el.dataset.id); if (!b) return;
-  await hbRemoveBlocks([b]); toast('Bloqueio retirado.', 'ok'); await hbRefresh();
+  await hbRemoveBlocks([b]); toast('Desbloqueado.', 'ok'); await hbRefresh();
 });
 
 /* ---------- prévia do paciente e Google ---------- */
@@ -249,3 +253,39 @@ function hbPreview(D) {
 function hbGoogleBox() {
   return html`<div class="card small"><h3 style="margin:0 0 6px">${icon('globe')} Google Agenda</h3><p class="muted" style="margin:0">Cada bloqueio e cada consulta vai para o Google Agenda da clínica (${S.clinic.email || 'conta da clínica'}) em até 5 minutos. O que você marcar direto no Google com horário também bloqueia o PEPMH.</p>${isOwner() ? html`<div class="row" style="margin-top:8px"><button class="btn sm" data-act="gsyncNow">${icon('repeat')} Ver última sincronização</button></div>` : ''}</div>`;
 }
+
+/* ---------- abrir atendimento numa data (abertura extra) ---------- */
+act('hbOpen', () => {
+  const keys = [...HB.sel].sort(); if (!keys.length) return;
+  const base = HB.data.av[0]; const st = base ? hbTime(base.start_time) : '14:00', en = base ? hbTime(base.end_time) : '20:00', mod = base?.modality || 'ambos';
+  modal('Abrir atendimento', html`<form data-form="hbSaveOpen" class="stack">
+    <p class="small muted" style="margin:0">${keys.length === 1 ? fLong(parseYmd(keys[0])) : `${keys.length} dias: ${keys.map(k => fDate(k).slice(0, 5)).join(', ')}`} · vale só ${keys.length === 1 ? 'para esta data' : 'para essas datas'}, a semana padrão não muda.</p>
+    <div class="grid g3"><label class="f"><span>Das</span><input class="in" type="time" name="start" value="${st}" required step="900"></label><label class="f"><span>Até</span><input class="in" type="time" name="end" value="${en}" required step="900"></label>
+      <label class="f"><span>Tipo</span><select class="in" name="modality">${Object.entries({ ambos: 'Online e presencial', online: 'Só online', presencial: 'Só presencial' }).map(([k, v]) => html`<option value="${k}" ${k === mod ? 'selected' : ''}>${v}</option>`)}</select></label></div>
+    <div class="row" style="gap:6px"><span class="tiny muted">Atalhos:</span><button type="button" class="btn sm ghost" data-act="hbPreset" data-s="08:00" data-e="12:00">Manhã</button><button type="button" class="btn sm ghost" data-act="hbPreset" data-s="14:00" data-e="18:00">Tarde</button><button type="button" class="btn sm ghost" data-act="hbPreset" data-s="14:00" data-e="20:00">14h às 20h</button><button type="button" class="btn sm ghost" data-act="hbPreset" data-s="08:00" data-e="20:00">Dia todo</button></div>
+    <label class="f"><span>Observação (só a equipe vê)</span><input class="in" name="notes" maxlength="120" placeholder="Ex.: mutirão, reposição de feriado"></label>
+    <div class="tip" style="margin:0">${icon('globe')}<span>Assim que salvar, os horários aparecem na página de agendamento e na área do paciente. Se o dia tiver bloqueio, ele é tirado.</span></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn primary" type="submit">${icon('check')} Abrir</button></div></form>`);
+});
+onForm('hbSaveOpen', async d => {
+  const keys = [...HB.sel].sort(); if (!keys.length) throw new Error('Selecione os dias no calendário.');
+  if (d.end <= d.start) throw new Error('O horário final precisa ser depois do inicial.');
+  const rows = keys.filter(k => !hbDayInfo(HB.data, k).av.some(a => hbTime(a.start_time) <= d.start && hbTime(a.end_time) >= d.end))
+    .map(k => ({ professional_id: HB.pro, day: k, start_time: d.start, end_time: d.end, modality: d.modality, notes: nz((d.notes || '').trim()) }));
+  if (!rows.length) { closeModal(); toast('Esse horário já estava aberto.'); return; }
+  await db.insert('availability_dates', rows);
+  // abrir = intenção de atender: tira os bloqueios que cobrem o horário aberto
+  const blocks = HB.data.evs.filter(b => hbIsBlock(b) && rows.some(r => new Date(b.starts_at) < new Date(`${r.day}T${r.end_time}`) && new Date(b.ends_at) > new Date(`${r.day}T${r.start_time}`)));
+  if (blocks.length) await hbRemoveBlocks(blocks);
+  closeModal(); HB.sel.clear();
+  toast(`${rows.length > 1 ? rows.length + ' dias abertos' : 'Dia aberto'}${blocks.length ? ' e desbloqueado' : ''}. Os pacientes já podem marcar.`, 'ok');
+  await hbRefresh(false);
+});
+act('hbCloseExtra', async () => {
+  const keys = [...HB.sel]; const list = HB.data.extra.filter(x => keys.includes(x.day)); if (!list.length) return;
+  const aps = HB.data.aps.filter(a => keys.includes(ymd(a.starts_at)));
+  if (!(await confirmBox(`Fechar de novo ${list.length === 1 ? 'este horário aberto' : list.length + ' horários abertos'}? Ele${list.length > 1 ? 's' : ''} some${list.length > 1 ? 'm' : ''} da página dos pacientes.${aps.length ? ` As ${aps.length} consulta(s) já marcada(s) continuam valendo.` : ''}`, 'Fechar'))) return;
+  for (const x of list) await db.remove('availability_dates', x.id);
+  HB.sel.clear(); toast('Fechado de novo.', 'ok'); await hbRefresh(false);
+});
+act('hbDelExtra', async el => { await db.remove('availability_dates', el.dataset.id); toast('Horário fechado.', 'ok'); await hbRefresh(); });

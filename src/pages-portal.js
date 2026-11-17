@@ -30,17 +30,18 @@ const DemoRPC = {
     const d = Demo.load(); const c = d.clinics.find(x => x.slug === p_slug && x.public_booking); if (!c) return [];
     const m = d.clinic_members.find(x => x.clinic_id === c.id && x.user_id === p_professional); if (!m) return [];
     const step = m.slot_min * 60000, lead = Date.now() + (c.min_lead_hours || 0) * 3600000, out = [];
-    const busy = d.appointments.filter(a => a.professional_id === m.user_id && !['cancelado', 'faltou'].includes(a.status)).map(a => [+new Date(a.starts_at), +new Date(a.ends_at)]);
+    const busy = d.appointments.filter(a => a.professional_id === m.user_id && !['cancelado', 'faltou'].includes(a.status)).map(a => [+new Date(a.starts_at), +new Date(a.ends_at)]).concat((d.work_events || []).filter(w => w.professional_id === m.user_id).map(w => [+new Date(w.starts_at), +new Date(w.ends_at)]));
+    const seen = new Set();
     for (let i = 0; i < Math.min(p_days, 31); i++) {
       const day = addDays(parseYmd(p_from), i);
-      d.availability.filter(a => a.professional_id === m.user_id && +a.weekday === day.getDay()).sort((a, b) => a.start_time < b.start_time ? -1 : 1).forEach(a => {
+      [...d.availability.filter(a => a.professional_id === m.user_id && +a.weekday === day.getDay()), ...(d.availability_dates || []).filter(x => x.professional_id === m.user_id && x.day === ymd(day))].sort((a, b) => a.start_time < b.start_time ? -1 : 1).forEach(a => {
         const [sh, sm] = a.start_time.split(':').map(Number), [eh, em] = a.end_time.split(':').map(Number);
         let t = new Date(day); t.setHours(sh, sm, 0, 0); const end = new Date(day); end.setHours(eh, em, 0, 0);
         while (+t + step <= +end) {
           const s = +t, e = s + step;
           if (s >= lead && !busy.some(([bs, be]) => bs < e && be > s)) {
-            if (['ambos', 'online'].includes(a.modality) && m.accepts_online && (m.meet_url || c.booking_requires_approval)) out.push({ starts_at: new Date(s).toISOString(), modality: 'online' });
-            if (['ambos', 'presencial'].includes(a.modality) && m.accepts_presencial) out.push({ starts_at: new Date(s).toISOString(), modality: 'presencial' });
+            if (['ambos', 'online'].includes(a.modality) && m.accepts_online && (m.meet_url || c.booking_requires_approval)) { const k = s + 'online'; if (!seen.has(k)) { seen.add(k); out.push({ starts_at: new Date(s).toISOString(), modality: 'online' }); } }
+            if (['ambos', 'presencial'].includes(a.modality) && m.accepts_presencial) { const k = s + 'presencial'; if (!seen.has(k)) { seen.add(k); out.push({ starts_at: new Date(s).toISOString(), modality: 'presencial' }); } }
           }
           t = new Date(e);
         }
