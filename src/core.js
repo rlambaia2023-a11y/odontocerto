@@ -78,6 +78,11 @@ const isGenericMeet = u => /^https?:\/\/meet\.google\.com\/?(new|landing)?\/?(\?
 const meetPill = a => a.modality !== 'online' ? '' : a.meet_status === 'gerando' ? html`<span class="pill warn" title="O script da conta Google da clínica cria a sala em até 5 minutos.">gerando link do Meet…</span>`
   : a.meet_status === 'validado' && a.meeting_url ? html`<span class="pill ok" title="Sala criada e confirmada pelo Google.">Meet validado</span>`
   : a.meet_status === 'erro' ? html`<span class="pill bad" title="${a.meet_error || ''}">Meet não criado</span>` : '';
+// e-mail automático com o link (só vai para e-mail validado pelo paciente)
+const meetMailPill = a => a.modality !== 'online' || !a.meet_mail_status ? '' : a.meet_mail_status === 'enviado' ? html`<span class="pill ok" title="Enviado ${a.meet_mail_at ? fDT(a.meet_mail_at) : ''}">link enviado por e-mail</span>`
+  : a.meet_mail_status === 'enviando' ? html`<span class="pill warn">enviando e-mail…</span>`
+  : a.meet_mail_status === 'sem_email' ? html`<span class="pill warn" title="O paciente não confirmou o e-mail. Envie o link pelo WhatsApp.">e-mail não validado</span>`
+  : html`<span class="pill bad" title="Falha ao enviar pelo Gmail da clínica. Envie pelo WhatsApp.">e-mail não enviado</span>`;
 const MEET_GENERIC_MSG = 'O endereço meet.google.com/new cria uma sala nova a cada clique — você e o paciente cairiam em salas diferentes. Abra "Criar sala nova no Meet", copie o endereço da sala que abriu (ex.: https://meet.google.com/abc-defg-hij) e cole aqui.';
 const waLink = (phone, text) => { let p = onlyDigits(phone); if (p && p.length <= 11) p = '55' + p; return `https://wa.me/${p}?text=${encodeURIComponent(text || '')}`; };
 const fPhone = p => { const d = onlyDigits(p); if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`; if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`; return p || ''; };

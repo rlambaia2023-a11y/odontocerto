@@ -136,6 +136,34 @@ onForm('completeProfile', async d => {
   if (profileMissing(S.patient).length) throw new Error('Não deu para salvar tudo. Fale com a clínica para conferir seu cadastro.');
   S.me.full_name = S.patient.name; toast('Cadastro completo! Agenda liberada.', 'ok'); router();
 });
+/* ---------- e-mail validado por código: obrigatório para consulta online (o link do Meet vai por e-mail) ---------- */
+const EV = { email: null, sent: false };
+const needsEmailCheck = () => S.mode === 'patient' && S.patient && !S.patient.email_verified_at && !isDemo();
+function emailVerifyCard(ctx) {
+  const email = EV.email || S.patient?.email || '';
+  return html`<div class="card" style="border-color:var(--warn)"><h2 style="margin-top:0">${icon('send')} Confirme seu e-mail</h2>
+    <p class="small">O link da consulta online é enviado para ${email ? html`<b>${email}</b>` : 'o seu e-mail'}. Para garantir que ele chegue, confirme o e-mail com um código de 6 números.</p>
+    ${EV.sent ? html`<p class="small" style="color:var(--ok)">Código enviado. Ele chega em até 5 minutos pelo e-mail da clínica (veja também spam e promoções).</p>` : ''}
+    <form data-form="evConfirm" class="row" style="gap:8px;align-items:flex-end"><input type="hidden" name="ctx" value="${ctx}">
+      <label class="f" style="flex:1;min-width:140px"><span>Código</span><input class="in" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" required></label>
+      <button class="btn primary" type="submit">${icon('check')} Confirmar</button></form>
+    <div class="row" style="margin-top:10px"><button class="btn sm" data-act="evSend" data-ctx="${ctx}">${icon('send')} ${EV.sent ? 'Enviar outro código' : 'Enviar código'}</button>${ctx === 'home' ? html`<a class="small" href="#/meus-dados">E-mail errado? Corrija em Meus dados</a>` : ''}</div></div>`;
+}
+const evRender = ctx => ctx === 'book' ? bkRender() : router();
+act('evSend', async el => {
+  el.disabled = true;
+  try { const r = await db.rpc('request_email_code'); EV.email = r?.email || EV.email; if (r?.verified) { if (S.patient) S.patient.email_verified_at = new Date().toISOString(); toast('Seu e-mail já está confirmado.', 'ok'); } else { EV.sent = true; toast('Código enviado. Chega em até 5 minutos.', 'ok'); } }
+  catch (e) { toast(e.message || 'Não deu para enviar o código.', 'bad'); }
+  evRender(el.dataset.ctx);
+});
+onForm('evConfirm', async d => {
+  if (!/^\d{6}$/.test((d.code || '').replace(/\D/g, ''))) throw new Error('Digite os 6 números do código.');
+  const r = await db.rpc('confirm_email_code', { p_code: d.code });
+  if (!r?.verified) throw new Error(r?.message || 'Código incorreto.');
+  if (S.patient) S.patient.email_verified_at = new Date().toISOString();
+  EV.sent = false; toast('E-mail confirmado!', 'ok');
+  if (d.ctx === 'book' && BK.form) { BK.verify = false; await bkBook(BK.form); } else evRender(d.ctx);
+});
 const checkEmailCard = email => html`<div class="card"><h2>Falta só confirmar seu e-mail</h2><p>Enviamos um link para <b>${email}</b>. Abra o e-mail e toque no link para ativar sua conta. Seu cadastro já chegou à clínica.</p><p class="small muted">Não chegou? Veja a caixa de spam ou promoções.</p></div>`;
 
 /* página de cadastro que a clínica manda para o paciente: /#/cadastro/<endereco-da-clinica> */
@@ -166,7 +194,7 @@ pubRoute('/agendar/:slug', async ({ slug }) => {
   const c = await db.rpc('public_clinic', { p_slug: slug });
   if (!c) return html`<div class="auth"><div class="card"><h2>Agendamento indisponível</h2><p class="muted">Esta clínica não está recebendo agendamentos online agora. Fale diretamente com ela.</p><a class="btn" href="#/">Voltar</a></div></div>`;
   applyTheme(c);
-  Object.assign(BK, { slug, clinic: c, pro: null, modality: null, date: null, slots: [], slot: null, done: null, embedded: false });
+  Object.assign(BK, { verify: false, form: null, slug, clinic: c, pro: null, modality: null, date: null, slots: [], slot: null, done: null, embedded: false });
   if (c.professionals.length === 1) after(() => ACT.bkPro({ dataset: { id: c.professionals[0].user_id } }));
   return html`<div style="min-height:100vh;background:var(--bg)">
     <header class="topbar ${safeLogo(c.logo_url) ? 'light' : ''}"><span class="logo">${safeLogo(c.logo_url) ? brandLogo(c) : html`<span class="mark" role="img" aria-label="PEPMH"></span>${c.name}`}</span><span class="sp"></span>${S.mode === 'patient' ? html`<a class="btn sm ${safeLogo(c.logo_url) ? 'primary' : ''}" style="${safeLogo(c.logo_url) ? '' : 'background:#fff'}" href="#/">Minha área</a>` : html`<a class="btn sm ${safeLogo(c.logo_url) ? 'primary' : ''}" style="${safeLogo(c.logo_url) ? '' : 'background:#fff'}" href="#/" data-act="bkLoginLink">Entrar</a>`}</header>
@@ -181,6 +209,7 @@ act('bkLoginLink', () => { location.hash = '#/'; S.clinic ? router() : renderAut
 function bookingBody() {
   const c = BK.clinic;
   if (BK.done) return bookingDone();
+  if (BK.verify) return emailVerifyCard('book');
   if (S.mode === 'patient' && S.patient && profileMissing(S.patient).length) return completeProfileCard();
   const proCard = p => html`<button class="card" style="text-align:left;cursor:pointer;width:100%;${BK.pro?.user_id === p.user_id ? 'border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-50)' : ''}" data-act="bkPro" data-id="${p.user_id}">
     <div class="row" style="flex-wrap:nowrap;align-items:flex-start"><span class="avatar lg">${initials(p.full_name)}</span><div class="grow"><b>${p.full_name}</b><div class="small muted">${p.specialty || PROF[p.profession] || ''}${councilOf(p) ? ' · ' + councilOf(p) : ''}</div>
@@ -236,12 +265,22 @@ onForm('bkConfirm', async d => {
       if (!ok) { LS.set('pepmh_pending_book', { slug: BK.slug }); document.getElementById('bk').innerHTML = fv(html`<div class="card"><h2>Falta só confirmar seu e-mail</h2><p>Enviamos um link para <b>${d.email}</b>. Abra o e-mail, toque no link e você volta para cá já com a conta ativa para escolher o horário.</p><p class="small muted">Seu cadastro já chegou à clínica. Não chegou o e-mail? Veja a caixa de spam ou promoções.</p></div>`); return; }
     }
   }
-  const r = await db.rpc('book_appointment', { p_slug: BK.slug, p_professional: BK.pro.user_id, p_start: BK.slot.starts_at, p_modality: BK.slot.modality, p_reason: d.reason || null, p_consent: !!d.consent, p_terms: !!d.terms });
+  await bkBook(d);
+});
+async function bkBook(d) {
+  let r;
+  try { r = await db.rpc('book_appointment', { p_slug: BK.slug, p_professional: BK.pro.user_id, p_start: BK.slot.starts_at, p_modality: BK.slot.modality, p_reason: d.reason || null, p_consent: !!d.consent, p_terms: !!d.terms }); }
+  catch (e) {
+    // consulta online exige e-mail confirmado: confirma aqui mesmo e conclui o agendamento em seguida
+    if (/Confirme seu e-mail/.test(e.message || '')) { BK.form = { reason: d.reason, consent: d.consent, terms: d.terms }; BK.verify = true; bkRender(); window.scrollTo(0, 0); return; }
+    throw e;
+  }
+  BK.form = null;
   BK.done = { ...BK.slot, id: r.appointment_id, fee: r.fee || (BK.slot.modality === 'online' ? ONLINE_FEE : null), meeting_url: r.meeting_url, pending: !!r.pending, pro: BK.pro };
   if (S.mode !== 'patient') { S.clinic = null; document.getElementById('view')?.remove(); try { await loadContext(); } catch { } }
   bkRender(); window.scrollTo(0, 0);
   const hb = document.querySelector('.topbar .btn'); if (hb) { hb.textContent = 'Minha área'; hb.removeAttribute('data-act'); hb.setAttribute('href', '#/'); hb.addEventListener('click', e => { e.preventDefault(); ACT.bkGoHome(); }); }
-});
+}
 function bookingDone() {
   const b = BK.done, start = new Date(b.starts_at), end = new Date(+start + (b.pro.slot_min || 30) * 60000); const c = BK.clinic;
   return html`<div class="card" style="text-align:center"><div style="font-size:2.2rem">${b.pending ? '⏳' : '✅'}</div><h2>${b.pending ? 'Pedido de consulta enviado!' : 'Consulta marcada!'}</h2>
@@ -318,6 +357,7 @@ proute('/', async () => {
   const [ap, docs, reqs, rets] = await Promise.all([db.list('appointments', { eq: { patient_id: p.id }, gte: { ends_at: new Date(+now - 3600000).toISOString() }, order: 'starts_at' }), db.list('documents', { eq: { patient_id: p.id }, order: 'created_at.desc', limit: 20 }).then(r => r.filter(d => d.released_at && d.signed_file_path && !d.deleted_at).slice(0, 3)), db.list('appointment_requests', { eq: { patient_id: p.id, status: 'pendente' } }), db.list('return_alerts', { eq: { patient_id: p.id, done: false }, order: 'due_date', limit: 3 })]);
   const next = ap.find(a => !['cancelado', 'faltou'].includes(a.status)); const nrec = next?.fee ? await apptReceipts([next.id]) : [];
   return html`<div class="pagehead"><div><h1>Olá, ${p.name.split(' ')[0]}!</h1><div class="muted small">${S.clinic.name}</div></div></div>
+  ${needsEmailCheck() ? emailVerifyCard('home') : ''}
   ${fbs.length ? fbCard(fbs[0]) : ''}
   <div class="grid g2 collapse"><div class="card"><h2>Próxima consulta</h2>${next ? html`<div class="row" style="margin:12px 0;flex-wrap:nowrap"><span class="avatar lg">${icon(next.modality === 'online' ? 'video' : 'cal')}</span><div><b>${fLong(new Date(next.starts_at))} às ${fTime(next.starts_at)}</b><div class="small muted">${MOD[next.modality || 'presencial']} · ${proById(next.professional_id).full_name || ''}</div>${apPill(next)}</div></div>
       <div class="row">${joinBtn(next)}${waitBtn(next)}<a class="btn sm" href="#/consultas">Ver detalhes</a></div>${next.approval === 'pendente' ? html`<p class="tiny muted">Aguardando a confirmação de ${proById(next.professional_id).full_name || 'profissional'}. O link aparece aqui após a aprovação.</p>` : next.modality === 'online' ? html`<p class="tiny muted">O link do Google Meet funciona no horário da consulta.</p>` : ''}${payBox(next, nrec)}`
@@ -333,7 +373,7 @@ proute('/agendar', async () => {
   if (S.clinic.slug && S.clinic.public_booking) {
     const c = await db.rpc('public_clinic', { p_slug: S.clinic.slug });
     if (c && c.professionals.length) {
-      Object.assign(BK, { slug: S.clinic.slug, clinic: c, pro: null, modality: null, date: null, slots: [], slot: null, done: null });
+      Object.assign(BK, { verify: false, form: null, slug: S.clinic.slug, clinic: c, pro: null, modality: null, date: null, slots: [], slot: null, done: null });
       if (c.professionals.length === 1) after(() => ACT.bkPro({ dataset: { id: c.professionals[0].user_id } }));
       return html`<div class="pagehead"><h1>Marcar consulta</h1></div><div id="bk">${bookingBody()}</div>`;
     }

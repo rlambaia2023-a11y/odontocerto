@@ -545,7 +545,8 @@ act('approveAppt', async el => {
   modal('Aprovar consulta', html`<p style="margin-top:0"><b>${p.name}</b> · ${fLong(new Date(a.starts_at))} às ${fTime(a.starts_at)} · ${MOD[a.modality]}</p>${a.reason ? html`<p class="small"><b>Motivo:</b> ${a.reason}</p>` : ''}
     <form data-form="approveAppt" class="stack"><input type="hidden" name="id" value="${a.id}">
     ${a.modality === 'online' ? html`<label class="f"><span>Link da chamada (Google Meet)</span><input class="in" name="meeting_url" type="url" placeholder="Em branco: o PEPMH cria a sala no Meet" value="${a.meeting_url || (isGenericMeet(pro.meet_url) ? '' : pro.meet_url) || ''}"></label>
-      <p class="small muted" style="margin:0">Deixe em branco: ao aprovar, o PEPMH cria a sala no Google Meet da conta da clínica (até 5 min) e só libera o envio depois que o Google confirmar o link.</p>` : ''}
+      <p class="small muted" style="margin:0">Deixe em branco: ao aprovar, o PEPMH cria a sala no Google Meet da conta da clínica (até 5 min) e, assim que o Google confirmar o link, envia por e-mail ao paciente.</p>
+      ${p.email_verified_at ? html`<p class="small" style="margin:0;color:var(--ok)">E-mail do paciente validado: ${p.email}</p>` : html`<p class="small" style="margin:0;color:var(--warn)">O paciente não confirmou o e-mail: o link não vai por e-mail. Envie pelo WhatsApp depois que ficar pronto.</p>`}` : ''}
     <button class="btn ok" type="submit">${icon('check')} Aprovar e avisar o paciente</button></form>`);
 });
 onForm('approveAppt', async d => {
