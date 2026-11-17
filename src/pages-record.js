@@ -97,8 +97,9 @@ const TABRENDER = {
   async evolucao(p) {
     const ev = await db.list('evolutions', { eq: { patient_id: p.id }, order: 'created_at.desc' });
     return html`<div class="card"><div class="row between" style="margin-bottom:12px"><h2>Evolução clínica</h2><button class="btn primary sm" data-act="newEvolution" data-id="${p.id}">${icon('plus')} Nova evolução</button></div>
-    ${ev.length ? html`<div class="tl">${ev.map(e => html`<div class="it"><div class="row between"><b class="small">${fDT(e.created_at)}</b><button class="btn sm ghost danger" data-act="delEvo" data-id="${e.id}" title="Excluir">${icon('trash')}</button></div>
-      <div class="card" style="padding:12px;margin-top:6px"><div class="tiny muted">${e.professional_name || ''}</div>${e.chief_complaint ? html`<div class="small"><b>Queixa / motivo:</b> ${e.chief_complaint}</div>` : ''}${e.cid ? html`<div class="small"><b>CID-10:</b> ${e.cid}</div>` : ''}<div class="prose small" style="margin-top:6px">${e.content}</div></div></div>`)}</div>` : html`<div class="empty">${icon('edit')}<div>Nenhuma evolução registrada.</div></div>`}</div>`;
+    ${ev.length ? html`<div class="tl">${ev.map(e => html`<div class="it"><div class="row between"><b class="small">${fDT(e.created_at)}</b><span class="row" style="gap:4px">${e.professional_id === Auth.userId() ? html`<button class="btn sm ghost" data-act="editEvo" data-id="${e.id}" title="Editar">${icon('edit')} Editar</button>` : ''}<button class="btn sm ghost danger" data-act="delEvo" data-id="${e.id}" title="Excluir">${icon('trash')}</button></span></div>
+      <div class="card" style="padding:12px;margin-top:6px"><div class="tiny muted">${e.professional_name || ''}${e.updated_at ? ` · editada em ${fDT(e.updated_at)}${e.updated_by_name ? ' por ' + e.updated_by_name : ''}` : ''}</div>${e.chief_complaint ? html`<div class="small"><b>Queixa / motivo:</b> ${e.chief_complaint}</div>` : ''}${e.cid ? html`<div class="small"><b>CID-10:</b> ${e.cid}</div>` : ''}<div class="prose small" style="margin-top:6px">${e.content}</div>
+      ${e.edit_history?.length ? html`<details style="margin-top:8px"><summary class="tiny muted" style="cursor:pointer">Versões anteriores (${e.edit_history.length})</summary>${[...e.edit_history].reverse().map(h => html`<div style="border-left:2px solid var(--line);padding-left:8px;margin-top:6px"><div class="tiny muted">${fDT(h.saved_at)}${h.by ? ' · ' + h.by : ''}</div>${h.chief_complaint ? html`<div class="tiny"><b>Queixa:</b> ${h.chief_complaint}</div>` : ''}${h.cid ? html`<div class="tiny"><b>CID-10:</b> ${h.cid}</div>` : ''}<div class="prose tiny">${h.content}</div></div>`)}</details>` : ''}</div></div>`)}</div>` : html`<div class="empty">${icon('edit')}<div>Nenhuma evolução registrada.</div></div>`}</div>`;
   },
 
   /* ---- plano de tratamento ---- */
@@ -174,19 +175,46 @@ act('printAnam', async el => {
 });
 
 act('newEvolution', async el => {
+  const pid = el.dataset.id; const t0 = startOfDay(new Date()).toISOString();
+  const [today, prev] = await Promise.all([
+    db.list('evolutions', { eq: { patient_id: pid, professional_id: Auth.userId() }, gte: { created_at: t0 }, order: 'created_at.desc', limit: 1 }),
+    db.list('evolutions', { eq: { patient_id: pid }, lt: { created_at: t0 }, order: 'created_at.desc', limit: 5 }),
+  ]);
+  evoModal(pid, today[0], el.dataset.prefill || '', prev);
+});
+act('editEvo', async el => {
+  const e = await db.get('evolutions', el.dataset.id); if (!e) return toast('Evolução não encontrada.', 'bad');
+  const prev = await db.list('evolutions', { eq: { patient_id: e.patient_id }, lt: { created_at: e.created_at }, order: 'created_at.desc', limit: 5 });
+  evoModal(e.patient_id, e, '', prev);
+});
+function evoModal(pid, e, prefill, prev) {
   const tpls = ['Exame clínico realizado. ', 'Anestesia infiltrativa com lidocaína 2% c/ epinefrina 1:100.000. ', 'Isolamento absoluto. ', 'Restauração em resina composta, cor __, face __. ', 'Profilaxia com pasta e taça de borracha. ', 'Orientações de higiene oral fornecidas. ', 'Paciente sem queixas. '];
-  modal('Nova evolução', html`<form data-form="saveEvo" class="stack"><input type="hidden" name="patient_id" value="${el.dataset.id}">
-    <div class="grid g2"><label class="f"><span>Queixa / motivo do atendimento</span><input class="in" name="chief_complaint"></label><label class="f"><span>CID-10 (opcional)</span><input class="in" name="cid" placeholder="Ex.: K02.1" maxlength="12" style="text-transform:uppercase"></label></div>
-    <label class="f"><span>Descrição do atendimento <i>*</i></span><textarea class="in" name="content" id="evotext" rows="7" required>${el.dataset.prefill || ''}</textarea></label>
+  const text = e ? (prefill ? `${e.content}\n\n${prefill}` : e.content) : prefill;
+  modal(e ? `Editar evolução de ${fDT(e.created_at)}` : 'Nova evolução', html`${prev.length ? html`<details class="card" style="padding:10px 12px;margin-bottom:12px" open><summary class="small" style="cursor:pointer"><b>Evoluções anteriores</b> <span class="muted">(últimas ${prev.length})</span></summary>
+    <div class="tl" style="margin-top:8px;max-height:240px;overflow:auto">${prev.map(x => html`<div class="it"><div class="tiny muted">${fDT(x.created_at)} · ${x.professional_name || ''}</div>${x.chief_complaint ? html`<div class="tiny"><b>Queixa:</b> ${x.chief_complaint}</div>` : ''}${x.cid ? html`<div class="tiny"><b>CID-10:</b> ${x.cid}</div>` : ''}<div class="small prose">${x.content}</div></div>`)}</div></details>` : ''}
+    ${e ? html`<p class="tiny muted" style="margin:0 0 8px">Já existe evolução registrada hoje — as alterações serão salvas nela. A versão anterior fica guardada no histórico.</p>` : ''}
+    <form data-form="saveEvo" class="stack"><input type="hidden" name="patient_id" value="${pid}"><input type="hidden" name="id" value="${e?.id || ''}">
+    <div class="grid g2"><label class="f"><span>Queixa / motivo do atendimento</span><input class="in" name="chief_complaint" value="${e?.chief_complaint || ''}"></label><label class="f"><span>CID-10 (opcional)</span><input class="in" name="cid" value="${e?.cid || ''}" placeholder="Ex.: K02.1" maxlength="12" style="text-transform:uppercase"></label></div>
+    <label class="f"><span>Descrição do atendimento <i>*</i></span><textarea class="in" name="content" id="evotext" rows="7" required>${text}</textarea></label>
     <div class="row" style="gap:6px">${S.me.profession === 'medicina' ? [['S: ', 'S (subjetivo)'], ['\nO: ', 'O (objetivo)'], ['\nA: ', 'A (avaliação)'], ['\nP: ', 'P (plano)']].map(([t, l]) => html`<button type="button" class="btn sm" data-act="evoIns" data-t="${t}">+ ${l}</button>`) : ''}${(S.me.profession === 'medicina' ? ['Exame físico sem alterações. ', 'Orientado(a) sobre sinais de alarme. ', 'Retorno em ___ dias. ', 'Paciente atendido(a) por teleconsulta, com termo de consentimento aceito. '] : tpls).map(t => html`<button type="button" class="btn sm" data-act="evoIns" data-t="${t}">+ ${t.split(' ').slice(0, 2).join(' ')}</button>`)}</div>
     <label class="check"><input type="checkbox" name="mark_done" checked> Marcar a consulta de hoje como atendida</label>
-    <div class="row between"><span class="tiny muted">Registrado por ${S.me.full_name}</span><button class="btn primary" type="submit">Salvar evolução</button></div></form>`, { wide: true });
-});
+    <div class="row between"><span class="tiny muted">${e ? `Registrado por ${e.professional_name || ''}${e.updated_at ? ' · editada em ' + fDT(e.updated_at) : ''}` : `Registrado por ${S.me.full_name}`}</span><button class="btn primary" type="submit">${e ? 'Salvar alterações' : 'Salvar evolução'}</button></div></form>`, { wide: true });
+}
 act('evoIns', el => { const t = document.getElementById('evotext'); t.value += el.dataset.t; t.focus(); });
 onForm('saveEvo', async d => {
-  await db.insert('evolutions', { patient_id: d.patient_id, cid: nz((d.cid || '').toUpperCase()), chief_complaint: nz(d.chief_complaint), content: d.content, professional_id: Auth.userId(), professional_name: S.me.full_name });
+  const row = { cid: nz((d.cid || '').toUpperCase()), chief_complaint: nz(d.chief_complaint), content: d.content };
+  if (d.id) {
+    const o = await db.get('evolutions', d.id); if (!o) return toast('Evolução não encontrada.', 'bad');
+    const changed = o.content !== row.content || (o.chief_complaint ?? null) !== row.chief_complaint || (o.cid ?? null) !== row.cid;
+    if (changed) {
+      const patch = { ...row, updated_by_name: S.me.full_name };
+      // no banco real o histórico é gravado pelo trigger evolutions_track_edit; no modo demonstração, aqui
+      if (isDemo()) Object.assign(patch, { updated_at: new Date().toISOString(), edit_history: [...(o.edit_history || []), { content: o.content, chief_complaint: o.chief_complaint, cid: o.cid, saved_at: o.updated_at || o.created_at, by: o.updated_by_name || o.professional_name }] });
+      await db.update('evolutions', d.id, patch);
+    }
+  } else await db.insert('evolutions', { patient_id: d.patient_id, ...row, professional_id: Auth.userId(), professional_name: S.me.full_name });
   if (d.mark_done) { const t0 = startOfDay(new Date()); const ap = await db.list('appointments', { eq: { patient_id: d.patient_id }, gte: { starts_at: t0.toISOString() }, lt: { starts_at: addDays(t0, 1).toISOString() } }); for (const a of ap) if (!['cancelado', 'faltou'].includes(a.status)) await db.update('appointments', a.id, { status: 'atendido' }); }
-  closeModal(); toast('Evolução registrada.', 'ok'); go(`#/paciente/${d.patient_id}?tab=evolucao`);
+  closeModal(); toast(d.id ? 'Evolução atualizada.' : 'Evolução registrada.', 'ok'); go(`#/paciente/${d.patient_id}?tab=evolucao`);
 });
 act('delEvo', async el => { if (await confirmBox('Excluir esta evolução?', 'Excluir')) { await db.remove('evolutions', el.dataset.id); router(); } });
 
