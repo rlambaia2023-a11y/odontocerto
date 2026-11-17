@@ -28,6 +28,20 @@ function weightStats(t, logs) {
   const imc = t?.altura && cur ? cur / (t.altura * t.altura) : null;
   return { ini, cur, lost, pct: lost != null && ini ? lost / ini * 100 : null, imc, logs: ls };
 }
+/* Todas as pesagens do paciente (acompanhamento + sinais vitais), da mais recente para a mais antiga */
+async function patientWeights(pid) {
+  const [wl, vt] = await Promise.all([db.list('weight_logs', { eq: { patient_id: pid }, order: 'data.desc,created_at.desc' }).catch(() => []), db.list('vitals', { eq: { patient_id: pid }, order: 'measured_at.desc' }).catch(() => [])]);
+  const all = wl.filter(l => l.peso != null).map(l => ({ ...l, origem: l.source === 'TirzTracker' ? 'importado' : l.registrado_pelo_paciente ? 'paciente' : 'emagrecimento' }))
+    .concat(vt.filter(v => v.peso != null).map(v => ({ id: v.id, data: ymd(new Date(v.measured_at)), created_at: v.measured_at, peso: v.peso, origem: 'sinais vitais' })));
+  return all.sort((a, b) => a.data < b.data ? 1 : a.data > b.data ? -1 : String(a.created_at) < String(b.created_at) ? 1 : -1);
+}
+async function weightLogsCard(p) {
+  const ws = await patientWeights(p.id); if (!ws.length) return '';
+  const [tr] = await db.list('weight_treatments', { eq: { patient_id: p.id }, limit: 1 }).catch(() => []);
+  return html`<div class="card" style="margin-top:14px"><div class="row between"><h2 style="margin:0">Histórico de peso</h2><a class="small" href="#/paciente/${p.id}?tab=emagrecimento">Abrir emagrecimento</a></div>
+    <div style="margin-top:10px">${weightChart([...ws].reverse(), tr?.peso_meta)}</div>
+    <div class="list" style="margin-top:10px">${ws.map(w => html`<div class="li small"><span class="grow"><b>${kg(w.peso)}</b> <span class="tiny muted">${w.origem}</span></span><span class="tiny muted">${fDate(w.data)}</span></div>`)}</div></div>`;
+}
 const lostPill = s => s.lost == null || s.lost === 0 ? '' : html`<span class="pill ${s.lost > 0 ? 'ok' : 'warn'}">${s.lost > 0 ? '−' : '+'}${num1(Math.abs(s.lost))} kg</span>`;
 const imcLabel = v => v < 18.5 ? 'abaixo do peso' : v < 25 ? 'peso adequado' : v < 30 ? 'sobrepeso' : v < 35 ? 'obesidade grau I' : v < 40 ? 'obesidade grau II' : 'obesidade grau III';
 

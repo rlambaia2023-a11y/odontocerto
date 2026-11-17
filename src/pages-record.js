@@ -49,10 +49,11 @@ const TABRENDER = {
   poscons: p => staffPostConsultTab(p),
   /* ---- resumo automático ---- */
   async resumo(p) {
-    const [an, ev, odo, plans, fin, appts, docs] = await Promise.all([
+    const [an, ev, odo, plans, fin, appts, docs, wl] = await Promise.all([
       db.list('anamneses', { eq: { patient_id: p.id }, order: 'created_at.desc', limit: 1 }), db.list('evolutions', { eq: { patient_id: p.id }, order: 'created_at.desc', limit: 3 }),
       db.list('odontogram', { eq: { patient_id: p.id } }), db.list('treatment_plans', { eq: { patient_id: p.id } }), db.list('finance_entries', { eq: { patient_id: p.id } }),
       db.list('appointments', { eq: { patient_id: p.id }, order: 'starts_at' }), db.list('documents', { eq: { patient_id: p.id }, order: 'created_at.desc', limit: 12 }).then(r => r.filter(d => !d.deleted_at).slice(0, 5)),
+      patientWeights(p.id),
     ]);
     const items = plans.length ? await db.list('treatment_items', { in: { plan_id: plans.map(x => x.id) } }) : [];
     const perio = isClinical() && showDental() ? ((await dentalList(p.id, 'periograma', 1)) || [])[0] : null; const ps = perio ? perioStats(perio.data) : null;
@@ -73,6 +74,7 @@ const TABRENDER = {
       ps ? `Último periograma (${fDate(perio.created_at)}): sangramento em ${ps.bopPct}% dos sítios, PS média ${f1(ps.pdMean)} mm. ${ps.dx}` : null,
       items.length ? `Plano de tratamento: ${done.length} de ${items.length} itens concluídos${pend.length ? `; faltam ${pend.slice(0, 4).map(i => i.description + (i.tooth ? ' (' + i.tooth + ')' : '')).join(', ')}${pend.length > 4 ? '…' : ''}` : ''}.` : null,
       lastA ? `Último atendimento em ${fDate(lastA.starts_at)}.` : null, nextA ? `Próxima consulta: ${fDT(nextA.starts_at)}.` : 'Sem consulta futura agendada.',
+      wl.length ? `Peso: ${kg(wl[0].peso)} em ${fDate(wl[0].data)}${wl.length > 1 ? ` (primeiro registro ${kg(wl[wl.length - 1].peso)} em ${fDate(wl[wl.length - 1].data)})` : ''}.` : null,
       faltas ? `Registro de ${faltas} falta(s).` : null, open ? `Valor em aberto: ${BRL(open)}.` : null,
     ].filter(Boolean);
     return html`<div class="grid g2 collapse">
