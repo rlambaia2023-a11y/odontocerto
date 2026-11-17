@@ -159,6 +159,7 @@ async function googleCard() {
   const on = g?.last_seen_at && (Date.now() - new Date(g.last_seen_at)) < 3 * 864e5;
   return html`<div class="card" id="sec-google" style="grid-column:1/-1"><h2>${icon('globe')} Google da clínica (Agenda, Gmail e Drive)</h2>
     <p class="small muted">Liga o PEPMH à conta Google da clínica: consultas e compromissos vão para o Google Agenda, o que já está no Google bloqueia a agenda do PEPMH, os acompanhamentos dos pacientes chegam por e-mail e as fotos ficam guardadas no Drive. O script roda dentro da conta da clínica e conversa com o PEPMH a cada 5 minutos.</p>
+    <p class="small"><b>Meet automático:</b> consultas online sem link ganham uma sala do Google Meet criada nesta conta, e o link só é liberado para envio depois que o Google confirma. Se o script foi instalado antes de 17/11/2026, copie o código novo, cole por cima no Apps Script e rode <b>instalar</b> de novo (ele testa o Meet na hora; o resultado aparece em "Registro de execução").</p>
     ${on ? html`<p class="small"><span class="pill ok">conectado</span> ${g.account_email ? html`<b>${g.account_email}</b> · ` : ''}último contato ${fDT(g.last_seen_at)}${g.last_sync_at ? ' · agenda lida ' + fDT(g.last_sync_at) : ''}</p>`
       : html`<p class="small"><span class="pill warn">${g?.last_seen_at ? 'sem contato há mais de 3 dias' : 'não conectado'}</span></p>
     <ol class="small" style="padding-left:18px;line-height:1.7">

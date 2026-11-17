@@ -544,15 +544,16 @@ act('approveAppt', async el => {
   if (!(await conflictGate(await findConflicts({ pro: a.professional_id, start: a.starts_at, end: a.ends_at, online: a.modality === 'online', ignoreAppt: a.id })))) return; const p = await db.get('patients', a.patient_id); const pro = pros().find(m => m.user_id === a.professional_id) || S.me;
   modal('Aprovar consulta', html`<p style="margin-top:0"><b>${p.name}</b> · ${fLong(new Date(a.starts_at))} às ${fTime(a.starts_at)} · ${MOD[a.modality]}</p>${a.reason ? html`<p class="small"><b>Motivo:</b> ${a.reason}</p>` : ''}
     <form data-form="approveAppt" class="stack"><input type="hidden" name="id" value="${a.id}">
-    ${a.modality === 'online' ? html`<label class="f"><span>Link da chamada (Google Meet) <i>*</i></span><input class="in" name="meeting_url" type="url" required placeholder="https://meet.google.com/abc-defg-hij" value="${a.meeting_url || pro.meet_url || ''}"></label>
-      <p class="small muted" style="margin:0">Não tem sala fixa? <a href="https://meet.google.com/new" target="_blank" rel="noopener">Abra o Meet</a> logado(a) na conta da clínica, copie o link da reunião e cole aqui. Para não repetir isso, cadastre uma sala fixa em Configurações → Meu atendimento online.</p>` : ''}
+    ${a.modality === 'online' ? html`<label class="f"><span>Link da chamada (Google Meet)</span><input class="in" name="meeting_url" type="url" placeholder="Em branco: o PEPMH cria a sala no Meet" value="${a.meeting_url || (isGenericMeet(pro.meet_url) ? '' : pro.meet_url) || ''}"></label>
+      <p class="small muted" style="margin:0">Deixe em branco: ao aprovar, o PEPMH cria a sala no Google Meet da conta da clínica (até 5 min) e só libera o envio depois que o Google confirmar o link.</p>` : ''}
     <button class="btn ok" type="submit">${icon('check')} Aprovar e avisar o paciente</button></form>`);
 });
 onForm('approveAppt', async d => {
   if (d.meeting_url && !/^https:\/\//.test(d.meeting_url)) throw new Error('O link precisa começar com https://');
   const a = await db.update('appointments', d.id, { approval: 'aprovado', status: 'confirmado', ...(d.meeting_url ? { meeting_url: d.meeting_url } : {}) });
   const full = a || await db.get('appointments', d.id); const p = await db.get('patients', full.patient_id); gpush('pushAppt', { id: d.id });
-  const txt = `Olá, ${p.name.split(' ')[0]}! Sua consulta ${full.modality === 'online' ? 'online ' : ''}com ${proName(full.professional_id)} está CONFIRMADA para ${fDate(full.starts_at)} às ${fTime(full.starts_at)}.${full.modality === 'online' ? ` Entre por este link no horário: ${d.meeting_url} (teste câmera e microfone antes). O link também está na sua área do paciente.` : ''}`;
+  const txt = `Olá, ${p.name.split(' ')[0]}! Sua consulta ${full.modality === 'online' ? 'online ' : ''}com ${proName(full.professional_id)} está CONFIRMADA para ${fDate(full.starts_at)} às ${fTime(full.starts_at)}.${full.modality === 'online' ? (d.meeting_url ? ` Entre por este link no horário: ${d.meeting_url} (teste câmera e microfone antes). O link também está na sua área do paciente.` : ' O link da chamada (Google Meet) aparece na sua área do paciente e enviamos por aqui assim que estiver pronto.') : ''}`;
+  if (full.modality === 'online' && !d.meeting_url) meetNotice(d.id);
   updateNotif(); await router();
   modal('Consulta aprovada', html`<p style="margin-top:0">${icon('check')} Aprovada. O paciente já vê ${full.modality === 'online' ? 'o link ' : 'a confirmação '}na área dele.</p>${p.phone ? html`<a class="btn primary" target="_blank" rel="noopener" href="${waLink(p.phone, txt)}" data-act="closeAfterOpen">${icon('wa')} Avisar no WhatsApp</a>` : html`<p class="small muted">Paciente sem celular cadastrado.</p>`}`);
 });

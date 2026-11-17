@@ -74,6 +74,10 @@ const initials = n => String(n || '?').trim().split(/\s+/).filter(w => /^\p{L}/u
 const onlyDigits = s => String(s || '').replace(/\D/g, '');
 const CONSULT_TYPES = ['Ginecologia', 'Pré-natal (obstetrícia)', 'Emagrecimento', 'Retorno', 'Outro'];
 const isGenericMeet = u => /^https?:\/\/meet\.google\.com\/?(new|landing)?\/?(\?.*)?$/i.test((u || '').trim());
+// situação do link do Meet criado automaticamente na conta Google da clínica
+const meetPill = a => a.modality !== 'online' ? '' : a.meet_status === 'gerando' ? html`<span class="pill warn" title="O script da conta Google da clínica cria a sala em até 5 minutos.">gerando link do Meet…</span>`
+  : a.meet_status === 'validado' && a.meeting_url ? html`<span class="pill ok" title="Sala criada e confirmada pelo Google.">Meet validado</span>`
+  : a.meet_status === 'erro' ? html`<span class="pill bad" title="${a.meet_error || ''}">Meet não criado</span>` : '';
 const MEET_GENERIC_MSG = 'O endereço meet.google.com/new cria uma sala nova a cada clique — você e o paciente cairiam em salas diferentes. Abra "Criar sala nova no Meet", copie o endereço da sala que abriu (ex.: https://meet.google.com/abc-defg-hij) e cole aqui.';
 const waLink = (phone, text) => { let p = onlyDigits(phone); if (p && p.length <= 11) p = '55' + p; return `https://wa.me/${p}?text=${encodeURIComponent(text || '')}`; };
 const fPhone = p => { const d = onlyDigits(p); if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`; if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`; return p || ''; };

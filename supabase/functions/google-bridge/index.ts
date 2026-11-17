@@ -9,6 +9,34 @@ const rest = async (q: string, init: RequestInit = {}) => { const r = await admi
 const patch = (q: string, body: unknown) => rest(q, { method: 'PATCH', body: JSON.stringify(body), headers: { Prefer: 'return=minimal' } });
 const b64 = (buf: ArrayBuffer) => { const u = new Uint8Array(buf); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
 const send = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: J });
+const APP = 'https://pepmh-web-production.up.railway.app';
+// sala real do Meet (ex.: https://meet.google.com/abc-defg-hij)
+const MEET_RE = /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/;
+const OLD_SCRIPT = 'O script do Google da clínica está desatualizado e não cria o Meet. Em Configurações → Google, copie o código novo, cole no Apps Script e rode "instalar".';
+
+// evento da consulta montado na hora do envio (sempre com os dados atuais)
+async function apptPayload(a: any, attempt: number) {
+  const [p] = a.patient_id ? await rest(`patients?select=name&id=eq.${a.patient_id}`) : [null];
+  const [c] = await rest(`clinics?select=name,address,city,state&id=eq.${a.clinic_id}`);
+  const online = a.modality === 'online';
+  const out: any = {
+    title: `${online ? 'Teleconsulta' : 'Consulta'} · ${p?.name || a.title || 'Paciente'}`,
+    start: a.starts_at, end: a.ends_at,
+    location: online ? (a.meeting_url || 'Google Meet') : [c?.name, c?.address, c?.city && `${c.city}/${c.state || ''}`].filter(Boolean).join(' – '),
+    description: `Agendado pelo PEPMH.${online && a.meeting_url ? '\nLink: ' + a.meeting_url : ''}\n${APP}/#/agenda`,
+  };
+  if (online && !a.meeting_url && a.meet_status === 'gerando') { out.meet = true; out.request_id = `${a.id}-${attempt}`; }
+  return out;
+}
+
+// resposta do Google sobre o Meet: só grava o link se a sala foi confirmada
+async function meetResult(id: string, clinicId: string, d: any) {
+  const [a] = await rest(`appointments?select=id,meeting_url,meet_status&id=eq.${id}&clinic_id=eq.${clinicId}`);
+  if (!a || a.meet_status !== 'gerando' || a.meeting_url) return;
+  const url = typeof d?.meet_url === 'string' ? d.meet_url.trim() : '';
+  if (d?.meet_status === 'success' && MEET_RE.test(url)) await patch(`appointments?id=eq.${id}&meet_status=eq.gerando`, { meeting_url: url, meet_status: 'validado', meet_error: null });
+  else await patch(`appointments?id=eq.${id}&meet_status=eq.gerando`, { meet_status: 'erro', meet_error: (d?.meet_error ? String(d.meet_error) : (d && 'meet_status' in d) ? 'O Google não confirmou a sala do Meet.' : OLD_SCRIPT).slice(0, 300) });
+}
 
 Deno.serve(async (req) => {
   try {
@@ -28,8 +56,13 @@ Deno.serve(async (req) => {
       const [job] = await rest(`google_jobs?select=*&id=eq.${r.id}&clinic_id=eq.${clinicId}`);
       if (!job) continue;
       await patch(`google_jobs?id=eq.${job.id}`, { status: r.ok ? 'ok' : (job.attempts >= 4 ? 'erro' : 'pendente'), result: r.data ?? null, error: r.ok ? null : String(r.error || '').slice(0, 300), done_at: now });
-      if (!r.ok) { if (job.ref_table === 'weight_checkins') await patch(`weight_checkins?id=eq.${job.ref_id}`, { notify_error: String(r.error || '').slice(0, 300) }); continue; }
+      if (!r.ok) {
+        if (job.ref_table === 'weight_checkins') await patch(`weight_checkins?id=eq.${job.ref_id}`, { notify_error: String(r.error || '').slice(0, 300) });
+        if (job.ref_table === 'appointments' && job.attempts >= 4) await patch(`appointments?id=eq.${job.ref_id}&clinic_id=eq.${clinicId}&meet_status=eq.gerando`, { meet_status: 'erro', meet_error: String(r.error || 'Falha no Google Agenda').slice(0, 300) });
+        continue;
+      }
       if (job.kind === 'upsertEvent' && r.data?.id && ['appointments', 'work_events'].includes(job.ref_table)) await patch(`${job.ref_table}?id=eq.${job.ref_id}&clinic_id=eq.${clinicId}`, { google_event_id: r.data.id });
+      if (job.kind === 'upsertEvent' && job.ref_table === 'appointments' && r.data?.id) await meetResult(job.ref_id, clinicId, r.data);
       if (job.kind === 'checkin') await patch(`weight_checkins?id=eq.${job.ref_id}`, { notified_at: now, drive_url: r.data?.drive_url || null, notify_error: null });
     }
 
@@ -51,9 +84,17 @@ Deno.serve(async (req) => {
     const jobs: any[] = await rest(`google_jobs?select=*&clinic_id=eq.${clinicId}&or=(status.eq.pendente,and(status.eq.enviado,sent_at.lt.${stale}))&attempts=lt.5&order=created_at&limit=15`);
     const out = [];
     for (const j of jobs) {
-      const p = { ...j.payload };
+      let p = { ...j.payload };
       // id atual do evento no Google (evita duplicar em reenvio)
-      if (j.kind === 'upsertEvent' && ['appointments', 'work_events'].includes(j.ref_table)) { const [row] = await rest(`${j.ref_table}?select=google_event_id&id=eq.${j.ref_id}`); if (!row) { await patch(`google_jobs?id=eq.${j.id}`, { status: 'ok', error: 'registro apagado', done_at: now }); continue; } p.id = row.google_event_id || null; }
+      if (j.kind === 'upsertEvent' && ['appointments', 'work_events'].includes(j.ref_table)) {
+        const [row] = await rest(`${j.ref_table}?select=*&id=eq.${j.ref_id}`);
+        if (!row) { await patch(`google_jobs?id=eq.${j.id}`, { status: 'ok', error: 'registro apagado', done_at: now }); continue; }
+        if (j.ref_table === 'appointments') {
+          if (['cancelado', 'faltou'].includes(row.status) || ['recusado', 'pendente'].includes(row.approval)) { await patch(`google_jobs?id=eq.${j.id}`, { status: 'ok', error: 'consulta inativa', done_at: now }); continue; }
+          p = await apptPayload(row, j.attempts);
+        }
+        p.id = row.google_event_id || null;
+      }
       if (j.kind === 'checkin' && p.photo_path) { const fr = await admin(`/storage/v1/object/progress-photos/${p.photo_path}`); if (fr.ok) { p.photo_b64 = b64(await fr.arrayBuffer()); p.photo_mime = fr.headers.get('content-type') || 'image/jpeg'; } delete p.photo_path; }
       await patch(`google_jobs?id=eq.${j.id}`, { status: 'enviado', sent_at: now, attempts: j.attempts + 1 });
       out.push({ id: j.id, kind: j.kind, payload: p });
