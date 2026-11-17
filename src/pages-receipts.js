@@ -12,7 +12,7 @@ const pixCard = () => html`<div class="card" style="border-left:4px solid var(--
 async function myReceiptsBlock() {
   const list = await db.list('payment_receipts', { eq: { patient_id: S.patient.id }, order: 'created_at.desc', limit: 20 }).catch(() => []);
   if (!list.length) return '';
-  return html`<h3 style="margin-top:16px">Comprovantes enviados</h3><div class="list">${list.map(r => html`<div class="li small"><span class="grow">${r.appointment_id ? html`<b>Consulta online · ${r.installment || 1}ª parte</b> · ` : ''}${r.amount ? BRL(r.amount) + ' · ' : ''}pago em ${fDate(r.paid_on)}${r.sent_by === 'clinica' ? ' · anexado pela clínica' : ''}${r.note ? html`<div class="tiny muted">${r.note}</div>` : ''}${r.response ? html`<div class="tiny" style="color:var(--brand)">Clínica: ${r.response}</div>` : ''}</span><span class="pill ${(RC_ST[r.status] || RC_ST.enviado)[0]}">${(RC_ST[r.status] || RC_ST.enviado)[1]}</span><button class="btn sm" data-act="rcView" data-id="${r.id}">${icon('file')} Ver</button></div>`)}</div>`;
+  return html`<h3 style="margin-top:16px">Comprovantes de pagamento enviados</h3><div class="list">${list.map(r => html`<div class="li small"><span class="grow">${r.appointment_id ? html`<b>Consulta online · ${r.installment || 1}ª parte</b> · ` : ''}${r.amount ? BRL(r.amount) + ' · ' : ''}pago em ${fDate(r.paid_on)}${r.sent_by === 'clinica' ? ' · anexado pela clínica' : ''}${r.note ? html`<div class="tiny muted">${r.note}</div>` : ''}${r.response ? html`<div class="tiny" style="color:var(--brand)">Clínica: ${r.response}</div>` : ''}</span><span class="pill ${(RC_ST[r.status] || RC_ST.enviado)[0]}">${(RC_ST[r.status] || RC_ST.enviado)[1]}</span><button class="btn sm" data-act="rcView" data-id="${r.id}">${icon('file')} Ver</button></div>`)}</div>`;
 }
 
 act('pReceipt', async el => {
@@ -56,11 +56,16 @@ async function staffReceiptsBlock() {
   return html`<div class="card" style="margin-bottom:14px"><h2>Comprovantes aguardando conferência (${list.length})</h2><div class="list" style="margin-top:10px">${list.map(r => html`<div class="li"><span class="grow"><span class="t">${pm[r.patient_id]?.name || ''}</span><span class="tiny muted">${r.sent_by === 'clinica' ? 'anexado pela clínica · ' : ''}${r.appointment_id ? `Consulta online ${am[r.appointment_id] ? 'de ' + fDT(am[r.appointment_id].starts_at) + ' ' : ''}· ${r.installment || 1}ª parte · ` : ''}${r.amount ? BRL(r.amount) + ' · ' : ''}pago em ${fDate(r.paid_on)}${r.note ? ' · ' + r.note : ''}${r.finance_entry_id ? ' · ligado a um lançamento' : ''}</span></span>
     <button class="btn sm" data-act="rcView" data-id="${r.id}">${icon('file')} Ver</button><button class="btn sm ok" data-act="rcOk" data-id="${r.id}">${icon('check')} Confirmar</button><button class="btn sm" data-act="rcNo" data-id="${r.id}">Recusar</button></div>`)}</div></div>`;
 }
-act('rcView', async el => {
-  const r = await db.get('payment_receipts', el.dataset.id); if (!r) return toast('Comprovante não encontrado.', 'bad');
-  const name = `comprovante-${fDate(r.paid_on).replace(/\//g, '-')}`;
-  if (r.file_data) return fileViewer('Comprovante de pagamento', r.file_data, { type: r.file_type, name });
-  await fileViewer('Comprovante de pagamento', await Remote.download('payment-receipts', r.file_path), { type: r.file_type, name });
+const rcFile = async id => {
+  const r = await db.get('payment_receipts', id); if (!r) throw new Error('Comprovante não encontrado.');
+  return { r, name: `comprovante-de-pagamento-${fDate(r.paid_on).replace(/\//g, '-')}`, src: r.file_data || await Remote.download('payment-receipts', r.file_path) };
+};
+act('rcView', async el => { const { r, name, src } = await rcFile(el.dataset.id); await fileViewer('Comprovante de pagamento', src, { type: r.file_type, name }); });
+act('rcDown', async el => {
+  const { r, name, src } = await rcFile(el.dataset.id);
+  const blob = typeof src === 'string' ? await (await fetch(src)).blob() : src, type = r.file_type || blob.type || '';
+  const ext = /^image\//.test(type) ? (type.split('/')[1] || 'jpg').replace('jpeg', 'jpg') : 'pdf';
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${name}.${ext}`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 });
 async function confirmReceipt(r) {
   const by = isDemo() ? null : Auth.userId(), now = new Date().toISOString();
@@ -128,6 +133,16 @@ act('rcDel', async el => {
   if (r && !isDemo()) await Remote.storageFetch(`object/payment-receipts/${r.file_path}`, { method: 'DELETE' }).catch(() => null);
   await db.remove('payment_receipts', el.dataset.id); toast('Comprovante excluído.', 'ok'); router();
 });
+
+/* comprovantes de pagamento na aba Prescrições e documentos: o médico confere, visualiza e baixa */
+function docReceiptsSection(list) {
+  if (!list.length) return '';
+  const pend = list.filter(r => r.status === 'enviado').length;
+  return html`<div class="card" style="margin-bottom:14px${pend ? ';border-color:var(--warn)' : ''}"><div class="row between wrap"><h3 style="margin:0">${icon('receipt')} Comprovantes de pagamento (${list.length})</h3>${pend ? html`<span class="pill warn">${pend} aguardando conferência</span>` : ''}</div>
+    <div class="list" style="margin-top:10px">${list.map(r => html`<div class="li small wrap">${icon('receipt')}<span class="grow"><b>Comprovante de pagamento</b>${r.appointment_id ? ` · consulta online, ${r.installment || 1}ª parte` : ''}${r.amount ? ' · ' + BRL(r.amount) : ''} · pago em ${fDate(r.paid_on)}<div class="tiny muted">${r.sent_by === 'clinica' ? 'anexado pela clínica' : 'enviado pelo paciente'} em ${fDT(r.created_at)}${r.note ? ' · ' + r.note : ''}</div></span>
+      <span class="pill ${(RC_ST[r.status] || RC_ST.enviado)[0]}">${(RC_ST[r.status] || RC_ST.enviado)[1]}</span><button class="btn sm" data-act="rcView" data-id="${r.id}">${icon('file')} Visualizar</button><button class="btn sm" data-act="rcDown" data-id="${r.id}">${icon('down')} Baixar</button>
+      ${r.status === 'enviado' ? html`<button class="btn sm ok" data-act="rcOk" data-id="${r.id}">${icon('check')} Confirmar</button><button class="btn sm" data-act="rcNo" data-id="${r.id}">Recusar</button>` : ''}</div>`)}</div></div>`;
+}
 
 /* lista de comprovantes de um paciente (aba Financeiro do prontuário) */
 async function patientReceiptsCard(p) {

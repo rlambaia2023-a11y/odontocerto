@@ -105,7 +105,7 @@ const SIGN_GUIDE = html`<div class="stack small">
     <li>No prontuário do paciente, aba <b>Documentos</b>, abra o documento e toque em <b>Assinar com certificado</b>.</li>
     <li>Toque em <b>1. Abrir no VIDaaS</b>, escolha o VIDaaS e aprove com o PIN ou a biometria.</li>
     <li>Volte ao PEPMH, toque em <b>3. PDF assinado</b>, escolha o arquivo que o VIDaaS gerou e toque em <b>Enviar PDF assinado</b>.</li>
-    <li>O documento passa para <i>na área do paciente</i>. O paciente entra na área dele, vai em <b>Receitas e documentos</b> e baixa o PDF assinado.</li></ol></div>
+    <li>O documento passa para <i>na área do paciente</i>. O paciente entra na área dele, vai em <b>Prescrições e documentos</b> e baixa o PDF assinado.</li></ol></div>
   <div><b>Está no computador?</b> Na tela de assinatura tem um link para mandar o documento ao seu WhatsApp. Abra no celular, já logada, e siga do passo 3.</div>
   <div><b>Só vai para o paciente o que está assinado.</b> Documento sem assinatura digital fica apenas no prontuário (pode imprimir e assinar à mão). Assinou errado? Use <b>Excluir</b>: o documento é anulado, sai da área do paciente e a verificação pública passa a mostrar "anulado".</div>
   <div class="tiny muted">Receita de controle especial ou de antimicrobiano em formato digital precisa da numeração do SNCR da Anvisa, que o PEPMH ainda não emite. Para essas, use a Prescrição Eletrônica do CFM ou imprima e assine à mão.</div></div>`;
@@ -384,6 +384,12 @@ act('hideDoc', async el => {
   if (!(await confirmBox('Tirar este documento da área do paciente? Ele continua no prontuário e você pode liberar de novo quando quiser.', 'Ocultar'))) return;
   await db.update('documents', el.dataset.id, { released_at: null, released_by: null });
   toast('Documento oculto da área do paciente.'); router();
+});
+act('viewSigned', async el => {
+  const d = await db.get('documents', el.dataset.id);
+  if (isDemo()) return toast('Na demonstração não há arquivo real para visualizar.', 'bad');
+  const nome = `${(DOCT[d.doc_type]?.[0] || 'documento').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\W+/g, '-').toLowerCase()}-${d.verify_code || d.id.slice(0, 8)}-assinado`;
+  await fileViewer(DOCT[d.doc_type]?.[0] || 'Documento assinado', await Remote.download('signed-docs', d.signed_file_path), { type: 'application/pdf', name: nome });
 });
 act('downloadSigned', async el => {
   const d = await db.get('documents', el.dataset.id);
