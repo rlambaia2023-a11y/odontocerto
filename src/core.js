@@ -34,7 +34,7 @@ function htmlToText(h) {
 
 /* ---------- ícones ---------- */
 const IC = {
-  home: 'M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z', cal: 'M4 5h16v16H4zM4 9h16M8 3v4M16 3v4', calme: 'M4 5h16v16H4zM4 9h16M8 3v4M16 3v4M9 15l2 2 4-4',
+  home: 'M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z', lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4M12 15v2', cal: 'M4 5h16v16H4zM4 9h16M8 3v4M16 3v4', calme: 'M4 5h16v16H4zM4 9h16M8 3v4M16 3v4M9 15l2 2 4-4',
   user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0', users: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 7.5M22 21a7 7 0 0 0-4-6.3',
   money: 'M3 6h18v12H3zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 9v.01M18 15v.01', tag: 'M3 12V3h9l9 9-9 9zM7.5 7.5h.01',
   pill: 'M10.5 20.5a5 5 0 0 1-7-7l10-10a5 5 0 0 1 7 7zM8.5 8.5l7 7', building: 'M5 21V3h14v18M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M3 21h18',

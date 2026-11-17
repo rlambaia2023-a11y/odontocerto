@@ -1,6 +1,6 @@
 /* ===== Locais de atendimento, compromissos externos, conflitos e Google da clínica ===== */
 const PLACE_KIND = { hospital: 'Hospital', maternidade: 'Maternidade', clinica: 'Clínica', consultorio: 'Consultório', outro: 'Outro' };
-const EV_KIND = { atendimento: 'Atendimento', plantao: 'Plantão', cirurgia: 'Cirurgia', parto: 'Parto', reuniao: 'Reunião', pessoal: 'Pessoal', outro: 'Outro', google: 'Google Agenda' };
+const EV_KIND = { atendimento: 'Atendimento', plantao: 'Plantão', cirurgia: 'Cirurgia', parto: 'Parto', reuniao: 'Reunião', pessoal: 'Pessoal', outro: 'Outro', google: 'Google Agenda', bloqueio: 'Agenda bloqueada' };
 const PLACE_COLORS = ['#7c3aed', '#0891b2', '#c2410c', '#be185d', '#15803d', '#4b5563'];
 
 /* ---------- chamada ao servidor que fala com o Google da clínica ---------- */
@@ -32,8 +32,8 @@ async function loadEvents(from, to, pro) {
 }
 const evWhere = e => e.place ? e.place.name : (e.location || (e.source === 'google' ? 'Google Agenda' : ''));
 function evCard(e) {
-  const c = e.place?.color || (e.source === 'google' ? '#64748b' : '#7c3aed');
-  return html`<div class="appt evx" style="border-left-color:${c};background:${c}14" data-act="editEvent" data-id="${e.id}"><div class="grow" style="min-width:0"><div class="t">${icon(e.source === 'google' ? 'globe' : 'building', 'small')}${fTime(e.starts_at)}–${fTime(e.ends_at)} ${e.title}</div><div class="tiny muted">${EV_KIND[e.kind] || ''}${evWhere(e) ? ' · ' + evWhere(e) : ''}${S.members.length > 1 ? ' · ' + proName(e.professional_id) : ''}</div></div></div>`;
+  const c = e.kind === 'bloqueio' ? '#c42b2b' : e.place?.color || (e.source === 'google' ? '#64748b' : '#7c3aed');
+  return html`<div class="appt evx" style="border-left-color:${c};background:${c}14" data-act="editEvent" data-id="${e.id}"><div class="grow" style="min-width:0"><div class="t">${icon(e.kind === 'bloqueio' ? 'lock' : e.source === 'google' ? 'globe' : 'building', 'small')}${fTime(e.starts_at)}–${fTime(e.ends_at)} ${e.title}</div><div class="tiny muted">${EV_KIND[e.kind] || ''}${evWhere(e) ? ' · ' + evWhere(e) : ''}${S.members.length > 1 ? ' · ' + proName(e.professional_id) : ''}</div></div></div>`;
 }
 
 /* ---------- conflitos de horário e de local ---------- */
@@ -51,7 +51,7 @@ async function findConflicts({ pro, start, end, placeId = null, online = false, 
   const me = { loc: online ? null : (placeId || 'clinica'), travel: placeId ? (P[placeId]?.travel_min ?? 30) : 30 };
   const items = [
     ...aps.filter(a => a.id !== ignoreAppt && !['cancelado', 'faltou'].includes(a.status) && a.approval !== 'recusado').map(a => ({ type: 'Consulta', label: pm[a.patient_id]?.name || a.title || 'Paciente', s: new Date(a.starts_at), e: new Date(a.ends_at), loc: a.modality === 'online' ? null : 'clinica', where: a.modality === 'online' ? 'online' : S.clinic.name, travel: 30 })),
-    ...evs.filter(e => e.id !== ignoreEvent).map(e => ({ type: EV_KIND[e.kind] || 'Compromisso', label: e.title, s: new Date(e.starts_at), e: new Date(e.ends_at), loc: e.place_id || (e.location ? 'txt:' + e.location.trim().toLowerCase() : null), where: P[e.place_id]?.name || e.location || (e.source === 'google' ? 'Google Agenda' : ''), travel: P[e.place_id]?.travel_min ?? 30 })),
+    ...evs.filter(e => e.id !== ignoreEvent).map(e => ({ type: EV_KIND[e.kind] || 'Compromisso', label: e.title, s: new Date(e.starts_at), e: new Date(e.ends_at), loc: e.kind === 'bloqueio' ? null : e.place_id || (e.location ? 'txt:' + e.location.trim().toLowerCase() : null), where: P[e.place_id]?.name || e.location || (e.source === 'google' ? 'Google Agenda' : ''), travel: P[e.place_id]?.travel_min ?? 30 })),
   ];
   const out = [];
   for (const it of items) {
@@ -113,7 +113,7 @@ async function eventForm(e) {
   return html`<form data-form="saveEvent" class="stack"><input type="hidden" name="id" value="${e.id || ''}">
     ${g ? html`<div class="tip" style="margin:0">${icon('globe')}<span>Este evento veio do Google Agenda da clínica. Para mudar, altere lá; aqui ele serve para o sistema saber que você está ocupada.</span></div>` : ''}
     <div class="grid g2"><label class="f"><span>Título <i>*</i></span><input class="in" name="title" required value="${e.title || ''}" placeholder="Ex.: Plantão obstetrícia" ${g ? 'disabled' : ''}></label>
-      <label class="f"><span>Tipo</span><select class="in" name="kind" ${g ? 'disabled' : ''}>${Object.entries(EV_KIND).filter(([k]) => k !== 'google' || g).map(([k, v]) => html`<option value="${k}" ${e.kind === k ? 'selected' : ''}>${v}</option>`)}</select></label></div>
+      <label class="f"><span>Tipo</span><select class="in" name="kind" ${g ? 'disabled' : ''}>${Object.entries(EV_KIND).filter(([k]) => (k !== 'google' || g) && (k !== 'bloqueio' || e.kind === 'bloqueio')).map(([k, v]) => html`<option value="${k}" ${e.kind === k ? 'selected' : ''}>${v}</option>`)}</select></label></div>
     <label class="f"><span>Local</span><select class="in" name="place_id" ${g ? 'disabled' : ''}><option value="">Outro endereço / sem local</option>${places.map(p => html`<option value="${p.id}" ${e.place_id === p.id ? 'selected' : ''}>${p.name}${p.city ? ' – ' + p.city : ''}</option>`)}</select></label>
     <label class="f"><span>Endereço (se não for um local cadastrado)</span><input class="in" name="location" value="${e.location || ''}" ${g ? 'disabled' : ''}></label>
     <div class="grid g3"><label class="f"><span>Data <i>*</i></span><input class="in" type="date" name="date" required value="${s ? ymd(s) : e._date || ymd(new Date())}" ${g ? 'disabled' : ''}></label>
