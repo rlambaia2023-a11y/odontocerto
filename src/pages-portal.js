@@ -313,6 +313,7 @@ function payBox(a, recs) {
   if (!a.fee) return '';
   if (a.auto_cancelled_at) return html`<p class="small" style="margin:10px 0 0;color:var(--bad)">${icon('x')} Cancelada automaticamente: os comprovantes de pagamento não foram anexados até 20 minutos antes.</p>`;
   if (['cancelado', 'faltou', 'atendido'].includes(a.status)) return '';
+  if (a.paid_full_at) return html`<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--ok-50)"><div class="row between small"><b>Pagamento da consulta online · ${BRL(a.fee)}</b><span class="pill ok">pago integralmente</span></div><p class="tiny" style="margin:6px 0 0">A clínica confirmou o pagamento do valor completo. Sua consulta está confirmada.</p></div>`;
   const mine = recs.filter(r => r.appointment_id === a.id && r.status !== 'recusado'), tot = sum(mine, r => +r.amount || 0), half = a.fee / 2, h = payDeadlines(a.starts_at), now = Date.now();
   const st = (ok, list, dl) => ok ? (list.length && list.every(r => r.status === 'confirmado') ? html`<span class="pill ok">confirmado</span>` : html`<span class="pill ok">comprovante enviado</span>`) : +dl < now ? html`<span class="pill bad">atrasado</span>` : html`<span class="pill warn">pendente</span>`;
   const ok1 = tot >= half - 0.005, ok2 = tot >= a.fee - 0.005, need = !ok1 ? 1 : !ok2 ? 2 : 0;

@@ -1,7 +1,16 @@
 /* ===== Início, Agenda, Pacientes ===== */
 const STATUS = { agendado: ['Agendado', 'gray'], confirmado: ['Confirmado', 'ok'], em_atendimento: ['Em andamento', 'warn'], atendido: ['Consulta finalizada', ''], faltou: ['Faltou', 'bad'], cancelado: ['Cancelado', 'bad'] };
-/* consulta com valor (online): antes de começar só fica "Confirmado" depois que a clínica confirma o comprovante dos 50% */
+/* consulta com valor (online): antes de começar só fica "Confirmado" depois que a clínica confirma o comprovante dos 50% (ou o master/médico confirma o pagamento integral) */
 const AG_PAG = ['Aguardando confirmação de pagamento', 'warn'];
+/* master (owner) ou médico confirma a consulta sem os 50%: entende-se que o paciente pagou o valor completo */
+const canPayFull = () => isClinical() || isDemo();
+async function markPaidFull(a) {
+  const recs = await db.list('payment_receipts', { eq: { appointment_id: a.id, status: 'confirmado' } }).catch(() => []);
+  const rest = Math.round((+a.fee - sum(recs, r => +r.amount || 0)) * 100) / 100;
+  await db.update('appointments', a.id, { paid_full_at: new Date().toISOString(), paid_full_by: isDemo() ? null : Auth.userId(), status: 'confirmado' });
+  if (rest > 0) await db.insert('finance_entries', { kind: 'receita', description: `Consulta online – pagamento integral confirmado (${fDate(a.starts_at)} ${fTime(a.starts_at)})`, amount: rest, due_date: ymd(new Date()), paid_at: ymd(new Date()), category: 'Procedimentos', patient_id: a.patient_id });
+}
+const paidHalfLocal = async a => sum(await db.list('payment_receipts', { eq: { appointment_id: a.id, status: 'confirmado' } }).catch(() => []), r => +r.amount || 0) >= +a.fee / 2 - 0.005;
 const apptLabel = a => a && +a.fee > 0 && a.status === 'agendado' ? AG_PAG : STATUS[a?.status] || [a?.status || '', ''];
 const START_EARLY_MIN = 30; /* "Em andamento" só quando o atendimento começa: no máximo 30 min antes do horário */
 const KINDS = { consulta: 'Consulta', teleconsulta: 'Teleconsulta (online)', avaliacao: 'Avaliação', retorno: 'Retorno', procedimento: 'Procedimento', urgencia: 'Urgência', manutencao: 'Manutenção' };
@@ -141,7 +150,7 @@ function apptForm(a = {}, p = null) {
     <label class="f"><span>Início</span><input class="in" type="time" name="time" required step="300" value="${s ? fTime(s) : a._time || '08:00'}"></label>
     <label class="f"><span>Duração</span><select class="in" name="dur">${[15, 20, 30, 40, 45, 60, 90, 120, 180].map(m => html`<option value="${m}" ${m === dur ? 'selected' : ''}>${m} min</option>`)}</select></label></div>
     <div class="grid g3"><label class="f"><span>Tipo</span><select class="in" name="kind">${Object.entries(KINDS).map(([k, v]) => html`<option value="${k}" ${a.kind === k ? 'selected' : ''}>${v}</option>`)}</select></label>
-    <label class="f"><span>Status</span><select class="in" name="status">${Object.entries(STATUS).map(([k, v]) => html`<option value="${k}" ${(a.status || 'agendado') === k ? 'selected' : ''}>${+a.fee > 0 && k === 'agendado' ? AG_PAG[0] : v[0]}</option>`)}</select>${+a.fee > 0 && ['agendado', 'confirmado'].includes(a.status || 'agendado') ? html`<span class="tiny muted">Fica "Confirmado" sozinho quando o comprovante dos 50% é confirmado no Financeiro.</span>` : ''}</label>
+    <label class="f"><span>Status</span><select class="in" name="status">${Object.entries(STATUS).map(([k, v]) => html`<option value="${k}" ${(a.status || 'agendado') === k ? 'selected' : ''}>${+a.fee > 0 && k === 'agendado' ? AG_PAG[0] : v[0]}</option>`)}</select>${+a.fee > 0 && ['agendado', 'confirmado'].includes(a.status || 'agendado') ? (a.paid_full_at ? html`<span class="tiny" style="color:var(--ok)">Pagamento integral (${BRL(a.fee)}) confirmado em ${fDT(a.paid_full_at)}${a.paid_full_by ? ' por ' + (proName(a.paid_full_by) || 'master') : ''}.${canPayFull() ? html` <a href="javascript:void 0" data-act="undoPaidFull" data-id="${a.id}">Desfazer</a>` : ''}</span>` : html`<span class="tiny muted">Fica "Confirmado" sozinho quando o comprovante dos 50% é confirmado no Financeiro.${canPayFull() ? ' Se o paciente pagou a consulta inteira, escolha "Confirmado" ou use o botão abaixo: vale como pagamento do valor completo.' : ''}</span>${a.id && canPayFull() ? html`<button type="button" class="btn sm ok" style="margin-top:4px" data-act="paidFull" data-id="${a.id}">${icon('check')} Paciente pagou o valor completo</button>` : ''}`) : ''}</label>
     <label class="f"><span>Profissional</span><select class="in" name="professional_id" data-change="apptPro">${pros().map(m => html`<option value="${m.user_id}" ${(a.professional_id || Auth.userId()) === m.user_id ? 'selected' : ''}>${m.full_name}</option>`)}</select></label></div>
     <div class="grid g2"><label class="f"><span>Modalidade</span><select class="in" name="modality" data-change="apptMod"><option value="presencial">Presencial</option><option value="online" ${a.modality === 'online' ? 'selected' : ''}>Online (Google Meet)</option></select></label>
     <label class="f ${a.modality === 'online' ? '' : 'hidden'}" id="meetbox"><span>Link da chamada</span><input class="in" name="meeting_url" type="url" placeholder="Em branco: o PEPMH cria a sala no Meet" value="${[a.meeting_url, (pros().find(m => m.user_id === (a.professional_id || Auth.userId())) || {}).meet_url].find(u => u && !isGenericMeet(u)) || ''}"><span class="tiny muted">Deixe em branco e o PEPMH cria a sala no Google Meet da conta da clínica (até 5 min), validada pelo Google. Se preferir, cole o endereço de uma sala.</span>${meetPill(a)}${meetMailPill(a)}${a.meet_status === 'erro' && a.meet_error ? html`<span class="tiny" style="color:var(--bad)">${a.meet_error}</span>` : ''}</label></div>
@@ -156,6 +165,15 @@ function apptForm(a = {}, p = null) {
     ${a.id && a.status === 'em_atendimento' ? html`<button type="button" class="btn" data-act="finishAppt" data-id="${a.id}">${icon('check')} Finalizar consulta</button>` : ''}</div>
     <button class="btn primary" type="submit">Salvar</button></div></form>`;
 }
+act('paidFull', async el => {
+  const a = await db.get('appointments', el.dataset.id); if (!a) return;
+  if (!await confirmBox(`Confirmar que o paciente pagou o valor completo da consulta (${BRL(a.fee)})? A consulta fica "Confirmado" e o valor que falta é lançado como recebido no Financeiro.`, 'Confirmar pagamento')) return;
+  await markPaidFull(a); closeModal(); toast('Pagamento integral confirmado. Consulta confirmada.', 'ok'); router();
+});
+act('undoPaidFull', async el => {
+  if (!await confirmBox('Desfazer a confirmação do pagamento integral? A consulta volta a depender dos comprovantes (o lançamento no Financeiro continua lá; exclua por lá se precisar).', 'Desfazer')) return;
+  await db.update('appointments', el.dataset.id, { paid_full_at: null, paid_full_by: null, status: 'agendado' }); closeModal(); toast('Confirmação desfeita.', 'ok'); router();
+});
 act('teleSendId', async el => { const a = await db.get('appointments', el.dataset.id); teleSendModal(a, await db.get('patients', a.patient_id)); });
 act('newAppt', el => modal('Novo agendamento', apptForm({ _date: el.dataset.date, _time: el.dataset.time || '08:00' }, null)));
 act('editAppt', async el => { const a = await db.get('appointments', el.dataset.id); const p = a.patient_id ? await db.get('patients', a.patient_id) : null; modal('Agendamento', apptForm(a, p)); });
@@ -169,7 +187,10 @@ onForm('saveAppt', async d => {
   if (d.modality === 'online' && d.meeting_url && !/^https:\/\//.test(d.meeting_url)) throw new Error('O link da chamada precisa começar com https://');
   if (d.modality === 'online' && isGenericMeet(d.meeting_url)) throw new Error(MEET_GENERIC_MSG);
   const row = { patient_id: pid, starts_at: s.toISOString(), ends_at: e.toISOString(), kind: d.modality === 'online' && d.kind === 'consulta' ? 'teleconsulta' : d.kind, status: d.status, professional_id: d.professional_id, notes: nz(d.notes), modality: d.modality, meeting_url: d.modality === 'online' ? nz(d.meeting_url) : null };
+  const prev = d.id ? await db.get('appointments', d.id) : null;
+  const payFull = prev && +prev.fee > 0 && canPayFull() && d.status === 'confirmado' && prev.status !== 'confirmado' && !prev.paid_full_at && !(await paidHalfLocal(prev));
   const saved = d.id ? (await db.update('appointments', d.id, row) || { id: d.id }) : await db.insert('appointments', row); if (saved?.id) gpush('pushAppt', { id: saved.id });
+  if (payFull) await markPaidFull(prev);
   if (d.request_id) { await db.update('appointment_requests', d.request_id, { status: 'agendado', response: `Agendado para ${fDT(s)}` }); updateNotif(); }
   closeModal(); toast('Agendamento salvo.', 'ok'); router();
   if (row.modality === 'online' && row.meeting_url && pid && !['cancelado', 'faltou', 'atendido'].includes(row.status)) teleSendModal({ ...row, id: saved?.id }, await db.get('patients', pid));
